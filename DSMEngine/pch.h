@@ -2,6 +2,13 @@
 #ifndef __PCH__H__
 #define __PCH__H__
 
+
+#define NOMINMAX
+
+#if defined(DEBUG) || defined(_DEBUG)
+#include <dxgidebug.h>
+#endif
+
 #include <Windows.h>
 #include <wrl/client.h>
 #include <wrl/event.h>
@@ -36,5 +43,6 @@
 #include <string_view>
 
 #include "Utilities/Macros.h"
+
 
 #endif

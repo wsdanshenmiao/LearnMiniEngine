@@ -102,7 +102,9 @@ namespace DSM::Graphics{
         // 全局根签名的引用指针
         ID3D12RootSignature* m_RootSignature = nullptr;
 
-        inline static std::map<std::uint32_t, Microsoft::WRL::ComPtr<ID3D12RootSignature>> sm_RootSignatureMap;
+        
+        inline static std::map<std::uint32_t, Microsoft::WRL::ComPtr<ID3D12RootSignature>> sm_RootSignatureMap{};
+        inline static std::mutex sm_RootSignatureMapMutex{};
     };
     
 }

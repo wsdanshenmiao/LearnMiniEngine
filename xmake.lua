@@ -30,9 +30,9 @@ after_build(function (target)
     end)
 
 if is_mode("debug") then 
-    binDir = path.join(os.projectdir(), "build/bin/Debug/")
+    binDir = path.join(os.projectdir(), "bin/Debug/")
 else 
-    binDir = path.join(os.projectdir(), "build/bin/Release/")
+    binDir = path.join(os.projectdir(), "bin/Release/")
 end 
 
 -- 添加需要的依赖包,同时禁用系统包

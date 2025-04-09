@@ -1,6 +1,7 @@
 #include "GameCore.h"
 #include "../Utilities/Macros.h"
 #include "../Graphics/Display.h"
+#include "../Graphics/RenderContext.h"
 
 namespace DSM::GameCore{
     using namespace Graphics;
@@ -14,7 +15,8 @@ namespace DSM::GameCore{
     // 初始化引擎
     void InitializeApplication(IGameApp& app)
     {
-
+        g_RenderContext.Create(app.RequiresRaytracingSupport());
+        
         app.Startup();
     }
 

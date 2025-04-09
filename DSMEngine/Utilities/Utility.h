@@ -2,10 +2,13 @@
 #ifndef __UTILITY_H__
 #define __UTILITY_H__
 
+#define NOMINMAX
+
 #include <string>
 #include <string_view>
 #include <format>
 #include <Windows.h>
+
 
 namespace DSM::Utility {
     template<typename... Args>

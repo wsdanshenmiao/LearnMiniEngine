@@ -1,6 +1,8 @@
 #include "RootSignature.h"
 #include "../Utilities/Hash.h"
+#include "RenderContext.h"
 
+using Microsoft::WRL::ComPtr;
 
 namespace DSM::Graphics{
     
@@ -148,13 +150,44 @@ namespace DSM::Graphics{
         bool firstCompile = false;
         ID3D12RootSignature** ppRootSignature = nullptr;
         {
+            // 加锁互斥锁
+            std::lock_guard<std::mutex>{sm_RootSignatureMapMutex};
             
+            if (auto it = sm_RootSignatureMap.find(hash); it != sm_RootSignatureMap.end()) {
+                ppRootSignature = it->second.GetAddressOf();
+            }
+            else {
+                ppRootSignature = sm_RootSignatureMap[hash].GetAddressOf();
+                firstCompile = true;
+            }
         }
-        
+
+        // 第一个到达的线程才进行根签名的创建
         if (firstCompile) {
+            ComPtr<ID3DBlob> serializedRootSig, errorBlob;
             
+            ASSERT_SUCCEEDED(D3D12SerializeRootSignature(
+                &rootSigDesc,
+                D3D_ROOT_SIGNATURE_VERSION_1,
+                serializedRootSig.GetAddressOf(),
+                errorBlob.GetAddressOf()));
+
+            ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreateRootSignature(0,
+                serializedRootSig->GetBufferPointer(),
+                serializedRootSig->GetBufferSize(),
+                IID_PPV_ARGS(&m_RootSignature)));
+
+            m_RootSignature->SetName(name.c_str());
+
+            // 将 Hash 表中的根签名与之关联
+            sm_RootSignatureMap[hash].Attach(m_RootSignature);
+            ASSERT(m_RootSignature == *ppRootSignature);
         }
         else {
+            while (*ppRootSignature == nullptr) {
+                std::this_thread::yield();
+            }
+            m_RootSignature = *ppRootSignature;
         }
 
         m_Finalized = true;
