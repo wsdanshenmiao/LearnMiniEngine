@@ -4,7 +4,8 @@
 
 using Microsoft::WRL::ComPtr;
 
-namespace DSM::Graphics{
+namespace DSM{
+    static std::map<std::size_t, Microsoft::WRL::ComPtr<ID3D12RootSignature>> s_RootSignatureMap{};
     
     void RootParameter::Clear() noexcept
     {
@@ -14,14 +15,14 @@ namespace DSM::Graphics{
         m_RootParameter.ParameterType = (D3D12_ROOT_PARAMETER_TYPE)0xffffffff;
     }
 
-    void RootParameter::InitAsConstants(UINT shaderRegister, UINT numDwords, D3D12_SHADER_VISIBILITY visibility, UINT space) noexcept
+    void RootParameter::InitAsConstants(std::uint32_t shaderRegister, std::uint32_t numDwords, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept
     {
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         m_RootParameter.Constants.Num32BitValues = numDwords;
     }
 
-    void RootParameter::InitAsConstantBuffer(UINT shaderRegister, D3D12_SHADER_VISIBILITY visibility, UINT space) noexcept
+    void RootParameter::InitAsConstantBuffer(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept
     {
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -29,7 +30,7 @@ namespace DSM::Graphics{
         m_RootParameter.Descriptor.RegisterSpace = space;
     }
 
-    void RootParameter::InitAsBufferSRV(UINT shaderRegister, D3D12_SHADER_VISIBILITY visibility, UINT space) noexcept
+    void RootParameter::InitAsBufferSRV(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept
     {
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
@@ -37,7 +38,7 @@ namespace DSM::Graphics{
         m_RootParameter.Descriptor.RegisterSpace = space;
     }
 
-    void RootParameter::InitAsBufferUAV(UINT shaderRegister, D3D12_SHADER_VISIBILITY visibility, UINT space) noexcept
+    void RootParameter::InitAsBufferUAV(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept
     {
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
@@ -45,7 +46,7 @@ namespace DSM::Graphics{
         m_RootParameter.Descriptor.RegisterSpace = space;
     }
 
-    void RootParameter::InitAsDescriptorTable(UINT rangeCount, D3D12_SHADER_VISIBILITY visibility, UINT space) noexcept
+    void RootParameter::InitAsDescriptorTable(std::uint32_t rangeCount, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept
     {
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -53,7 +54,7 @@ namespace DSM::Graphics{
         m_RootParameter.DescriptorTable.NumDescriptorRanges = rangeCount;
     }
 
-    void RootParameter::SetTableRange(UINT rangeIndex, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT shaderRegister, UINT count, UINT space)
+    void RootParameter::SetTableRange(std::uint32_t rangeIndex, D3D12_DESCRIPTOR_RANGE_TYPE type, std::uint32_t shaderRegister, std::uint32_t count, std::uint32_t space)
     {
         ASSERT(m_RootParameter.DescriptorTable.pDescriptorRanges != nullptr, "Descriptor ranges is null");
         
@@ -68,7 +69,7 @@ namespace DSM::Graphics{
 
 
 
-    void RootSignature::InitStaticSampler(UINT shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility)
+    void RootSignature::InitStaticSampler(std::uint32_t shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility)
     {
         auto& sampler = m_StaticSamplers[m_NumInitializedStaticSamplers++];
         sampler.Filter = samplerDesc.Filter;
@@ -150,14 +151,15 @@ namespace DSM::Graphics{
         bool firstCompile = false;
         ID3D12RootSignature** ppRootSignature = nullptr;
         {
+            static std::mutex rootSignatureMutex{};
             // 加锁互斥锁
-            std::lock_guard<std::mutex>{sm_RootSignatureMapMutex};
+            std::lock_guard<std::mutex>{rootSignatureMutex};
             
-            if (auto it = sm_RootSignatureMap.find(hash); it != sm_RootSignatureMap.end()) {
+            if (auto it = s_RootSignatureMap.find(hash); it != s_RootSignatureMap.end()) {
                 ppRootSignature = it->second.GetAddressOf();
             }
             else {
-                ppRootSignature = sm_RootSignatureMap[hash].GetAddressOf();
+                ppRootSignature = s_RootSignatureMap[hash].GetAddressOf();
                 firstCompile = true;
             }
         }
@@ -180,7 +182,7 @@ namespace DSM::Graphics{
             m_RootSignature->SetName(name.c_str());
 
             // 将 Hash 表中的根签名与之关联
-            sm_RootSignatureMap[hash].Attach(m_RootSignature);
+            s_RootSignatureMap[hash].Attach(m_RootSignature);
             ASSERT(m_RootSignature == *ppRootSignature);
         }
         else {

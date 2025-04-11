@@ -34,6 +34,8 @@ namespace DSM::GameCore{
     void TerminateApplication(IGameApp& app)
     {
         app.Cleanup();
+
+        g_RenderContext.Shutdown();
     }
     
     HWND g_hWnd = nullptr;

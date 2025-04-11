@@ -27,6 +27,11 @@ namespace DSM {
         CommandQueue& GetComputeQueue() noexcept { return m_ComputeQueue; }
         CommandQueue& GetCopyQueue() noexcept { return m_CopyQueue; }
 
+
+    public:
+        inline static bool sm_bTypedUAVLoadSupport_R11G11B10_FLOAT = false;
+        inline static bool sm_bTypedUAVLoadSupport_R16G16B16A16_FLOAT = false;
+        
     private:
         Microsoft::WRL::ComPtr<ID3D12Device5> m_pDevice{};
         Microsoft::WRL::ComPtr<IDXGIFactory7> m_pFactory{};

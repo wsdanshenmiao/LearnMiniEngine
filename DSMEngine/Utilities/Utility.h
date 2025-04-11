@@ -21,7 +21,7 @@ namespace DSM::Utility {
     template<typename... Args>
     inline void Print(const std::wstring_view format, Args&&... args)
     {
-        auto formatArgs{std::make_format_args(args...)};
+        auto formatArgs{std::make_wformat_args(args...)};
         std::wstring outStr{std::vformat(format, formatArgs)};
         fputws(outStr.c_str(), stdout);
     }

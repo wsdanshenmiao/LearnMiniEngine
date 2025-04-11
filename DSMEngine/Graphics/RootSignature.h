@@ -4,7 +4,7 @@
 
 #include "../pch.h"
 
-namespace DSM::Graphics{
+namespace DSM{
 
     // 根参数
     class RootParameter
@@ -24,20 +24,20 @@ namespace DSM::Graphics{
 
         // 初始化为各种类型的根参数，包含根常量，根描述符，根描述符堆
         // 根常量
-        void InitAsConstants(UINT shaderRegister, UINT numDwords, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, UINT space = 0) noexcept;
+        void InitAsConstants(std::uint32_t shaderRegister, std::uint32_t numDwords, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
         // 根描述符
-        void InitAsConstantBuffer(UINT shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, UINT space = 0) noexcept;
-        void InitAsBufferSRV(UINT shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, UINT space = 0) noexcept;
-        void InitAsBufferUAV(UINT shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, UINT space = 0) noexcept;
+        void InitAsConstantBuffer(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
+        void InitAsBufferSRV(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
+        void InitAsBufferUAV(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
         // 描述符堆
-        void InitAsDescriptorTable(UINT rangeCount, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, UINT space = 0) noexcept;
-        void SetTableRange(UINT rangeIndex, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT shaderRegister, UINT count, UINT space = 0);
+        void InitAsDescriptorTable(std::uint32_t rangeCount, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
+        void SetTableRange(std::uint32_t rangeIndex, D3D12_DESCRIPTOR_RANGE_TYPE type, std::uint32_t shaderRegister, std::uint32_t count, std::uint32_t space = 0);
         void InitAsDescriptorRange(
             D3D12_DESCRIPTOR_RANGE_TYPE type,
-            UINT shaderRegister,
-            UINT count,
+            std::uint32_t shaderRegister,
+            std::uint32_t count,
             D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL,
-            UINT space = 0)
+            std::uint32_t space = 0)
         {
             InitAsDescriptorTable(count, visibility, space);
             SetTableRange(0, type, shaderRegister, count, space);
@@ -54,19 +54,19 @@ namespace DSM::Graphics{
     class RootSignature
     {
     public:
-        RootSignature(UINT numRootParams, UINT numStaticSamplers)
+        RootSignature(std::uint32_t numRootParams, std::uint32_t numStaticSamplers)
         {
             Reset(numRootParams, numStaticSamplers);
         }
 
-        void Reset(UINT numRootParams, UINT numStaticSamplers)
+        void Reset(std::uint32_t numRootParams, std::uint32_t numStaticSamplers)
         {
             m_RootParameters.clear();
             m_StaticSamplers.clear();
             m_NumInitializedStaticSamplers = 0;    
         }
         
-        void InitStaticSampler(UINT shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL);
+        void InitStaticSampler(std::uint32_t shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL);
         void Finalize(const std::wstring& name, D3D12_ROOT_SIGNATURE_FLAGS flags = D3D12_ROOT_SIGNATURE_FLAG_NONE);
         
         ID3D12RootSignature* GetRootSignature() const noexcept { return m_RootSignature; };
@@ -84,15 +84,12 @@ namespace DSM::Graphics{
         }
 
         // 销毁所有缓存的根签名
-        static void DestroyAll() noexcept
-        {
-            sm_RootSignatureMap.clear();
-        }
+        static void DestroyAll() noexcept;
 
     protected:
         bool m_Finalized = false;
 
-        UINT m_NumInitializedStaticSamplers = 0;
+        std::uint32_t m_NumInitializedStaticSamplers = 0;
 
         // 所有的根参数
         std::vector<RootParameter> m_RootParameters{};
@@ -103,8 +100,6 @@ namespace DSM::Graphics{
         ID3D12RootSignature* m_RootSignature = nullptr;
 
         
-        inline static std::map<std::uint32_t, Microsoft::WRL::ComPtr<ID3D12RootSignature>> sm_RootSignatureMap{};
-        inline static std::mutex sm_RootSignatureMapMutex{};
     };
     
 }
