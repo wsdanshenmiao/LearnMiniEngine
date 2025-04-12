@@ -5,8 +5,8 @@
 namespace DSM {
     CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE listType) noexcept
         :m_CommandListType(listType),
-        m_NextFenceValue((uint64_t)m_CommandListType << 56 | 1),
-        m_LastCompletedFenceValue((uint64_t)m_CommandListType << 56),
+        m_NextFenceValue((uint64_t)m_CommandListType << QUEUE_TYPE_MOVEBITS | 1),
+        m_LastCompletedFenceValue((uint64_t)m_CommandListType << QUEUE_TYPE_MOVEBITS),
         m_CommandAllocatorPool(listType){
     }
 
@@ -26,7 +26,7 @@ namespace DSM {
         ASSERT_SUCCEEDED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_pFence.GetAddressOf())));
         m_pFence->SetName(L"CommandQueue::m_pFence");
         // 区分不同队列的 Fence
-        m_pFence->Signal((std::uint64_t)m_CommandListType << 56);
+        m_pFence->Signal((std::uint64_t)m_CommandListType << QUEUE_TYPE_MOVEBITS);
 
         // 创建事件
         m_FenceEventHandle = CreateEvent(nullptr, false, false, nullptr);
@@ -67,7 +67,7 @@ namespace DSM {
     void CommandQueue::StallForFence(std::uint64_t fenceValue)
     {
         // 当前队列等待其他队列
-        auto& producer = g_RenderContext.GetCommandQueue((D3D12_COMMAND_LIST_TYPE)(fenceValue >> 56));
+        auto& producer = g_RenderContext.GetCommandQueue((D3D12_COMMAND_LIST_TYPE)(fenceValue >> QUEUE_TYPE_MOVEBITS));
         m_pCommandQueue->Wait(producer.m_pFence.Get(), fenceValue);
     }
 

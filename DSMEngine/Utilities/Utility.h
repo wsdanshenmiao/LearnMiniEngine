@@ -53,6 +53,12 @@ namespace DSM::Utility {
 #endif
 
 
+    template <typename T> 
+    inline T AlignUp( T value, size_t alignment )
+    {
+        return (T)(((size_t)value + (alignment - 1)) & ~(alignment - 1));
+    }
+    
     
 }
 

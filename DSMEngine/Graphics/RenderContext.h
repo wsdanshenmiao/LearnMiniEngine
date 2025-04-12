@@ -27,6 +27,11 @@ namespace DSM {
         CommandQueue& GetComputeQueue() noexcept { return m_ComputeQueue; }
         CommandQueue& GetCopyQueue() noexcept { return m_CopyQueue; }
 
+        bool IsFenceComplete(std::uint64_t fenceValue) noexcept
+        {
+            return GetCommandQueue(D3D12_COMMAND_LIST_TYPE(fenceValue >> QUEUE_TYPE_MOVEBITS)).IsFenceComplete(fenceValue);
+        }
+
 
     public:
         inline static bool sm_bTypedUAVLoadSupport_R11G11B10_FLOAT = false;
