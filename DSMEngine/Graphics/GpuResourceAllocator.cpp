@@ -26,7 +26,21 @@ namespace DSM {
 
     void GpuResourceAllocator::Cleanup(std::uint64_t fenceValue)
     {
-        
+        std::lock_guard<std::mutex> lock(m_Mutex);
+
+        auto discardFunc = [fenceValue](auto& fullResource, auto& retiredResource) {
+            for (const auto& resource : fullResource) {
+                retiredResource.push(std::make_pair(fenceValue, resource));
+            }
+        };
+        if (m_InitData.m_Strategy == AllocationStrategy::PlacedResource) {
+            m_HeapData.m_FullHeaps.push_back(m_HeapData.m_CurrHeap);
+            discardFunc(m_HeapData.m_FullHeaps, m_HeapData.m_RetiredHeaps);
+        }
+        else {
+            m_ResourceData.m_FullResources.push_back(m_ResourceData.m_CurrResource);
+            discardFunc(m_ResourceData.m_FullResources, m_ResourceData.m_RetiredResources);
+        }
     }
 
     GpuResourceLocatioin GpuResourceAllocator::AllocateFormHeap(std::uint64_t alignSize)

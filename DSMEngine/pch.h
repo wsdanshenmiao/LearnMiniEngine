@@ -41,6 +41,7 @@
 #include <numeric>
 #include <format>
 #include <string_view>
+#include <concepts>
 
 #include "Utilities/Macros.h"
 
