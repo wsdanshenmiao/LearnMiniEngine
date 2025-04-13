@@ -34,6 +34,7 @@
 # Xmake cache
 .xmake/
 build/
+bin/
 
 .git/
 .idea/
