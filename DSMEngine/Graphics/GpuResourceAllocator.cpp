@@ -2,42 +2,46 @@
 #include "RenderContext.h"
 
 namespace DSM {
-    GpuResourceLocatioin GpuResourceAllocator::Allocate(std::uint64_t size, std::uint32_t alignment)
+    GpuResourceLocatioin GpuResourceAllocator::Allocate(
+        std::uint64_t size,
+        std::uint32_t alignment,
+        D3D12_RESOURCE_FLAGS flags)
     {
         auto bufferSize = size;
-        // 对齐为2的指数倍 
         if (alignment != 0 ) {
-            ASSERT(alignment & (alignment - 1) == 0);
-
+            // 对齐为2的指数倍 
+            ASSERT(std::has_single_bit(alignment));
             bufferSize = Utility::AlignUp(size, alignment);
+            m_CurrOffset = Utility::AlignUp(m_CurrOffset, alignment);
         }
-        m_CurrOffset = Utility::AlignUp(bufferSize, alignment);
 
         if (m_InitData.m_Strategy == AllocationStrategy::PlacedResource) {
             return AllocateFormHeap(bufferSize);
         }
         else {
-            return AllocateFormResource(bufferSize);
+            return AllocateFormResource(bufferSize, flags);
         }
+
+        m_CurrOffset += bufferSize;
     }
 
     void GpuResourceAllocator::Cleanup(std::uint64_t fenceValue)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
 
-        auto discardFunc = [fenceValue](auto& fullResource, auto& retiredResource) {
-            for (const auto& resource : fullResource) {
-                retiredResource.push(std::make_pair(fenceValue, resource));
-            }
-            fullResource.clear();
-        };
         if (m_InitData.m_Strategy == AllocationStrategy::PlacedResource) {
             m_HeapData.m_FullHeaps.push_back(m_HeapData.m_CurrHeap);
-            discardFunc(m_HeapData.m_FullHeaps, m_HeapData.m_RetiredHeaps);
+            for (const auto& heap : m_HeapData.m_FullHeaps) {
+                m_HeapData.m_RetiredHeaps.push(std::make_pair(fenceValue, heap));
+            }
+            m_HeapData.m_FullHeaps.clear();
         }
         else {
             m_ResourceData.m_FullResources.push_back(m_ResourceData.m_CurrResource);
-            discardFunc(m_ResourceData.m_FullResources, m_ResourceData.m_RetiredResources);
+            for (const auto& resource : m_ResourceData.m_FullResources) {
+                m_ResourceData.m_RetiredResources.push(std::make_pair(fenceValue, resource));
+            }
+            m_ResourceData.m_FullResources.clear();
         }
     }
 
@@ -60,17 +64,15 @@ namespace DSM {
             while (!m_ResourceData.m_RetiredResources.empty()) {
                 m_ResourceData.m_RetiredResources.pop();
             }
-            while (!m_ResourceData.m_AvailableResources.empty()) {
-                m_ResourceData.m_AvailableResources.pop();
-            }
+            m_ResourceData.m_AvailableResources.clear();
             m_ResourceData.m_ResourcePool.clear();
         }
     }
 
-    GpuResourceLocatioin GpuResourceAllocator::AllocateFormHeap(std::uint64_t alignSize)
+    GpuResourceLocatioin GpuResourceAllocator::AllocateFormHeap(std::uint64_t bufferSize)
     {
         auto& currHeap = m_HeapData.m_CurrHeap;
-        if (m_CurrOffset + alignSize > m_SubResourceSize) {
+        if (m_CurrOffset + bufferSize > m_SubResourceSize) {
             ASSERT(currHeap != nullptr);
             m_HeapData.m_FullHeaps.push_back(currHeap);
             currHeap = nullptr;
@@ -85,14 +87,16 @@ namespace DSM {
         GpuResourceLocatioin ret{};
         ret.m_Heap = currHeap;
         ret.m_Offset = m_CurrOffset;
-        ret.m_Size = alignSize;
+        ret.m_Size = bufferSize;
         return ret;
     }
 
-    GpuResourceLocatioin GpuResourceAllocator::AllocateFormResource(std::uint64_t alignSize)
+    GpuResourceLocatioin GpuResourceAllocator::AllocateFormResource(
+        std::uint64_t bufferSize,
+        D3D12_RESOURCE_FLAGS flags)
     {
         auto& currResource = m_ResourceData.m_CurrResource;
-        if (m_CurrOffset + alignSize > m_SubResourceSize) {
+        if (m_CurrOffset + bufferSize > m_SubResourceSize) {
             ASSERT(currResource != nullptr);
             m_ResourceData.m_FullResources.push_back(currResource);
             currResource = nullptr;
@@ -100,7 +104,7 @@ namespace DSM {
 
         // 当第一次分配或当前堆满的时候请求新的资源
         if (currResource == nullptr) {
-            currResource = RequestResource();
+            currResource = RequestResource(flags);
             m_CurrOffset = 0;
         }
         
@@ -109,13 +113,11 @@ namespace DSM {
         ret.m_GpuAddress = currResource->GetGpuAddress();
         ret.m_MappedAddress = currResource->GetMappedAddress();
         ret.m_Offset = m_CurrOffset;
-        ret.m_Size = alignSize;
-
-        m_CurrOffset += alignSize;
+        ret.m_Size = bufferSize;
         return ret;
     }
 
-    GpuResource* GpuResourceAllocator::RequestResource()
+    GpuResource* GpuResourceAllocator::RequestResource(D3D12_RESOURCE_FLAGS flags)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
 
@@ -124,21 +126,22 @@ namespace DSM {
         // 清除已经完成的资源
         while (!retiredResource.empty() &&
             g_RenderContext.IsFenceComplete(retiredResource.front().first)) {
-            availableResource.push(retiredResource.front().second);
+            auto flags = retiredResource.front().second->GetResource()->GetDesc().Flags;
+            availableResource[flags].push(retiredResource.front().second);
             retiredResource.pop();
         }
 
         GpuResource* ret = nullptr;
         if (availableResource.empty()) {
-            ret = CreateNewResource(m_SubResourceSize);
+            ret = CreateNewResource(m_SubResourceSize, flags);
             if (m_InitData.m_HeapType == D3D12_HEAP_TYPE_UPLOAD) {
                 ret->Map();
             }
             m_ResourceData.m_ResourcePool.emplace_back(ret);
         }
         else {
-            ret = availableResource.front();
-            availableResource.pop();
+            ret = availableResource[flags].front();
+            availableResource[flags].pop();
         }
         return ret;
     }
@@ -168,7 +171,9 @@ namespace DSM {
         return ret;
     }
 
-    GpuResource* GpuResourceAllocator::CreateNewResource(std::uint64_t size)
+    GpuResource* GpuResourceAllocator::CreateNewResource(
+        std::uint64_t size,
+        D3D12_RESOURCE_FLAGS flags)
     {
         D3D12_HEAP_PROPERTIES heapProperties{};
         heapProperties.Type = m_InitData.m_HeapType;
@@ -177,7 +182,7 @@ namespace DSM {
 
         D3D12_RESOURCE_DESC resourceDesc{};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        resourceDesc.Flags = m_InitData.m_ResourceFlags;
+        resourceDesc.Flags = flags;
         resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
         resourceDesc.Width = size;
         resourceDesc.Height = 1;

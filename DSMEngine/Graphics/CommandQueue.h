@@ -7,6 +7,8 @@
 namespace DSM {
     class CommandQueue
     {
+        friend class RenderContext;
+        friend class CommandBuffer;
     public:
         CommandQueue(D3D12_COMMAND_LIST_TYPE listType) noexcept;
         ~CommandQueue()
@@ -33,12 +35,12 @@ namespace DSM {
         ID3D12CommandQueue* GetCommandQueue() const {return m_pCommandQueue.Get();}
         std::uint64_t GetNextFenceValue() {return m_NextFenceValue;}
 
-    private:
+    protected:
         std::uint64_t ExecuteCommandList(ID3D12CommandList* list);
         ID3D12CommandAllocator* RequestCommandAllocator();
         void DiscardCommandAllocator(std::uint64_t fenceValueForReset, ID3D12CommandAllocator* allocator);
 
-    private:
+    protected:
         const D3D12_COMMAND_LIST_TYPE m_CommandListType{};
         Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_pCommandQueue{};
 

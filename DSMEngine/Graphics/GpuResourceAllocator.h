@@ -32,11 +32,7 @@ namespace DSM {
         {
             AllocationStrategy m_Strategy{};
             D3D12_HEAP_TYPE m_HeapType{};
-            union
-            {
-                D3D12_HEAP_FLAGS m_HeapFlags;           // 分配策略为 PlacedResource 时使用
-                D3D12_RESOURCE_FLAGS m_ResourceFlags;   // 分配策略为 ManualSubAllocation 时使用
-            };
+            D3D12_HEAP_FLAGS m_HeapFlags;           // 分配策略为 PlacedResource 时使用
         };
 
     private:
@@ -57,7 +53,7 @@ namespace DSM {
             std::vector<std::unique_ptr<GpuResource>> m_ResourcePool{};
             std::vector<GpuResource*> m_FullResources{};
             std::queue<std::pair<std::uint64_t, GpuResource*>> m_RetiredResources{};
-            std::queue<GpuResource*> m_AvailableResources{};
+            std::map<D3D12_RESOURCE_FLAGS, std::queue<GpuResource*>> m_AvailableResources{};
         };
         
     public:
@@ -74,21 +70,28 @@ namespace DSM {
         void ShutDown() noexcept;
         
         // 请求资源
-        GpuResourceLocatioin Allocate(std::uint64_t size, std::uint32_t alignment = 0);
+        GpuResourceLocatioin Allocate(
+            std::uint64_t size,
+            std::uint32_t alignment = 0,
+            D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
         void Cleanup(std::uint64_t fenceValue);
 
         AllocationStrategy GetAllocationStrategy() const noexcept { return m_InitData.m_Strategy; }
     
         
     private:
-        GpuResourceLocatioin AllocateFormHeap(std::uint64_t alignSize);
-        GpuResourceLocatioin AllocateFormResource(std::uint64_t alignSize);
+        GpuResourceLocatioin AllocateFormHeap(std::uint64_t bufferSize);
+        GpuResourceLocatioin AllocateFormResource(
+            std::uint64_t bufferSize,
+            D3D12_RESOURCE_FLAGS flags);
         
         // 当前资源满的时候分配新的资源
-        GpuResource* RequestResource();
+        GpuResource* RequestResource(D3D12_RESOURCE_FLAGS flags);
         ID3D12Heap* RequestHeap();
 
-        GpuResource* CreateNewResource(std::uint64_t size = DEFAULT_RESOURCE_POOL_SIZE);
+        GpuResource* CreateNewResource(
+            std::uint64_t size = DEFAULT_RESOURCE_POOL_SIZE,
+            D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
         ID3D12Heap* CreateNewHeap(std::uint64_t size = DEFAULT_RESOURCE_POOL_SIZE);
 
     private:

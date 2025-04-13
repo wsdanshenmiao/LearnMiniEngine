@@ -44,6 +44,7 @@
 #include <concepts>
 
 #include "Utilities/Macros.h"
+#include "Utilities/EnumUtil.h"
 
 
 

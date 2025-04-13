@@ -1,4 +1,6 @@
 #include "RenderContext.h"
+
+#include "GpuBuffer.h"
 #include "GraphicsCommon.h"
 #include "RootSignature.h"
 
@@ -119,13 +121,9 @@ namespace DSM {
             initData.m_Strategy = GpuResourceAllocator::AllocationStrategy::ManualSubAllocation;
             initData.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
             initData.m_HeapType = (D3D12_HEAP_TYPE)(i + 1);
-            initData.m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
-            if (initData.m_HeapType == D3D12_HEAP_TYPE_DEFAULT) {
-                initData.m_ResourceFlags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-            }
             m_BufferAllocator[i].Create(initData);
         }
-        
+
     }
 
     void RenderContext::Shutdown()

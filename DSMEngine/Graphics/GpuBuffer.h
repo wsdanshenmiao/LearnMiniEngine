@@ -9,12 +9,12 @@ namespace DSM {
     // 用于创建 Buffer 的描述
     struct GpuBufferDesc
     {
-        std::uint64_t m_Size;
-        DSMResourceUsage m_Usage;
-        DSMBindFlag m_BindFlag;
-        DSMBufferFlag m_BufferFlag;
-        std::uint32_t m_Stride;
-        DXGI_FORMAT m_Format;
+        std::uint64_t m_Size = 0;
+        DSMResourceUsage m_Usage = DSMResourceUsage::Default;
+        DSMBindFlag m_BindFlag = DSMBindFlag::None;
+        DSMBufferFlag m_BufferFlag = DSMBufferFlag::None;
+        std::uint32_t m_Stride = 0;
+        DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
     };
 
     

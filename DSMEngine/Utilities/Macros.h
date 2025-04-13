@@ -3,6 +3,7 @@
 #define __MACROS_H__
 
 #include "Utility.h"
+#include <cstdio>
 
 
 #define DSM_NONCOPYABLE(Class)  \

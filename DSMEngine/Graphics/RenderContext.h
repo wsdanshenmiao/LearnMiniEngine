@@ -28,6 +28,11 @@ namespace DSM {
         CommandQueue& GetComputeQueue() noexcept { return m_ComputeQueue; }
         CommandQueue& GetCopyQueue() noexcept { return m_CopyQueue; }
 
+        void CreateCommandList(
+            D3D12_COMMAND_LIST_TYPE listType,
+            ID3D12GraphicsCommandList** ppList,
+            ID3D12CommandAllocator** ppAllocator);
+
         GpuResourceAllocator& GetBufferAllocator(D3D12_HEAP_TYPE heapType) noexcept
         {
             return m_BufferAllocator[(heapType - 1) % 3];
@@ -53,6 +58,32 @@ namespace DSM {
 
         std::array<GpuResourceAllocator, 3> m_BufferAllocator;
     };
+
+    inline void RenderContext::CreateCommandList(
+        D3D12_COMMAND_LIST_TYPE listType,
+        ID3D12GraphicsCommandList** ppList,
+        ID3D12CommandAllocator** ppAllocator)
+    {
+        ASSERT(ppList != nullptr && ppAllocator != nullptr);
+        ASSERT(listType != D3D12_COMMAND_LIST_TYPE_BUNDLE);
+        
+        switch (listType) {
+            case D3D12_COMMAND_LIST_TYPE_DIRECT: {
+                *ppAllocator = GetGraphicsQueue().RequestCommandAllocator(); break;
+            }
+            case D3D12_COMMAND_LIST_TYPE_COMPUTE: {
+                *ppAllocator = GetCommandQueue().RequestCommandAllocator(); break;
+            }
+            case D3D12_COMMAND_LIST_TYPE_COPY: {
+                *ppAllocator = GetCopyQueue().RequestCommandAllocator(); break;
+            }
+            case D3D12_COMMAND_LIST_TYPE_BUNDLE: break;
+        }
+
+        ASSERT_SUCCEEDED(m_pDevice->CreateCommandList(
+            1, listType, *ppAllocator, nullptr, IID_PPV_ARGS(ppList)));
+        (*ppList)->SetName(L"CommandList");
+    }
 
 #define g_RenderContext	RenderContext::GetInstance()
 }
