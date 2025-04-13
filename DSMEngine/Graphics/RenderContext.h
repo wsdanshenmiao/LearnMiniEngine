@@ -5,12 +5,13 @@
 #include "../pch.h"
 #include "../Utilities/Singleton.h"
 #include "CommandQueue.h"
+#include "GpuResourceAllocator.h"
 
 namespace DSM {
     class RenderContext : public Singleton<RenderContext>
     {
     public:
-        RenderContext() noexcept;
+        RenderContext();
         ~RenderContext()
         {
             Shutdown();
@@ -23,9 +24,14 @@ namespace DSM {
         IDXGIFactory7* GetFactory() const{return m_pFactory.Get();}
 
         CommandQueue& GetCommandQueue(D3D12_COMMAND_LIST_TYPE listType = D3D12_COMMAND_LIST_TYPE_DIRECT) noexcept;
-        CommandQueue& GetGraphicsQueue()noexcept { return m_GraphicsQueue; }
+        CommandQueue& GetGraphicsQueue() noexcept { return m_GraphicsQueue; }
         CommandQueue& GetComputeQueue() noexcept { return m_ComputeQueue; }
         CommandQueue& GetCopyQueue() noexcept { return m_CopyQueue; }
+
+        GpuResourceAllocator& GetBufferAllocator(D3D12_HEAP_TYPE heapType) noexcept
+        {
+            return m_BufferAllocator[(heapType - 1) % 3];
+        }
 
         bool IsFenceComplete(std::uint64_t fenceValue) noexcept
         {
@@ -44,6 +50,8 @@ namespace DSM {
         CommandQueue m_GraphicsQueue;
         CommandQueue m_ComputeQueue;
         CommandQueue m_CopyQueue;
+
+        std::array<GpuResourceAllocator, 3> m_BufferAllocator;
     };
 
 #define g_RenderContext	RenderContext::GetInstance()

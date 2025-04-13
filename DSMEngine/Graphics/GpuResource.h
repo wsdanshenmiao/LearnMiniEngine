@@ -13,16 +13,21 @@ namespace DSM {
             :m_Resource(nullptr),
             m_GpuAddress(D3D12_GPU_VIRTUAL_ADDRESS_NULL),
             m_UsageState(D3D12_RESOURCE_STATE_COMMON){}
-        GpuResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES currState) noexcept
+        GpuResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES currState)
             :m_Resource(resource),
-            m_GpuAddress(D3D12_GPU_VIRTUAL_ADDRESS_NULL),
-            m_UsageState(currState){}
+            m_UsageState(currState)
+        {
+            if (resource != nullptr) {
+                m_GpuAddress = resource->GetGPUVirtualAddress();
+            }
+        }
         ~GpuResource() noexcept { Destroy(); }
         
         DSM_NONCOPYABLE(GpuResource);
 
         virtual void Destroy() noexcept
         {
+            Unmap();
             m_Resource = nullptr;
             m_GpuAddress = D3D12_GPU_VIRTUAL_ADDRESS_NULL;
             ++m_VersitonID;
@@ -33,6 +38,8 @@ namespace DSM {
         
         ID3D12Resource* GetResource(){ return m_Resource.Get(); }
         const ID3D12Resource* GetResource() const { return m_Resource.Get(); }
+
+        D3D12_RESOURCE_STATES GetUsageState() const noexcept { return m_UsageState; }
 
         D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddress() const noexcept { return m_GpuAddress; }
         void* Map()

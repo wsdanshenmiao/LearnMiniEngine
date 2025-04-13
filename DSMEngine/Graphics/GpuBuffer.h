@@ -23,10 +23,6 @@ namespace DSM {
     {
     public:
         GpuBuffer(const GpuBufferDesc& bufferDesc, void* initData = nullptr);
-        ~GpuBuffer()
-        {
-            Unmap();
-        }
 
         void SetName(const std::wstring& name)
         {

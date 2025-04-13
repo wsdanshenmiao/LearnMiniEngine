@@ -87,7 +87,7 @@ namespace DSM::GameCore{
                     done = true;
                 }
             }
-            if (done == true) break;
+            if (done) break;
         }while (UpdateApplication(app));
 
         TerminateApplication(app);

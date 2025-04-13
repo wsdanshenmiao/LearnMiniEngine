@@ -22,7 +22,7 @@ namespace DSM {
 
     enum class DSMResourceUsage : std::uint8_t
     {
-        Default, Upload, Readback
+        Default = 1, Upload = 2, Readback = 3
     };
 
     enum class DSMBindFlag : std::uint32_t

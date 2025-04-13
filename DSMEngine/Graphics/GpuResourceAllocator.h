@@ -30,8 +30,8 @@ namespace DSM {
         
         struct AllocatorInitData
         {
-            AllocationStrategy m_Strategy;
-            D3D12_HEAP_TYPE m_HeapType;
+            AllocationStrategy m_Strategy{};
+            D3D12_HEAP_TYPE m_HeapType{};
             union
             {
                 D3D12_HEAP_FLAGS m_HeapFlags;           // 分配策略为 PlacedResource 时使用
@@ -61,15 +61,25 @@ namespace DSM {
         };
         
     public:
-        GpuResourceAllocator(const AllocatorInitData& initData,
-            std::uint64_t subResourceSize = DEFAULT_RESOURCE_POOL_SIZE);
+        GpuResourceAllocator() = default;
+        ~GpuResourceAllocator() { ShutDown(); };
+        DSM_NONCOPYABLE(GpuResourceAllocator);
 
+        void Create(const AllocatorInitData& initData,
+            std::uint64_t subResourceSize = DEFAULT_RESOURCE_POOL_SIZE) noexcept
+        {
+            m_InitData = initData;
+            m_SubResourceSize = subResourceSize;
+        }
+        void ShutDown() noexcept;
+        
         // 请求资源
-        GpuResourceLocatioin Allocate(std::uint64_t size, std::uint32_t alignment = DEFAULT_ALIGN);
+        GpuResourceLocatioin Allocate(std::uint64_t size, std::uint32_t alignment = 0);
         void Cleanup(std::uint64_t fenceValue);
 
-        AllocationStrategy GetAllocationStrategy() const { return m_InitData.m_Strategy; }
-
+        AllocationStrategy GetAllocationStrategy() const noexcept { return m_InitData.m_Strategy; }
+    
+        
     private:
         GpuResourceLocatioin AllocateFormHeap(std::uint64_t alignSize);
         GpuResourceLocatioin AllocateFormResource(std::uint64_t alignSize);
@@ -82,17 +92,17 @@ namespace DSM {
         ID3D12Heap* CreateNewHeap(std::uint64_t size = DEFAULT_RESOURCE_POOL_SIZE);
 
     private:
-        const AllocatorInitData m_InitData{};
+        AllocatorInitData m_InitData{};
 
         union
         {
-            HeapData m_HeapData{};
             ResourceData m_ResourceData{};
+            HeapData m_HeapData;
         };
         std::mutex m_Mutex{};
         
         std::uint64_t m_CurrOffset{};
-        const std::uint64_t m_SubResourceSize{};
+        std::uint64_t m_SubResourceSize{};
     };
 
 }

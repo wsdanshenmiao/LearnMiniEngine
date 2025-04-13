@@ -1,14 +1,14 @@
 #include "RenderContext.h"
 #include "GraphicsCommon.h"
+#include "RootSignature.h"
 
 using Microsoft::WRL::ComPtr;
 
 namespace DSM {
-    RenderContext::RenderContext() noexcept
+    RenderContext::RenderContext()
         :m_GraphicsQueue(D3D12_COMMAND_LIST_TYPE_DIRECT),
         m_ComputeQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE),
-        m_CopyQueue(D3D12_COMMAND_LIST_TYPE_COPY){
-    }
+        m_CopyQueue(D3D12_COMMAND_LIST_TYPE_COPY) {}
 
     void RenderContext::Create(bool requireDXRSupport)
     {
@@ -66,7 +66,7 @@ namespace DSM {
             }
 
             // 是否支持光追
-            if (requireDXRSupport && !Graphics::IsDirectXRaytracingSupported(m_pDevice.Get())) {
+            if (requireDXRSupport && !IsDirectXRaytracingSupported(m_pDevice.Get())) {
                 continue;
             }
 
@@ -113,12 +113,29 @@ namespace DSM {
         m_GraphicsQueue.Create(m_pDevice.Get());
         m_ComputeQueue.Create(m_pDevice.Get());
         m_CopyQueue.Create(m_pDevice.Get());
+
+        for (int i = 0; i < m_BufferAllocator.size(); ++i) {
+            GpuResourceAllocator::AllocatorInitData initData{};
+            initData.m_Strategy = GpuResourceAllocator::AllocationStrategy::ManualSubAllocation;
+            initData.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
+            initData.m_HeapType = (D3D12_HEAP_TYPE)(i + 1);
+            initData.m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
+            if (initData.m_HeapType == D3D12_HEAP_TYPE_DEFAULT) {
+                initData.m_ResourceFlags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            }
+            m_BufferAllocator[i].Create(initData);
+        }
+        
     }
 
     void RenderContext::Shutdown()
     {
         m_pFactory = nullptr;
         m_pDevice = nullptr;
+
+        for (auto& allocator : m_BufferAllocator) {
+            allocator.ShutDown();
+        }
         
         m_GraphicsQueue.Shutdown();
         m_ComputeQueue.Shutdown();

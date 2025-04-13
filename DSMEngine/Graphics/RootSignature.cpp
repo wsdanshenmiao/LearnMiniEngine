@@ -65,9 +65,15 @@ namespace DSM{
         range->BaseShaderRegister = shaderRegister;
     }
 
-    
 
-
+    void RootSignature::Reset(std::uint32_t numRootParams, std::uint32_t numStaticSamplers)
+    {
+        m_RootParameters.clear();
+        m_StaticSamplers.clear();
+        m_RootParameters.resize(numRootParams);
+        m_StaticSamplers.resize(numStaticSamplers);
+        m_NumInitializedStaticSamplers = 0;   
+    }
 
     void RootSignature::InitStaticSampler(std::uint32_t shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility)
     {

@@ -59,12 +59,7 @@ namespace DSM{
             Reset(numRootParams, numStaticSamplers);
         }
 
-        void Reset(std::uint32_t numRootParams, std::uint32_t numStaticSamplers)
-        {
-            m_RootParameters.clear();
-            m_StaticSamplers.clear();
-            m_NumInitializedStaticSamplers = 0;    
-        }
+        void Reset(std::uint32_t numRootParams, std::uint32_t numStaticSamplers);
         
         void InitStaticSampler(std::uint32_t shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL);
         void Finalize(const std::wstring& name, D3D12_ROOT_SIGNATURE_FLAGS flags = D3D12_ROOT_SIGNATURE_FLAG_NONE);
