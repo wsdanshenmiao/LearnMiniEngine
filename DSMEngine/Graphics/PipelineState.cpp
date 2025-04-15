@@ -1,5 +1,4 @@
 #include "PipelineState.h"
-
 #include "RenderContext.h"
 #include "RootSignature.h"
 #include "../Utilities/Hash.h"

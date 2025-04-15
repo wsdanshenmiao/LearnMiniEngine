@@ -116,6 +116,33 @@ namespace DSM {
         m_ComputeQueue.Create(m_pDevice.Get());
         m_CopyQueue.Create(m_pDevice.Get());
 
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.Width = 100000;
+        resourceDesc.Height = 1;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.SampleDesc = { 1, 0};
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        GpuResourceDesc gpuDesc = {};
+        gpuDesc.m_Desc = resourceDesc;
+        gpuDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        {
+            std::vector<std::unique_ptr<GpuResource>> gpuResources;
+            for (int i = 0; i < 65; ++i) {
+                gpuResources.emplace_back(std::make_unique<GpuResource>(gpuDesc));
+            }
+        }
+        {
+            std::vector<std::unique_ptr<GpuResource>> gpuResources0;
+            for (int i = 0; i < 65; ++i) {
+                gpuResources0.emplace_back(std::make_unique<GpuResource>(gpuDesc));
+            }
+        }
+        std::vector<std::unique_ptr<GpuResource>> gpuResources;
+        for (int i = 0; i < 65; ++i) {
+            gpuResources.emplace_back(std::make_unique<GpuResource>(gpuDesc));
+        }
     }
 
     void RenderContext::Shutdown()

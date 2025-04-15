@@ -70,15 +70,7 @@ namespace DSM {
         ~LinearBufferAllocator() { ShutDown(); };
         DSM_NONCOPYABLE(LinearBufferAllocator);
 
-        void Create(LinearBufferDesc bufferDesc, std::uint64_t pageSize = DEFAULT_BUFFER_PAGE_SIZE) noexcept
-        {
-            m_PageSize = pageSize;
-            m_BufferDesc = bufferDesc;
-            
-            auto newPage = std::make_unique<LinearBufferPage>(m_PageSize, CreateNewBuffer());
-            m_CurrPage = newPage.get();
-            m_PagePool.emplace_back(std::move(newPage));
-        }
+        void Create(LinearBufferDesc bufferDesc, std::uint64_t pageSize = DEFAULT_BUFFER_PAGE_SIZE);
         void ShutDown();
 
         GpuResourceLocatioin CreateBuffer(std::uint64_t bufferSize, std::uint32_t alignment = 0);
@@ -88,11 +80,9 @@ namespace DSM {
         // 释放某个缓冲区
         void ReleaseBuffer(GpuResource* buffer, std::uint64_t fenceValue);
 
-        // 清除已经使用完毕的资源
-        void Cleanup(std::uint64_t fenceValue);
-
     private:
         LinearBufferPage* RequestPage();
+        LinearBufferPage* AllocateLargePage(std::uint64_t bufferSize);
 
     private:
         LinearBufferDesc m_BufferDesc{};
@@ -106,19 +96,12 @@ namespace DSM {
         std::queue<std::pair<std::uint64_t, LinearBufferPage*>> m_RetiredPages{};
         // 可重复使用的资源
         std::queue<LinearBufferPage*> m_AvailablePages{};
+        // 需要删除的资源
+        std::queue<std::pair<std::uint64_t, LinearBufferPage*>> m_DeletionResources{};
 
         std::uint64_t m_PageSize{};
         
         std::mutex m_Mutex{};
-
-
-
-        
-        
-        
-        // 需要删除的资源
-        std::queue<std::pair<std::uint64_t, GpuResource*>> m_DeletionResources{};
-        
         
     };
 

@@ -2,7 +2,16 @@
 #include "RenderContext.h"
 
 namespace DSM {
-    
+    void LinearBufferAllocator::Create(LinearBufferDesc bufferDesc, std::uint64_t pageSize)
+    {
+        m_PageSize = pageSize;
+        m_BufferDesc = bufferDesc;
+
+        auto buffer = CreateNewBuffer();
+        auto newPage = std::make_unique<LinearBufferPage>(m_PageSize, buffer);
+        m_CurrPage = newPage.get();
+        m_PagePool.emplace_back(std::move(newPage));
+    }
 
     void LinearBufferAllocator::ShutDown()
     {
@@ -14,6 +23,9 @@ namespace DSM {
         while (!m_AvailablePages.empty()) {
             m_AvailablePages.pop();
         }
+        while (!m_DeletionResources.empty()) {
+            m_DeletionResources.pop();
+        }
         m_PagePool.clear();
     }
 
@@ -22,8 +34,13 @@ namespace DSM {
         GpuResourceLocatioin ret{};
 
         std::lock_guard lock(m_Mutex);
-        // TODO: 后续考虑分配过大资源的情况
-        if (!m_CurrPage->Allocate(bufferSize, alignment, ret)) {    // 创建新的Page
+
+        // 过大的资源额外管理
+        if (auto alignSize = Utility::AlignUp(bufferSize, alignment) > m_PageSize) {
+            auto largePage = AllocateLargePage(alignSize);
+            largePage->Allocate(alignSize, alignment, ret);
+        }
+        else if (!m_CurrPage->Allocate(bufferSize, alignment, ret)) {    // 创建新的Page
             // 记录已经满的Page
             m_FullPages[m_CurrPage->m_Resource.get()] = m_CurrPage;
             m_CurrPage = RequestPage();
@@ -55,6 +72,21 @@ namespace DSM {
         }
         
         return ret;
+    }
+
+    LinearBufferPage* LinearBufferAllocator::AllocateLargePage(std::uint64_t bufferSize)
+    {
+        // 过大的资源直接释放
+        while (!m_DeletionResources.empty() &&
+            g_RenderContext.IsFenceComplete(m_DeletionResources.front().first)) {
+            m_DeletionResources.pop();
+        }
+        
+        auto buffer = CreateNewBuffer(bufferSize);
+        auto largePage = new LinearBufferPage(bufferSize, buffer);
+        m_FullPages.insert(std::make_pair(buffer, largePage));
+        
+        return largePage;
     }
 
     GpuResource* LinearBufferAllocator::CreateNewBuffer(std::uint64_t bufferSize)
@@ -96,38 +128,37 @@ namespace DSM {
             nullptr,
             IID_PPV_ARGS(&resource)));
         resource->SetName(L"CommittedResourceManager SubResource");
-        
-        return new GpuResource(resource, resourceState);
+
+        /*auto buffer = new GpuResource(resource, resourceState);
+        if (m_BufferDesc.m_HeapType == D3D12_HEAP_TYPE_UPLOAD) {
+            buffer->Map();
+        }
+        return buffer;*/
+        return nullptr;
     }
 
     void LinearBufferAllocator::ReleaseBuffer(GpuResource* buffer, std::uint64_t fenceValue)
     {
-        if (!m_CurrPage->ReleaseResource(buffer)) {
-            std::lock_guard lock(m_Mutex);
-            
-            auto pageIt = m_FullPages.find(buffer);
-            ASSERT(pageIt != m_FullPages.end(), "Resource is not create by this allocator");
-            pageIt->second->ReleaseResource(buffer);
+        std::lock_guard lock(m_Mutex);
+        
+        if (m_CurrPage->ReleaseResource(buffer)) return;
+        
+        auto pageIt = m_FullPages.find(buffer);
+        ASSERT(pageIt != m_FullPages.end(), "Resource is not create by this allocator");
+        pageIt->second->ReleaseResource(buffer);
 
-            // 子资源都清空之后回收该资源
-            if (pageIt->second->GetSubResourceCount() == 0) {
+        // 子资源都清空之后回收该资源
+        if (pageIt->second->GetSubResourceCount() == 0) {
+            if (buffer->GetResource()->GetDesc().Width > m_PageSize) {
+                m_DeletionResources.push(std::make_pair(fenceValue, pageIt->second));
+            }
+            else {
                 m_FullPages.erase(buffer);
                 m_RetiredPages.push(std::make_pair(fenceValue, pageIt->second));
             }
         }
     }
 
-    void LinearBufferAllocator::Cleanup(std::uint64_t fenceValue)
-    {
-        std::lock_guard lock(m_Mutex);
-
-        while (!m_DeletionResources.empty() && g_RenderContext.IsFenceComplete(m_DeletionResources.front().first))
-        {
-            // 超过子资源大小的资源直接删除
-            delete m_DeletionResources.front().second;
-            m_DeletionResources.pop();
-        }
-    }
 
 
 }

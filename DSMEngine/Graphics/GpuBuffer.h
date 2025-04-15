@@ -5,7 +5,7 @@
 #include "GpuResource.h"
 #include "GraphicsCommon.h"
 
-namespace DSM {
+/*namespace DSM {
     // 用于创建 Buffer 的描述
     struct GpuBufferDesc
     {
@@ -23,6 +23,8 @@ namespace DSM {
     {
     public:
         GpuBuffer(const GpuBufferDesc& bufferDesc, void* initData = nullptr);
+        ~GpuBuffer();
+        DSM_NONCOPYABLE(GpuBuffer);
 
         void SetName(const std::wstring& name)
         {
@@ -32,6 +34,11 @@ namespace DSM {
         const GpuBufferDesc& GetDesc() const noexcept { return m_BufferDesc; }
         std::uint64_t GetSize() const noexcept {return m_BufferDesc.m_Size; }
         std::uint32_t GetStride() const noexcept { return m_BufferDesc.m_Stride; }
+        std::uint32_t GetCount() const
+        {
+            ASSERT(m_BufferDesc.m_Stride != 0);
+            return static_cast<std::uint32_t>(m_BufferDesc.m_Size / m_BufferDesc.m_Stride);
+        }
         DXGI_FORMAT GetFormat() const noexcept { return m_BufferDesc.m_Format; }
 
         bool Mappable() const noexcept
@@ -45,6 +52,6 @@ namespace DSM {
         GpuBufferDesc m_BufferDesc;
     };
 
-}
+}*/
 
 #endif

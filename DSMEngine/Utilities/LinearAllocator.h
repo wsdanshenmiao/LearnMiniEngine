@@ -14,7 +14,7 @@ namespace DSM {
         ~LinearAllocator() = default;
 
         // 返回分配的资源所处的偏移量
-        std::uint64_t Allocate(std::uint64_t size, std::uint32_t alignment) noexcept
+        std::uint64_t Allocate(std::uint64_t size, std::uint32_t alignment = 0) noexcept
         {
             auto alignOffset = Utility::AlignUp(m_CurrOffset, alignment);
             m_CurrOffset = alignOffset + size;
@@ -22,7 +22,7 @@ namespace DSM {
         }
         void Clear() noexcept
         {
-            m_CurrOffset = m_MaxSize;
+            m_CurrOffset = m_StartOffset;
         }
 
         bool Full() const noexcept { return m_CurrOffset >= m_MaxSize; }

@@ -33,11 +33,6 @@ namespace DSM {
             ID3D12GraphicsCommandList** ppList,
             ID3D12CommandAllocator** ppAllocator);
 
-        GpuResourceAllocator& GetBufferAllocator(D3D12_HEAP_TYPE heapType) noexcept
-        {
-            return m_BufferAllocator[(heapType - 1) % 3];
-        }
-
         bool IsFenceComplete(std::uint64_t fenceValue) noexcept
         {
             return GetCommandQueue(D3D12_COMMAND_LIST_TYPE(fenceValue >> QUEUE_TYPE_MOVEBITS)).IsFenceComplete(fenceValue);
@@ -56,7 +51,6 @@ namespace DSM {
         CommandQueue m_ComputeQueue;
         CommandQueue m_CopyQueue;
 
-        std::array<GpuResourceAllocator, 3> m_BufferAllocator;
     };
 
     
