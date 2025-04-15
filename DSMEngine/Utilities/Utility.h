@@ -54,10 +54,15 @@ namespace DSM::Utility {
 
 
     template <typename T> 
-    inline T AlignUp( T value, size_t alignment )
+    inline constexpr T AlignUp( T value, size_t alignment ) noexcept
     {
-        return (T)(((size_t)value + (alignment - 1)) & ~(alignment - 1));
+        if (alignment == 0 || alignment == 1) return value;
+        else return (T)(((size_t)value + (alignment - 1)) & ~(alignment - 1));
     }
+
+
+
+    inline constexpr std::uint64_t INVALID_ALLOC_OFFSET = std::numeric_limits<std::uint64_t>::max();
     
     
 }

@@ -38,10 +38,18 @@ namespace DSM {
         
         ID3D12Resource* GetResource(){ return m_Resource.Get(); }
         const ID3D12Resource* GetResource() const { return m_Resource.Get(); }
+        ID3D12Resource** GetAddressOf() { return m_Resource.GetAddressOf(); }
+         ID3D12Resource* const * GetAddressOf() const { return m_Resource.GetAddressOf(); }
 
         D3D12_RESOURCE_STATES GetUsageState() const noexcept { return m_UsageState; }
 
-        D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddress() const noexcept { return m_GpuAddress; }
+        D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddress() noexcept
+        {
+            if (m_GpuAddress == D3D12_GPU_VIRTUAL_ADDRESS_NULL) {
+                m_GpuAddress = m_Resource->GetGPUVirtualAddress();
+            }
+            return m_GpuAddress;
+        }
         void* Map()
         {
             if (m_MappedAddress == nullptr) {
@@ -78,6 +86,16 @@ namespace DSM {
     };
 
 
+    // 用于定位子资源在缓冲区中的位置
+    struct GpuResourceLocatioin
+    {
+        GpuResource* m_Resource{};
+        ID3D12Heap* m_Heap{};
+        D3D12_GPU_VIRTUAL_ADDRESS m_GpuAddress{};
+        void* m_MappedAddress{};
+        std::uint64_t m_Offset{};
+        std::uint64_t m_Size{};
+    };
     
 }
 

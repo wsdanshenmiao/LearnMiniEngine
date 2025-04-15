@@ -116,24 +116,12 @@ namespace DSM {
         m_ComputeQueue.Create(m_pDevice.Get());
         m_CopyQueue.Create(m_pDevice.Get());
 
-        for (int i = 0; i < m_BufferAllocator.size(); ++i) {
-            GpuResourceAllocator::AllocatorInitData initData{};
-            initData.m_Strategy = GpuResourceAllocator::AllocationStrategy::ManualSubAllocation;
-            initData.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
-            initData.m_HeapType = (D3D12_HEAP_TYPE)(i + 1);
-            m_BufferAllocator[i].Create(initData);
-        }
-
     }
 
     void RenderContext::Shutdown()
     {
         m_pFactory = nullptr;
         m_pDevice = nullptr;
-
-        for (auto& allocator : m_BufferAllocator) {
-            allocator.ShutDown();
-        }
         
         m_GraphicsQueue.Shutdown();
         m_ComputeQueue.Shutdown();
@@ -148,4 +136,32 @@ namespace DSM {
             default:return m_GraphicsQueue;
         }
     }
+    
+    void RenderContext::CreateCommandList(
+        D3D12_COMMAND_LIST_TYPE listType,
+        ID3D12GraphicsCommandList** ppList,
+        ID3D12CommandAllocator** ppAllocator)
+    {
+        ASSERT(ppList != nullptr && ppAllocator != nullptr);
+        ASSERT(listType != D3D12_COMMAND_LIST_TYPE_BUNDLE);
+        
+        switch (listType) {
+            case D3D12_COMMAND_LIST_TYPE_DIRECT: {
+                *ppAllocator = GetGraphicsQueue().RequestCommandAllocator(); break;
+            }
+            case D3D12_COMMAND_LIST_TYPE_COMPUTE: {
+                *ppAllocator = GetCommandQueue().RequestCommandAllocator(); break;
+            }
+            case D3D12_COMMAND_LIST_TYPE_COPY: {
+                *ppAllocator = GetCopyQueue().RequestCommandAllocator(); break;
+            }
+            case D3D12_COMMAND_LIST_TYPE_BUNDLE: break;
+        }
+
+        ASSERT_SUCCEEDED(m_pDevice->CreateCommandList(
+            1, listType, *ppAllocator, nullptr, IID_PPV_ARGS(ppList)));
+        (*ppList)->SetName(L"CommandList");
+    }
+
+    
 }
