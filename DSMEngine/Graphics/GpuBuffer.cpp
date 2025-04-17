@@ -60,8 +60,6 @@ namespace DSM{
             m_BufferDesc.m_Usage == DSMResourceUsage::Readback) {
             ASSERT_SUCCEEDED(m_Resource->Map(0, nullptr, &m_MappedData));
         }
-
-        // TODO: 封装完命令列表后转变资源状态，并将初始话资源拷贝到Buffer中
     }
 
     void GpuBuffer::Destroy()

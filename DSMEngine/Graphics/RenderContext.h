@@ -29,7 +29,8 @@ namespace DSM {
         CommandQueue& GetComputeQueue() noexcept { return m_ComputeQueue; }
         CommandQueue& GetCopyQueue() noexcept { return m_CopyQueue; }
 
-        DynamicBufferAllocator& GetDynamicBufferAllocator() noexcept { return m_DynamicBufferAllocator; }
+        DynamicBufferAllocator& GetCpuBufferAllocator() noexcept { return m_CpuBufferAllocator; }
+        DynamicBufferAllocator& GetGpuBufferAllocator() noexcept { return m_GpuBufferAllocator; }
 
         void CreateCommandList(
             D3D12_COMMAND_LIST_TYPE listType,
@@ -41,10 +42,20 @@ namespace DSM {
             return GetCommandQueue(D3D12_COMMAND_LIST_TYPE(fenceValue >> QUEUE_TYPE_MOVEBITS)).IsFenceComplete(fenceValue);
         }
 
+        void CleanupDynamicBuffer(std::uint64_t fenceValue)
+        {
+            m_CpuBufferAllocator.Cleanup(fenceValue);
+            m_GpuBufferAllocator.Cleanup(fenceValue);
+        }
+
+        void ExecuteCommandList(CommandList* cmdList, bool waitForCompletion = false);
 
     public:
         inline static bool sm_bTypedUAVLoadSupport_R11G11B10_FLOAT = false;
         inline static bool sm_bTypedUAVLoadSupport_R16G16B16A16_FLOAT = false;
+
+        inline static constexpr std::uint64_t sm_GpuAllocatorPageSize = DEFAULT_BUFFER_PAGE_SIZE;
+        inline static constexpr std::uint64_t sm_CpuBufferPageSize = 0x200000;
         
     private:
         Microsoft::WRL::ComPtr<ID3D12Device5> m_pDevice{};
@@ -54,7 +65,10 @@ namespace DSM {
         CommandQueue m_ComputeQueue;
         CommandQueue m_CopyQueue;
 
-        DynamicBufferAllocator m_DynamicBufferAllocator;
+        // 主要用于初始化默认资源
+        DynamicBufferAllocator m_CpuBufferAllocator;
+        // 主要用于常量缓冲区等创建在上传堆资源
+        DynamicBufferAllocator m_GpuBufferAllocator;
 
     };
 

@@ -93,10 +93,13 @@ namespace DSM {
     {
         ASSERT(list != nullptr);
 
+        std::lock_guard<std::mutex> guard{m_EventMutex};
+        
         ASSERT_SUCCEEDED(((ID3D12GraphicsCommandList*)list)->Close());
 
-        std::lock_guard<std::mutex> guard{m_EventMutex};
+        m_pCommandQueue->ExecuteCommandLists(1, &list);
         m_pCommandQueue->Signal(m_pFence.Get(), m_NextFenceValue);
+        
         return m_NextFenceValue++;
     }
 
@@ -111,4 +114,5 @@ namespace DSM {
 
         m_CommandAllocatorPool.DiscardAllocator(fenceValueForReset, allocator);
     }
+
 }

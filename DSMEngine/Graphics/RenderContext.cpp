@@ -1,5 +1,6 @@
 #include "RenderContext.h"
 
+#include "CommandList.h"
 #include "GpuBuffer.h"
 #include "GraphicsCommon.h"
 #include "RootSignature.h"
@@ -116,7 +117,8 @@ namespace DSM {
         m_ComputeQueue.Create(m_pDevice.Get());
         m_CopyQueue.Create(m_pDevice.Get());
 
-        m_DynamicBufferAllocator.Create();
+        m_CpuBufferAllocator.Create(sm_CpuBufferPageSize);
+        m_GpuBufferAllocator.Create(sm_GpuAllocatorPageSize);
     }
 
     void RenderContext::Shutdown()
@@ -124,7 +126,8 @@ namespace DSM {
         m_pFactory = nullptr;
         m_pDevice = nullptr;
 
-        m_DynamicBufferAllocator.Shutdown();
+        m_CpuBufferAllocator.Shutdown();
+        m_GpuBufferAllocator.Shutdown();
         
         m_GraphicsQueue.Shutdown();
         m_ComputeQueue.Shutdown();
@@ -163,8 +166,26 @@ namespace DSM {
 
         ASSERT_SUCCEEDED(m_pDevice->CreateCommandList(
             1, listType, *ppAllocator, nullptr, IID_PPV_ARGS(ppList)));
-        (*ppList)->SetName(L"CommandList");
     }
 
-    
+    void RenderContext::ExecuteCommandList(CommandList* cmdList, bool waitForCompletion)
+    {
+        ASSERT(cmdList != nullptr);
+        ASSERT(cmdList->m_CmdListType == D3D12_COMMAND_LIST_TYPE_DIRECT ||
+            cmdList->m_CmdListType == D3D12_COMMAND_LIST_TYPE_COMPUTE);
+
+        // 清空屏障
+        cmdList->FlushResourceBarriers();
+
+        auto& cmdQueue = GetCommandQueue(cmdList->m_CmdListType);
+        auto fenceValue = cmdQueue.ExecuteCommandList(cmdList->GetCommandList());
+
+        m_DynamicBufferAllocator.Cleanup(fenceValue);
+
+        if (waitForCompletion) {
+            cmdQueue.WaitForFence(fenceValue);
+        }
+
+        cmdList->Reset();
+    }
 }
