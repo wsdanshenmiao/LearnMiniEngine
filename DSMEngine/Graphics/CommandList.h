@@ -5,26 +5,26 @@
 #include "GpuBuffer.h"
 
 namespace DSM {
-    class GraphicsCommandBuffer;
-    class ComputeCommandBuffer;
+    class GraphicsCommandList;
+    class ComputeCommandList;
 
     
     // 对命令列表的封装
-    class CommandBuffer
+    class CommandList
     {
     public:
-        CommandBuffer();
-        ~CommandBuffer();
-        DSM_NONCOPYABLE(CommandBuffer);
+        CommandList();
+        ~CommandList();
+        DSM_NONCOPYABLE(CommandList);
 
-        GraphicsCommandBuffer& GetGraphicsCommandBuffer()
+        GraphicsCommandList& GetGraphicsCommandList()
         {
-            ASSERT(m_CmdListType != D3D12_COMMAND_LIST_TYPE_COMPUTE, "Cannot convert async compute buffer to graphics")
-            return reinterpret_cast<GraphicsCommandBuffer&>(*this);
+            ASSERT(m_CmdListType != D3D12_COMMAND_LIST_TYPE_COMPUTE, "Cannot convert async compute list to graphics")
+            return reinterpret_cast<GraphicsCommandList&>(*this);
         }
-        ComputeCommandBuffer& GetComputeCommandBuffer()
+        ComputeCommandList& GetComputeCommandList()
         {
-            return reinterpret_cast<ComputeCommandBuffer&>(*this);
+            return reinterpret_cast<ComputeCommandList&>(*this);
         }
 
         ID3D12GraphicsCommandList* GetCommandList() { return m_CmdList; }
@@ -46,12 +46,12 @@ namespace DSM {
         std::wstring m_ID{};
     };
 
-    class GraphicsCommandBuffer : public CommandBuffer
+    class GraphicsCommandList : public CommandList
     {
         
     };
 
-    class ComputeCommandBuffer : public CommandBuffer
+    class ComputeCommandList : public CommandList
     {
         
     };

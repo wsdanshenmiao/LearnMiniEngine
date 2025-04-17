@@ -31,8 +31,8 @@ namespace DSM {
         std::uint64_t UsedSize() const noexcept { return m_CurrOffset; }
         
     private:
-        std::uint64_t m_MaxSize{};      // 最大容量
-        std::uint64_t m_StartOffset{};  // 起始偏移
+        const std::uint64_t m_MaxSize{};      // 最大容量
+        const std::uint64_t m_StartOffset{};  // 起始偏移
         std::uint64_t m_CurrOffset{};   // 当前的偏移
     };   
 }

@@ -42,22 +42,22 @@
 #define STRINGIFY(x) #x
 #define ASSERT( isFalse, ... ) \
     if (!(bool)(isFalse)) { \
-        DSM::Utility::Print("\nAssertion failed in " STRINGIFY(__FILE__) " @ " STRINGIFY(__LINE__) "\n"); \
-        DSM::Utility::PrintSubMessage("\'" #isFalse "\' is false"); \
+        DSM::Utility::Print("\nAssertion failed in {} @ {}\n", __FILE__, __LINE__); \
+        DSM::Utility::PrintSubMessage("\'{}\' is false", isFalse); \
         DSM::Utility::PrintSubMessage(__VA_ARGS__); \
         DSM::Utility::Print("\n"); \
         __debugbreak(); \
     }
 #define ASSERT_SUCCEEDED( hr, ... ) \
     if (FAILED(hr)) { \
-        DSM::Utility::Print("\nHRESULT failed in " STRINGIFY(__FILE__) " @ " STRINGIFY(__LINE__) "\n"); \
-        DSM::Utility::PrintSubMessage("hr = 0x%08X", hr); \
+        DSM::Utility::Print("\nHRESULT failed in {} @ {}\n", __FILE__, __LINE__); \
+        DSM::Utility::PrintSubMessage("hr = {}", hr); \
         DSM::Utility::PrintSubMessage(__VA_ARGS__); \
         DSM::Utility::Print("\n"); \
         __debugbreak(); \
     }
 #define ERROR( ... ) \
-    DSM::Utility::Print("\nError reported in " STRINGIFY(__FILE__) " @ " STRINGIFY(__LINE__) "\n"); \
+    DSM::Utility::Print("\nError reported in {} @ {}\n", __FILE__, __LINE__); \
     DSM::Utility::PrintSubMessage(__VA_ARGS__); \
     DSM::Utility::Print("\n");
 
@@ -66,8 +66,8 @@
         static bool s_TriggeredWarning = false; \
         if ((bool)(isTrue) && !s_TriggeredWarning) { \
             s_TriggeredWarning = true; \
-            Utility::Print("\nWarning issued in " STRINGIFY(__FILE__) " @ " STRINGIFY(__LINE__) "\n"); \
-            Utility::PrintSubMessage("\'" #isTrue "\' is true"); \
+            Utility::Print("\nWarning issued in {} @ {}\n", __FILE__, __LINE__); \
+            Utility::PrintSubMessage("\'{}\' is true", isTrue); \
             Utility::PrintSubMessage(__VA_ARGS__); \
             Utility::Print("\n"); \
         } \
@@ -81,7 +81,7 @@
 #define D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN   ((D3D12_GPU_VIRTUAL_ADDRESS)-1)
 
 #define DEFAULT_ALIGN 256
-#define DEFAULT_BUFFER_PAGE_SIZE 0x20000
+#define DEFAULT_BUFFER_PAGE_SIZE (D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 2)
 #define DEFAULT_PLACED_RESOURCE_PAGE_SIZE (D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 64)
 
 #define QUEUE_TYPE_MOVEBITS 56

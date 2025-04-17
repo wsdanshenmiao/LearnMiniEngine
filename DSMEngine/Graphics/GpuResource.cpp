@@ -4,9 +4,9 @@
 namespace DSM {
 
     static std::map<DSMHeapDesc, GpuResourceAllocator> s_GpuResourceAllocators{};
+    
 
-
-    GpuResource::GpuResource(const GpuResourceDesc& resourceDesc)
+    void GpuResource::Create(const GpuResourceDesc& resourceDesc)
     {
         DSMHeapDesc heapDesc{};
         heapDesc.m_HeapType = resourceDesc.m_HeapType;
@@ -24,18 +24,14 @@ namespace DSM {
         }
         m_Resource = resource;
         m_UsageState = resourceDesc.m_State;
-        m_GpuAddress = m_Resource->GetGPUVirtualAddress();
-        
-        if (resourceDesc.m_HeapType == D3D12_HEAP_TYPE_UPLOAD) {
-            ASSERT_SUCCEEDED(m_Resource->Map(0, nullptr, &m_MappedAddress));
-        }
     }
 
-    void GpuResource::Destroy() noexcept
+    void GpuResource::Destroy()
     {
-        m_Allocator->ReleaseResource(m_Resource.Get());
-        Unmap();
+        if (m_Allocator != nullptr) {
+            m_Allocator->ReleaseResource(m_Resource.Get());
+        }
         m_Resource = nullptr;
-        m_GpuAddress = D3D12_GPU_VIRTUAL_ADDRESS_NULL;
+        m_Allocator = nullptr;
     }
 }

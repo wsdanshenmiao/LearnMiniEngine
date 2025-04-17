@@ -8,7 +8,7 @@ namespace DSM {
     class CommandQueue
     {
         friend class RenderContext;
-        friend class CommandBuffer;
+        friend class CommandList;
     public:
         CommandQueue(D3D12_COMMAND_LIST_TYPE listType) noexcept;
         ~CommandQueue()

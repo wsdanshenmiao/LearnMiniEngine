@@ -1,83 +1,97 @@
 #include "GpuBuffer.h"
-#include "LinearBufferAllocator.h"
 #include "RenderContext.h"
 
-/*namespace DSM{
-
-    static std::map<LinearBufferDesc, LinearBufferAllocator> s_BufferAllocator{};
-    
+namespace DSM{
     GpuBuffer::GpuBuffer(const GpuBufferDesc& bufferDesc, void* initData)
         :m_BufferDesc(bufferDesc){
         // 从资源池中分配资源
-        LinearBufferDesc allocDesc{};
-        
         auto alignment = 0;
         if (Utility::HasAllFlags(bufferDesc.m_BufferFlag, DSMBufferFlag::ConstantBuffer)) {
             alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
         }
+        auto bufferSize = Utility::AlignUp(bufferDesc.m_Size, alignment);
         
-        allocDesc.m_Flags = D3D12_RESOURCE_FLAG_NONE;
-        allocDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
-        auto transitioningState = D3D12_RESOURCE_STATE_COMMON;
+        auto resourceFlags = D3D12_RESOURCE_FLAG_NONE;
+        auto heapType = D3D12_HEAP_TYPE_DEFAULT;
+        auto resourceState = D3D12_RESOURCE_STATE_COMMON;
         if (Utility::HasAllFlags(bufferDesc.m_BufferFlag, DSMBufferFlag::AccelStruct)) {
-            transitioningState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+            resourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
         }
         if (bufferDesc.m_Usage == DSMResourceUsage::Upload) {
-            transitioningState = D3D12_RESOURCE_STATE_GENERIC_READ;
-            allocDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
+            resourceState = D3D12_RESOURCE_STATE_GENERIC_READ;
+            heapType = D3D12_HEAP_TYPE_UPLOAD;
         }
         else if (bufferDesc.m_Usage == DSMResourceUsage::Readback) {
-            allocDesc.m_Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
-            transitioningState = D3D12_RESOURCE_STATE_COPY_DEST;
-            allocDesc.m_HeapType = D3D12_HEAP_TYPE_READBACK;
+            resourceFlags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+            resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+            heapType = D3D12_HEAP_TYPE_READBACK;
         }
         
         if (Utility::HasAllFlags(bufferDesc.m_BindFlag, DSMBindFlag::UnorderedAccess)) {
-            allocDesc.m_Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         }
         if (!Utility::HasAllFlags(bufferDesc.m_BindFlag, DSMBindFlag::ShaderResource)) {
-            allocDesc.m_Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+            resourceFlags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
         }
         if (Utility::HasAllFlags(bufferDesc.m_BufferFlag, DSMBufferFlag::AccelStruct)) {
-            allocDesc.m_Flags |= D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE;
+            resourceFlags |= D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE;
         }
 
-        GpuResourceLocatioin resourceLoc{};
-        if (auto it = s_BufferAllocator.find(allocDesc); it != s_BufferAllocator.end()) {
-            resourceLoc = it->second.CreateBuffer(bufferDesc.m_Size, alignment);
+        D3D12_RESOURCE_DESC resourceDesc{};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+        resourceDesc.Width = bufferSize;
+        resourceDesc.Height = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Flags = resourceFlags;
+        resourceDesc.SampleDesc = {1,0};
+        GpuResourceDesc gpuResourceDesc{};
+        gpuResourceDesc.m_Desc = resourceDesc;
+        gpuResourceDesc.m_State = resourceState;
+        gpuResourceDesc.m_HeapType = heapType;
+        gpuResourceDesc.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
+
+        Create(gpuResourceDesc);
+        
+        if (m_BufferDesc.m_Usage == DSMResourceUsage::Upload ||
+            m_BufferDesc.m_Usage == DSMResourceUsage::Readback) {
+            ASSERT_SUCCEEDED(m_Resource->Map(0, nullptr, &m_MappedData));
         }
-        else {
-            s_BufferAllocator[allocDesc].Create(allocDesc);
-            resourceLoc = s_BufferAllocator[allocDesc].CreateBuffer(bufferDesc.m_Size);
-        }
-        m_Resource = resourceLoc.m_Resource->GetResource();
-        m_UsageState = resourceLoc.m_Resource->GetUsageState();
-        m_GpuAddress = resourceLoc.m_GpuAddress;
-        m_MappedAddress = resourceLoc.m_MappedAddress;
 
         // TODO: 封装完命令列表后转变资源状态，并将初始话资源拷贝到Buffer中
     }
 
-    GpuBuffer::~GpuBuffer()
+    void GpuBuffer::Destroy()
     {
-        LinearBufferDesc allocDesc{};
-        allocDesc.m_Flags = m_Resource->GetDesc().Flags;
-        switch (m_BufferDesc.m_Usage) {
-        case DSMResourceUsage::Default: allocDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT; break;
-        case DSMResourceUsage::Upload: allocDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD; break;
-        case DSMResourceUsage::Readback: allocDesc.m_HeapType = D3D12_HEAP_TYPE_READBACK; break;
-        }
+        GpuResource::Destroy();
+        Unmap();
     }
 
+    void* GpuBuffer::Map()
+    {
+        if (m_MappedData == nullptr) {
+            ASSERT_SUCCEEDED(m_Resource->Map(0, nullptr, &m_MappedData));
+        }
+        return m_MappedData;
+    }
+
+    void GpuBuffer::Unmap()
+    {
+        if (m_MappedData != nullptr) {
+            m_Resource->Unmap(0, nullptr);
+            m_MappedData = nullptr;
+        }
+    }
 
     void GpuBuffer::Update(void* data, std::uint64_t size, std::uint64_t offset)
     {
-        // 之后上传堆才可写出数据
         ASSERT(m_BufferDesc.m_Usage == DSMResourceUsage::Upload);
-
-        if (m_MappedAddress == nullptr) {
+        if (m_MappedData == nullptr) {
             Map();
         }
-        memcpy(GetMappedAddress<char>() + offset, data, size);
+        memcpy(GetMappedData<char>() + offset, data, size);
     }
-}*/
+}

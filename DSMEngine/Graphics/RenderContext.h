@@ -5,6 +5,7 @@
 #include "../pch.h"
 #include "../Utilities/Singleton.h"
 #include "CommandQueue.h"
+#include "DynamicBufferAllocator.h"
 #include "GpuResourceAllocator.h"
 
 namespace DSM {
@@ -28,6 +29,8 @@ namespace DSM {
         CommandQueue& GetComputeQueue() noexcept { return m_ComputeQueue; }
         CommandQueue& GetCopyQueue() noexcept { return m_CopyQueue; }
 
+        DynamicBufferAllocator& GetDynamicBufferAllocator() noexcept { return m_DynamicBufferAllocator; }
+
         void CreateCommandList(
             D3D12_COMMAND_LIST_TYPE listType,
             ID3D12GraphicsCommandList** ppList,
@@ -50,6 +53,8 @@ namespace DSM {
         CommandQueue m_GraphicsQueue;
         CommandQueue m_ComputeQueue;
         CommandQueue m_CopyQueue;
+
+        DynamicBufferAllocator m_DynamicBufferAllocator;
 
     };
 

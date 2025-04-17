@@ -2,6 +2,9 @@
 #include "RenderContext.h"
 
 namespace DSM {
+    //
+    // GpuResourcePage Implementation
+    //
     ID3D12Resource* GpuResourcePage::Allocate(const D3D12_RESOURCE_DESC& resourceDesc, D3D12_RESOURCE_STATES resourceState)
     {
         auto resourceSize = resourceDesc.Width * resourceDesc.Height * resourceDesc.DepthOrArraySize;
@@ -29,9 +32,14 @@ namespace DSM {
 
 
 
-    
+
+    //
+    // GpuResourceAllocator Implementation
+    //
     void GpuResourceAllocator::Create(DSMHeapDesc heapDesc, std::uint64_t heapSize) noexcept
     {
+        std::lock_guard lock{m_Mutex};
+        
         m_HeapDesc = heapDesc;
         m_HeapSize = heapSize;
         auto newHeap = CreateNewHeap();
@@ -42,6 +50,8 @@ namespace DSM {
 
     void GpuResourceAllocator::ShutDown()
     {
+        std::lock_guard lock{m_Mutex};
+        
         while (!m_AvailablePages.empty()) {
             m_AvailablePages.pop();
         }
@@ -60,8 +70,7 @@ namespace DSM {
         std::lock_guard lock{m_Mutex};
         
         ID3D12Resource* resource = nullptr;
-        if (resourceSize > m_HeapSize ||
-            resourceSize < D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT) {    // 过大或过小的资源不创建堆
+        if (resourceSize > m_HeapSize) {    // 过大或过小的资源不创建堆
             D3D12_HEAP_PROPERTIES prop = {};
             prop.Type = m_HeapDesc.m_HeapType;
             ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreateCommittedResource(
@@ -96,7 +105,7 @@ namespace DSM {
         if (!m_CurrPage->ReleaseResource(resource) && m_ResourceMappings.contains(resource)) {
             auto it = m_FullPages.find(m_ResourceMappings[resource]);
             ASSERT((*it)->ReleaseResource(resource));
-            if ((*it)->GetSubresourcesCount() <= 0) {
+            if ((*it)->Empty()) {
                 (*it)->Reset();
                 m_AvailablePages.push(*it);
                 m_FullPages.erase(it);

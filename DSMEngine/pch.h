@@ -3,12 +3,15 @@
 #define __PCH__H__
 
 
-#define NOMINMAX
+
 
 #if defined(DEBUG) || defined(_DEBUG)
 #include <dxgidebug.h>
 #endif
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <wrl/client.h>
 #include <wrl/event.h>

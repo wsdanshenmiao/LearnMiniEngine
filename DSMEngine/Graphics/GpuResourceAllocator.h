@@ -3,7 +3,6 @@
 #define __GPURESOURCEALLOCATOR_H__
 
 #include "GpuResource.h"
-#include "../Utilities/Hash.h"
 #include "../Utilities/LinearAllocator.h"
 
 namespace DSM {
@@ -24,7 +23,7 @@ namespace DSM {
         GpuResourcePage(ID3D12Heap* agentHeap)
             :m_Heap(agentHeap), m_Allocator(agentHeap->GetDesc().SizeInBytes){}
         ~GpuResourcePage() = default;
-        DSM_NONCOPYABLE(GpuResourcePage)
+        DSM_NONCOPYABLE_NONMOVABLE(GpuResourcePage);
 
         ID3D12Resource* Allocate(const D3D12_RESOURCE_DESC& resourceDesc, D3D12_RESOURCE_STATES resourceState);
         bool ReleaseResource(ID3D12Resource* resource);
@@ -34,6 +33,9 @@ namespace DSM {
             m_Allocator.Clear();
         }
         std::size_t GetSubresourcesCount() const noexcept{ return m_SubResources.size(); }
+
+        bool Full() const noexcept { return m_Allocator.Full(); }
+        bool Empty() const noexcept { return m_SubResources.empty(); }
         
     private:
         Microsoft::WRL::ComPtr<ID3D12Heap> m_Heap{};
