@@ -1,9 +1,12 @@
 #include "GpuBuffer.h"
+
+#include "CommandList.h"
 #include "RenderContext.h"
 
 namespace DSM{
-    GpuBuffer::GpuBuffer(const GpuBufferDesc& bufferDesc, void* initData)
-        :m_BufferDesc(bufferDesc){
+
+    void GpuBuffer::Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData)
+    {
         // 从资源池中分配资源
         auto alignment = 0;
         if (Utility::HasAllFlags(bufferDesc.m_BufferFlag, DSMBufferFlag::ConstantBuffer)) {
@@ -54,11 +57,15 @@ namespace DSM{
         gpuResourceDesc.m_HeapType = heapType;
         gpuResourceDesc.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
 
-        Create(gpuResourceDesc);
+        GpuResource::Create(name, gpuResourceDesc);
         
         if (m_BufferDesc.m_Usage == DSMResourceUsage::Upload ||
             m_BufferDesc.m_Usage == DSMResourceUsage::Readback) {
             ASSERT_SUCCEEDED(m_Resource->Map(0, nullptr, &m_MappedData));
+        }
+
+        if (initData != nullptr) {
+            CommandList::InitBuffer(*this, initData, bufferSize);
         }
     }
 

@@ -6,7 +6,7 @@ namespace DSM {
     static std::map<DSMHeapDesc, GpuResourceAllocator> s_GpuResourceAllocators{};
     
 
-    void GpuResource::Create(const GpuResourceDesc& resourceDesc)
+    void GpuResource::Create(const std::wstring& name, const GpuResourceDesc& resourceDesc)
     {
         DSMHeapDesc heapDesc{};
         heapDesc.m_HeapType = resourceDesc.m_HeapType;
@@ -24,6 +24,8 @@ namespace DSM {
         }
         m_Resource = resource;
         m_UsageState = resourceDesc.m_State;
+
+        m_Resource->SetName(name.c_str());
     }
 
     void GpuResource::Destroy()

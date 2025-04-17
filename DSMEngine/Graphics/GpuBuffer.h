@@ -22,10 +22,16 @@ namespace DSM {
     class GpuBuffer : public GpuResource
     {
     public:
-        GpuBuffer(const GpuBufferDesc& bufferDesc, void* initData = nullptr);
+        GpuBuffer() = default;
+        GpuBuffer(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData = nullptr)
+            :m_BufferDesc(bufferDesc)
+        {
+            Create(name, bufferDesc, initData);
+        }
         ~GpuBuffer() = default;
         DSM_NONCOPYABLE(GpuBuffer);
 
+        void Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData = nullptr);
         virtual void Destroy() override;
 
         const GpuBufferDesc& GetDesc() const noexcept { return m_BufferDesc; }
