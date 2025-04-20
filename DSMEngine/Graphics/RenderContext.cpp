@@ -1,7 +1,6 @@
 #include "RenderContext.h"
-
-#include "CommandList.h"
-#include "GpuBuffer.h"
+#include "CommandList/CommandList.h"
+#include "Resource/GpuBuffer.h"
 #include "GraphicsCommon.h"
 #include "RootSignature.h"
 
@@ -117,8 +116,8 @@ namespace DSM {
         m_ComputeQueue.Create(m_pDevice.Get());
         m_CopyQueue.Create(m_pDevice.Get());
 
-        m_CpuBufferAllocator.Create(sm_CpuBufferPageSize);
-        m_GpuBufferAllocator.Create(sm_GpuAllocatorPageSize);
+        m_CpuBufferAllocator.Create(DynamicBufferAllocator::AllocateMode::CpuExclusive, sm_CpuBufferPageSize);
+        m_GpuBufferAllocator.Create(DynamicBufferAllocator::AllocateMode::GpuExclusive, sm_GpuAllocatorPageSize);
     }
 
     void RenderContext::Shutdown()
@@ -180,8 +179,9 @@ namespace DSM {
         auto& cmdQueue = GetCommandQueue(cmdList->m_CmdListType);
         auto fenceValue = cmdQueue.ExecuteCommandList(cmdList->GetCommandList());
 
-        m_DynamicBufferAllocator.Cleanup(fenceValue);
-
+        m_CpuBufferAllocator.Cleanup(fenceValue);
+        m_GpuBufferAllocator.Cleanup(fenceValue);
+        
         if (waitForCompletion) {
             cmdQueue.WaitForFence(fenceValue);
         }

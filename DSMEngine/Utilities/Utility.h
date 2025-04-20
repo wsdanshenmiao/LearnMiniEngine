@@ -58,14 +58,14 @@ namespace DSM::Utility {
 
 
     template <typename T> 
-    inline constexpr T AlignUp( T value, std::uint32_t alignment ) noexcept
+    inline constexpr T AlignUp( T value, std::uint64_t alignment ) noexcept
     {
         if (alignment == 0 || alignment == 1) return value;
         else return (T)(((std::uint64_t)value + (alignment - 1)) & ~(alignment - 1));
     }
 
     template <typename T>
-    inline constexpr T IsAligned(T value, std::uint32_t alignment ) noexcept
+    inline constexpr T IsAligned(T value, std::uint64_t alignment ) noexcept
     {
         return 0 == ((std::uint64_t)value & (alignment - 1));
     }

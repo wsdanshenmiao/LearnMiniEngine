@@ -3,7 +3,7 @@
 #define __LINEARBUFFERALLOCATOR_H__
 
 #include "GpuBuffer.h"
-#include "../Utilities/LinearAllocator.h"
+#include "../../Utilities/LinearAllocator.h"
 
 namespace DSM {
 
@@ -58,11 +58,16 @@ namespace DSM {
     class DynamicBufferAllocator
     {
     public:
+        enum class AllocateMode
+        {
+            CpuExclusive, GpuExclusive
+        };
+        
         DynamicBufferAllocator() = default;
         ~DynamicBufferAllocator() { Shutdown(); };
         DSM_NONCOPYABLE_NONMOVABLE(DynamicBufferAllocator);
 
-        void Create(std::uint64_t pageSize = DEFAULT_BUFFER_PAGE_SIZE);
+        void Create(AllocateMode mode, std::uint64_t pageSize = DEFAULT_BUFFER_PAGE_SIZE);
         void Shutdown();
 
         GpuResourceLocatioin Allocate(std::uint64_t bufferSize, std::uint32_t alignment = 0);
@@ -74,6 +79,8 @@ namespace DSM {
         GpuResource* CreateNewBuffer(std::uint64_t bufferSize = 0);
 
     private:
+        AllocateMode m_AllocateMode = AllocateMode::CpuExclusive;
+        
         std::vector<std::unique_ptr<DynamicBufferPage>> m_PagePool;
 
         std::vector<DynamicBufferPage*> m_FullPages;

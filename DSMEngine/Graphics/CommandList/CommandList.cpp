@@ -1,6 +1,6 @@
 #include "CommandList.h"
-
-#include "RenderContext.h"
+#include "../RenderContext.h"
+#include "../PipelineState.h"
 
 namespace DSM {
     CommandList::CommandList(const std::wstring& id)
@@ -139,7 +139,7 @@ namespace DSM {
         resourceBarrier.UAV.pResource = resource.GetResource();
         resourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         m_ResourceBarriers.push_back(std::move(resourceBarrier));
-
+        
         if (flush) {
             FlushResourceBarriers();
         }

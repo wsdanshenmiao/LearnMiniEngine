@@ -68,10 +68,9 @@ namespace DSM{
 
     void RootSignature::Reset(std::uint32_t numRootParams, std::uint32_t numStaticSamplers)
     {
-        m_RootParameters.clear();
-        m_StaticSamplers.clear();
         m_RootParameters.resize(numRootParams);
         m_StaticSamplers.resize(numStaticSamplers);
+        m_DescriptorTableSize.resize(numRootParams);
         m_NumInitializedStaticSamplers = 0;   
     }
 
@@ -146,7 +145,20 @@ namespace DSM{
             const auto& param = rootSigDesc.pParameters[i];
             // 若是描述符表，每个描述符都需要Hash
             if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE) {
-                hash = Utility::HashState(param.DescriptorTable.pDescriptorRanges, param.DescriptorTable.NumDescriptorRanges, hash);
+                auto& descriptorTable = param.DescriptorTable;
+                ASSERT(descriptorTable.pDescriptorRanges != nullptr);
+                
+                hash = Utility::HashState(descriptorTable.pDescriptorRanges, descriptorTable.NumDescriptorRanges, hash);
+
+                // 记录当前是何种描述符表
+                auto& ranges = descriptorTable.pDescriptorRanges;
+                auto& bitMap = ranges->RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER ? m_SamplerTableBitMap : m_DescriptorTableBitMap;
+                bitMap |= (1 << i);
+
+                // 获取描述符表的大小
+                for (std::size_t j = 0; j < descriptorTable.NumDescriptorRanges; ++j) {
+                    m_DescriptorTableSize[i] += ranges[j].NumDescriptors;
+                }
             }
             else {
                 hash = Utility::HashState(&param);

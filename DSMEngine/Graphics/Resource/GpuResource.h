@@ -2,7 +2,7 @@
 #ifndef __GPURESOURCE_H__
 #define __GPURESOURCE_H__
 
-#include "../pch.h"
+#include "../../pch.h"
 
 namespace DSM {
     class GpuResourceAllocator;

@@ -63,7 +63,14 @@ namespace DSM{
         
         void InitStaticSampler(std::uint32_t shaderRegister, const D3D12_SAMPLER_DESC& samplerDesc, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL);
         void Finalize(const std::wstring& name, D3D12_ROOT_SIGNATURE_FLAGS flags = D3D12_ROOT_SIGNATURE_FLAG_NONE);
-        
+
+        std::uint32_t GetDescriptorTableBitMap() const { return m_DescriptorTableBitMap; }
+        std::uint32_t GetSamplerTableBitMap() const { return m_SamplerTableBitMap; }
+        std::uint32_t GetDescriptorTableSize(std::size_t index) const
+        {
+            ASSERT(index < m_DescriptorTableSize.size());
+            return m_DescriptorTableSize[index];
+        }
         ID3D12RootSignature* GetRootSignature() const noexcept { return m_RootSignature; };
         
         // 获取根参数
@@ -94,7 +101,11 @@ namespace DSM{
         // 全局根签名的引用指针
         ID3D12RootSignature* m_RootSignature = nullptr;
 
-        
+        // 描述描述符表在根签名中的位置
+        std::uint32_t m_DescriptorTableBitMap{};
+        // 采样器在根参数中的位置
+        std::uint32_t m_SamplerTableBitMap{};
+        std::vector<std::uint32_t> m_DescriptorTableSize{};
     };
     
 }

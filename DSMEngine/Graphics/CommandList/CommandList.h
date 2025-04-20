@@ -2,13 +2,13 @@
 #ifndef __COMMANDBUFFER_H__
 #define __COMMANDBUFFER_H__
 
-#include "DynamicBufferAllocator.h"
-#include "GpuBuffer.h"
-#include "PipelineState.h"
+#include "../Resource/DynamicBufferAllocator.h"
 
 namespace DSM {
     class GraphicsCommandList;
     class ComputeCommandList;
+    class PipelineState;
+    class PSO;
 
     struct DWParam
     {
@@ -82,6 +82,7 @@ namespace DSM {
         static void InitTexture(GpuResource& dest, std::uint32_t numSubResource, D3D12_SUBRESOURCE_DATA subResources[]);
         static void InitBuffer(GpuResource& dest, const void* data, std::size_t byteSize, std::size_t destOffset = 0);
         static void InitTextureArraySlice(GpuResource& dest, std::uint32_t sliceIndex, GpuResource& src);
+
         
     protected:
         void BindDescriptorHeaps();
@@ -97,16 +98,6 @@ namespace DSM {
 
         std::vector<D3D12_RESOURCE_BARRIER> m_ResourceBarriers{};
         std::array<ID3D12DescriptorHeap*, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_CurrDescriptorHeaps{};
-    };
-
-    class GraphicsCommandList : public CommandList
-    {
-        
-    };
-
-    class ComputeCommandList : public CommandList
-    {
-        
     };
 
 }

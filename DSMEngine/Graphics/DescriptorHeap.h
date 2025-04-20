@@ -3,11 +3,11 @@
 #define __D3D12DESCRIPTORHANDLE__H__
 
 #include <d3d12.h>
-#include <array>
 #include <vector>
-#include <string>
 #include <wrl/client.h>
-#include <memory>
+#include <mutex>
+#include "../Utilities/LinearAllocator.h"
+#include "../Utilities/Macros.h"
 
 namespace DSM {
     // 描述符的句柄
@@ -36,22 +36,18 @@ namespace DSM {
         D3D12_GPU_DESCRIPTOR_HANDLE m_GPUHandle{};
     };
 
-    // 存储 Shader Visible 的静态描述符堆 
+
     class DescriptorHeap
     {
     public:
-        DescriptorHeap(ID3D12Device* device);
-        ~DescriptorHeap();
+        DescriptorHeap(const std::wstring& name, D3D12_DESCRIPTOR_HEAP_TYPE heapType, std::uint32_t heapSize);
+        ~DescriptorHeap() = default;
+        DSM_NONCOPYABLE(DescriptorHeap);
 
-        // 创建描述符堆
-        void Create(const std::wstring& name, D3D12_DESCRIPTOR_HEAP_TYPE heapType, std::uint32_t maxCount);
-        // 销毁描述符堆
-        void Destroy();
         void Clear();
 
         bool HasValidSpace(std::uint32_t numDescriptors) const noexcept;
         bool IsValidHandle(const DescriptorHandle& handle) const noexcept;
-        DescriptorHandle AllocateAndCopy(const std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& srcHandle);
         DescriptorHandle Allocate(std::uint32_t count = 1);
         
         ID3D12DescriptorHeap* GetHeap() const noexcept;
@@ -61,33 +57,33 @@ namespace DSM {
         DescriptorHandle operator[](std::uint32_t index) const noexcept;
         
     private:
-        Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
-        D3D12_DESCRIPTOR_HEAP_DESC m_HeapDesc{};
         std::uint32_t m_DescriptorSize{};
-        std::uint32_t m_NumFreeDescriptors{};
         
         DescriptorHandle m_FirstHandle{};
-        DescriptorHandle m_NextFreeHandle{};
+        LinearAllocator m_Allocator;
     };
 
-    // Shader Visible 的描述符缓冲堆
-    class DescriptorCache
+    // 无上限的描述符堆，储存cpu可见的描述符
+    class DescriptorAllocator
     {
     public:
-        DescriptorCache(ID3D12Device* device, std::uint32_t maxCount = 1024);
-
-        ID3D12DescriptorHeap* GetHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType) const noexcept;
-        DescriptorHandle AllocateAndCopy(
-            D3D12_DESCRIPTOR_HEAP_TYPE heapType,
-            const std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& srcHandle);
-        DescriptorHandle Allocate(D3D12_DESCRIPTOR_HEAP_TYPE heapType, std::uint32_t count = 1);
-        void Clear();
+        DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE heapTyep)
+            :m_HeapType(heapTyep){}
         
-    private:
-        // 存储不同描述符的数组
-        std::array<std::unique_ptr<DescriptorHeap>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_DescriptorHeaps;
-        ID3D12Device* m_Device;
+        D3D12_CPU_DESCRIPTOR_HANDLE Allocate(std::uint32_t count);
+
+        static void DetroyAll(){ sm_DescriptorHeapPool.clear(); }
+
+
+    protected:
+        static constexpr std::uint32_t sm_NumDescriptorsPerHeap = 256;
+        static std::vector<DescriptorHeap> sm_DescriptorHeapPool;
+        static std::mutex sm_Mutex;
+
+
+        const D3D12_DESCRIPTOR_HEAP_TYPE m_HeapType{};
+        DescriptorHeap* m_CurrHeap{};
     };
     
 }

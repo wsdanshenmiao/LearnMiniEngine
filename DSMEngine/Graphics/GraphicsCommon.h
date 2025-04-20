@@ -15,37 +15,6 @@ namespace DSM {
         return featureSupport.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
     }
 
-    enum class DSMSubresourceType : std::uint8_t
-    {
-        CBV, SRV, UAV, RTV, DSV, Invalid
-    };
-
-    enum class DSMResourceUsage : std::uint8_t
-    {
-        Default = 1, Upload = 2, Readback = 3
-    };
-
-    enum class DSMBindFlag : std::uint32_t
-    {
-        None = 0,
-        ConstantBuffer = 1 << 0,
-        ShaderResource = 1 << 1,
-        RenderTarget = 1 << 2,
-        DepthStencil = 1 << 3,
-        UnorderedAccess = 1 << 4,
-    };
-
-    enum class DSMBufferFlag : std::uint32_t
-    {
-        None,
-        IndirectArgsBuffer = 1 << 0,
-        RowBuffer = 1 << 1,
-        StructuredBuffer = 1 << 2,
-        ConstantBuffer = 1 << 3,
-        VertexBuffer = 1 << 4,
-        IndexBuffer = 1 << 5,
-        AccelStruct = 1 << 6
-    };
 }
 
 #endif

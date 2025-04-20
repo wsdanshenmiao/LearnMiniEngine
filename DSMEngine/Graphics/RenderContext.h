@@ -5,8 +5,8 @@
 #include "../pch.h"
 #include "../Utilities/Singleton.h"
 #include "CommandQueue.h"
-#include "DynamicBufferAllocator.h"
-#include "GpuResourceAllocator.h"
+#include "Resource/DynamicBufferAllocator.h"
+#include "Resource/GpuResourceAllocator.h"
 
 namespace DSM {
     class RenderContext : public Singleton<RenderContext>

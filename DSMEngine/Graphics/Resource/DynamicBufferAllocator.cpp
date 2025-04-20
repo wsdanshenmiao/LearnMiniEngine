@@ -1,11 +1,12 @@
 #include "DynamicBufferAllocator.h"
-#include "RenderContext.h"
+#include "../RenderContext.h"
 
 namespace DSM {
-    void DynamicBufferAllocator::Create(std::uint64_t pageSize)
+    void DynamicBufferAllocator::Create(AllocateMode mode, std::uint64_t pageSize)
     {
         std::lock_guard lock{m_Mutex};
-        
+
+        m_AllocateMode = mode;
         m_PageSize = pageSize;
 
         auto buffer = CreateNewBuffer();
@@ -131,7 +132,17 @@ namespace DSM {
         bufferDesc.m_Desc = resourceDesc;
         bufferDesc.m_State = resourceState;
         bufferDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
-        auto ret = new GpuResource(bufferDesc);
+
+        if (m_AllocateMode == AllocateMode::CpuExclusive) {
+            bufferDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
+            resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        }
+        else if ( m_AllocateMode == AllocateMode::GpuExclusive ) {
+            bufferDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+            resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        }
+        
+        auto ret = new GpuResource(L"DynamicBuffer", bufferDesc);
         
         return ret;
     }

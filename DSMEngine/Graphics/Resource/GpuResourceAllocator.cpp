@@ -1,5 +1,5 @@
 #include "GpuResourceAllocator.h"
-#include "RenderContext.h"
+#include "../RenderContext.h"
 
 namespace DSM {
     //

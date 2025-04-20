@@ -3,7 +3,7 @@
 #define __GPURESOURCEALLOCATOR_H__
 
 #include "GpuResource.h"
-#include "../Utilities/LinearAllocator.h"
+#include "../../Utilities/LinearAllocator.h"
 
 namespace DSM {
     

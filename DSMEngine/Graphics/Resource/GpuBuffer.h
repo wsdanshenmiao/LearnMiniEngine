@@ -2,19 +2,18 @@
 #ifndef __GPUBUFFER_H__
 #define __GPUBUFFER_H__
 
+#include <d3d12.h>
 #include "GpuResource.h"
-#include "GraphicsCommon.h"
+#include "../../Utilities/Macros.h"
 
 namespace DSM {
     // 用于创建 Buffer 的描述
     struct GpuBufferDesc
     {
         std::uint64_t m_Size = 0;
-        DSMResourceUsage m_Usage = DSMResourceUsage::Default;
-        DSMBindFlag m_BindFlag = DSMBindFlag::None;
-        DSMBufferFlag m_BufferFlag = DSMBufferFlag::None;
         std::uint32_t m_Stride = 0;
-        DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
+        D3D12_HEAP_TYPE m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
     };
 
     
@@ -42,12 +41,11 @@ namespace DSM {
             ASSERT(m_BufferDesc.m_Stride != 0);
             return static_cast<std::uint32_t>(m_BufferDesc.m_Size / m_BufferDesc.m_Stride);
         }
-        DXGI_FORMAT GetFormat() const noexcept { return m_BufferDesc.m_Format; }
 
         bool Mappable() const noexcept
         {
-            return m_BufferDesc.m_Usage == DSMResourceUsage::Upload ||
-                m_BufferDesc.m_Usage == DSMResourceUsage::Readback ;
+            return m_BufferDesc.m_HeapType == D3D12_HEAP_TYPE_UPLOAD ||
+                m_BufferDesc.m_HeapType == D3D12_HEAP_TYPE_READBACK;
         }
         void* Map();
         void Unmap();
@@ -61,6 +59,19 @@ namespace DSM {
         GpuBufferDesc m_BufferDesc{};
         void* m_MappedData{};
     };
+
+
+    inline GpuBufferDesc GetReadBackBufferDesc(std::uint64_t size, std::uint32_t stride)
+    {
+        GpuBufferDesc bufferDesc;
+
+        bufferDesc.m_Size = size;
+        bufferDesc.m_Stride = stride;
+        bufferDesc.m_HeapType = D3D12_HEAP_TYPE_READBACK;
+        bufferDesc.m_Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        return bufferDesc;
+    }
 
 }
 
