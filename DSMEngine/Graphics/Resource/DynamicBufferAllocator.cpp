@@ -10,7 +10,8 @@ namespace DSM {
         m_PageSize = pageSize;
 
         auto buffer = CreateNewBuffer();
-        auto newPage = std::make_unique<DynamicBufferPage>(buffer);
+        bool mappedAble = m_AllocateMode == AllocateMode::CpuExclusive;
+        auto newPage = std::make_unique<DynamicBufferPage>(buffer, mappedAble);
         m_CurrPage = newPage.get();
         m_PagePool.emplace_back(std::move(newPage));
     }
@@ -100,7 +101,8 @@ namespace DSM {
 
         DynamicBufferPage* ret = nullptr;
         if (m_AvailablePages.empty()) {
-            auto newPage = std::make_unique<DynamicBufferPage>(CreateNewBuffer());
+            bool mappedAble = m_AllocateMode == AllocateMode::CpuExclusive;
+            auto newPage = std::make_unique<DynamicBufferPage>(CreateNewBuffer(), mappedAble);
             ret = newPage.get();
             m_PagePool.emplace_back(std::move(newPage));
         }

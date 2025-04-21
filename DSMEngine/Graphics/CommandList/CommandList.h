@@ -2,13 +2,21 @@
 #ifndef __COMMANDBUFFER_H__
 #define __COMMANDBUFFER_H__
 
-#include "../Resource/DynamicBufferAllocator.h"
+#include <d3d12.h>
+#include <wrl/client.h>
+#include <vector>
+#include <array>
+#include "../../Utilities/Macros.h"
+
 
 namespace DSM {
     class GraphicsCommandList;
     class ComputeCommandList;
     class PipelineState;
     class PSO;
+    class DynamicDescriptorHeap;
+    class GpuResource;
+    struct GpuResourceLocatioin;
 
     struct DWParam
     {
@@ -95,6 +103,9 @@ namespace DSM {
         ID3D12RootSignature* m_CurrGraphicsRootSignature{};
         ID3D12RootSignature* m_CurrComputeRootSignature{};
         ID3D12PipelineState* m_CurrPipelineState{};
+
+        DynamicDescriptorHeap* m_ViewDescriptorHeap{};
+        DynamicDescriptorHeap* m_SampleDescriptorHeap{};
 
         std::vector<D3D12_RESOURCE_BARRIER> m_ResourceBarriers{};
         std::array<ID3D12DescriptorHeap*, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_CurrDescriptorHeaps{};

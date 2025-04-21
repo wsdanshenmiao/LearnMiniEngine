@@ -1,5 +1,4 @@
 #include "DescriptorHeap.h"
-
 #include "RenderContext.h"
 #include "../Utilities/Macros.h"
 
@@ -78,6 +77,7 @@ namespace DSM {
 			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		}
 		heapDesc.Type = heapType;
+		heapDesc.NumDescriptors = heapSize;
 
 		auto pDevice = g_RenderContext.GetDevice();
 		ASSERT_SUCCEEDED(pDevice->CreateDescriptorHeap(
@@ -153,9 +153,10 @@ namespace DSM {
 	D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocator::Allocate(std::uint32_t count)
 	{
 		if (m_CurrHeap == nullptr || !m_CurrHeap->HasValidSpace(count)) {
-			auto& newHeap = sm_DescriptorHeapPool.emplace_back(
+			auto newHeap = std::make_unique<DescriptorHeap>(
 				L"DescriptorAllocator::DescriptorHeap", m_HeapType, sm_NumDescriptorsPerHeap);
-			m_CurrHeap = &newHeap;
+			m_CurrHeap = newHeap.get();
+			sm_DescriptorHeapPool.emplace_back(std::move(newHeap));
 		}
 
 		return m_CurrHeap->Allocate(count);

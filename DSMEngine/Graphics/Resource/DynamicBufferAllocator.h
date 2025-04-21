@@ -6,7 +6,6 @@
 #include "../../Utilities/LinearAllocator.h"
 
 namespace DSM {
-
     // 用于定位子资源在缓冲区中的位置
     struct GpuResourceLocatioin
     {
@@ -21,10 +20,12 @@ namespace DSM {
     {
         friend class DynamicBufferAllocator;
     public:
-        DynamicBufferPage(GpuResource* agentResource) 
+        DynamicBufferPage(GpuResource* agentResource, bool mappedAble) 
             :m_Resource(agentResource), m_LiearAllocator(agentResource->GetResource()->GetDesc().Width)
         {
-            ASSERT_SUCCEEDED(m_Resource->GetResource()->Map(0, nullptr, reinterpret_cast<void**>(&m_MappedAddress)));
+            if (mappedAble) {
+                ASSERT_SUCCEEDED(m_Resource->GetResource()->Map(0, nullptr, reinterpret_cast<void**>(&m_MappedAddress)));
+            }
         }
         ~DynamicBufferPage() = default;
 
@@ -39,7 +40,9 @@ namespace DSM {
                 outResource.m_Offset = offset;
                 outResource.m_Size = size;
                 outResource.m_GpuAddress = m_Resource->GetGpuVirtualAddress() + offset;
-                outResource.m_MappedAddress = m_MappedAddress + offset;
+                if (m_MappedAddress != nullptr) {
+                    outResource.m_MappedAddress = m_MappedAddress + offset;
+                }
                 return true;
             }
         }

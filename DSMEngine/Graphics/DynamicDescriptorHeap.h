@@ -2,13 +2,15 @@
 #ifndef __DYNAMICDESCRIPTORHEAP_H__
 #define __DYNAMICDESCRIPTORHEAP_H__
 
-#include <d3d12.h>
 #include <queue>
-#include "../Utilities/Macros.h"
+#include <functional>
+#include <array>
+#include "DescriptorHeap.h"
 
 namespace DSM {
-    class DescriptorHeap;
     class RootSignature;
+    class CommandList;
+    class DescriptorHandle;
     
     class DynamicDescriptorHeap
     {
@@ -31,7 +33,7 @@ namespace DSM {
             std::vector<DescriptorTableCache> m_DescriptorTables{};
 
             // 解析根签名
-            void ParseRootSignature(D3D12_DESCRIPTOR_HEAP_TYPE heapType, const RootSignature* rootSig);
+            void ParseRootSignature(D3D12_DESCRIPTOR_HEAP_TYPE heapType, const RootSignature& rootSig);
             // 计算需要使用的描述符
             std::uint32_t ComputeStaledSize() const;
             // 解除先前的绑定并重新计算需要绑定的根参数
@@ -42,87 +44,84 @@ namespace DSM {
                 std::uint32_t offset,
                 std::uint32_t numHandles,
                 const D3D12_CPU_DESCRIPTOR_HANDLE handles[]);
-            template <typename SetFunc>
             void CopyAndBindStaleTables(
                 D3D12_DESCRIPTOR_HEAP_TYPE heapType,
                 std::uint32_t descriptorSize,
-                D3D12_CPU_DESCRIPTOR_HANDLE handleStart,
-                SetFunc setFunc);
+                DescriptorHandle handleStart,
+                std::function<void(UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
+            void Cleanup();
         };
         
     public:
-        DynamicDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType);
+        DynamicDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType)
+            :m_HeapType(heapType){}
+        DSM_NONCOPYABLE(DynamicDescriptorHeap);
+
+        void Reset();
 
         // 通过根签名的解析结果检测资源绑定是否正确，同时将CPU描述符拷贝到GPU可见的描述符中
         void SetGraphicsDescriptorHandle(
             std::uint32_t rootIndex,
             std::uint32_t offset,
             std::uint32_t numHandle,
-            D3D12_CPU_DESCRIPTOR_HANDLE handles[]);
+            D3D12_CPU_DESCRIPTOR_HANDLE handles[])
+        {
+            m_GraphicsHandleCache.StageDescriptorHandles(rootIndex, offset, numHandle, handles);
+        }
         void SetComputeDescriptorHandle(
             std::uint32_t rootIndex,
             std::uint32_t offset,
             std::uint32_t numHandle,
-            D3D12_CPU_DESCRIPTOR_HANDLE handles[]);
+            D3D12_CPU_DESCRIPTOR_HANDLE handles[])
+        {
+            m_ComputeHandleCache.StageDescriptorHandles(rootIndex, offset, numHandle, handles);
+        }
 
         // 解析根描述符
-        void ParseGraphicsRootSignature(const RootSignature& rootSig);
-        void ParseComputeRootSignature(const RootSignature& rootSig);
+        void ParseGraphicsRootSignature(const RootSignature& rootSig)
+        {
+            m_GraphicsHandleCache.ParseRootSignature(m_HeapType, rootSig);
+        }
+        void ParseComputeRootSignature(const RootSignature& rootSig)
+        {
+            m_ComputeHandleCache.ParseRootSignature(m_HeapType, rootSig);
+        }
+
+        void CommitGraphicsRootDescriptorTables();
+        void CommitComputeRootDescriptorTables();
+        
+        D3D12_GPU_DESCRIPTOR_HANDLE UploadDirect( D3D12_CPU_DESCRIPTOR_HANDLE handle);
 
         // 回收使用完毕的描述符堆
         void Cleanup(std::uint64_t fenceValue);
 
+        static DynamicDescriptorHeap* AllocateDynamicDescriptorHeap(CommandList* owningList, D3D12_DESCRIPTOR_HEAP_TYPE heapType);
+        static void FreeDynamicDescriptorHeap(std::uint64_t fenceValue, DynamicDescriptorHeap* heap);
         static void DestroyAll();
+
+    private:
+        void CopyAndBindStaleTables(
+            DescriptorHandleCache& handleCache,
+            std::function<void(UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
+        void RequestDescriptorHeap();
         
     private:
+        using DynamicDescriptorHeapPool = std::vector<std::unique_ptr<DynamicDescriptorHeap>>;
+        inline static std::array<DynamicDescriptorHeapPool, 2> sm_DynamicDescriptorHeapPools{};
+        inline static std::array<std::queue<DynamicDescriptorHeap*>, 2> sm_AvailableDescriptorHeaps{};
+        inline static std::mutex sm_Mutex;
+        
+        CommandList* m_OwningCmdList{};
         const D3D12_DESCRIPTOR_HEAP_TYPE m_HeapType{};
         DescriptorHeap* m_pCurrentHeap{};
         std::vector<DescriptorHeap*> m_FullDescriptorHeaps{};
+
+        DescriptorHandleCache m_GraphicsHandleCache{};
+        DescriptorHandleCache m_ComputeHandleCache{};
     };
 
     
-    template <typename SetFunc>
-    inline void DynamicDescriptorHeap::DescriptorHandleCache::CopyAndBindStaleTables(
-        D3D12_DESCRIPTOR_HEAP_TYPE heapType,
-        std::uint32_t descriptorSize,
-        D3D12_CPU_DESCRIPTOR_HANDLE handleStart,
-        SetFunc setFunc)
-    {
-        std::uint32_t staleParamCount{};
-        std::vector<std::uint32_t> usedTableSizes(m_DescriptorTables.size());
-        std::vector<std::uint32_t> rootIndexs(m_DescriptorTables.size());
-        auto staleBitMap = m_StaleRootParamsBitMap;
-        m_StaleRootParamsBitMap = 0;
-        unsigned long rootIndex{};
-        // 获取绑定了资源的根参数
-        while (_BitScanForward(&rootIndex, staleBitMap)) {
-            staleBitMap ^= (1 << rootIndex);
 
-            auto& descriptorTable = m_DescriptorTables[rootIndex];
-            ASSERT(_BitScanReverse(&rootIndex, descriptorTable.m_AssignedHandlesBitMap));
-            
-            usedTableSizes[staleParamCount] = descriptorTable.m_TableHandles.size();
-            rootIndexs[staleParamCount] = rootIndex;
-            ++staleParamCount;
-        }
-
-        // 每次拷贝 16 个
-        static constexpr std::uint32_t maxDescriptorPerCopy = 16;
-        std::uint32_t numDestDescriptorRanges= 0 ;
-        D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangesStarts[maxDescriptorPerCopy];
-        std::uint32_t pDestDescriptorRangesSizes[maxDescriptorPerCopy];
-        std::uint32_t numSrcDescriptorRanges = 0;
-        D3D12_CPU_DESCRIPTOR_HANDLE pSrcDescriptorRangesStarts[maxDescriptorPerCopy];
-        std::uint32_t pSrcDescriptorRangesSizes[maxDescriptorPerCopy];
-        
-        // 每一个描述符表
-        for (std::uint32_t i = 0; i < staleParamCount; ++i) {
-            rootIndex = rootIndexs[i];
-            setFunc(rootIndex, handleStart);
-
-            auto& descriptorTable = m_DescriptorTables[rootIndex];
-        }
-    }
 }
 
 

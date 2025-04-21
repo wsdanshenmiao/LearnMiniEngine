@@ -46,7 +46,7 @@ namespace DSM{
         m_RootParameter.Descriptor.RegisterSpace = space;
     }
 
-    void RootParameter::InitAsDescriptorTable(std::uint32_t rangeCount, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept
+    void RootParameter::InitAsDescriptorTable(std::uint32_t rangeCount, D3D12_SHADER_VISIBILITY visibility) noexcept
     {
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -129,7 +129,7 @@ namespace DSM{
     {
         if (m_Finalized) return;
 
-        ASSERT(m_NumInitializedStaticSamplers == m_RootParameters.size());
+        ASSERT(m_NumInitializedStaticSamplers == m_StaticSamplers.size());
 
         D3D12_ROOT_SIGNATURE_DESC rootSigDesc;
         rootSigDesc.Flags = flags;
@@ -157,7 +157,7 @@ namespace DSM{
 
                 // 获取描述符表的大小
                 for (std::size_t j = 0; j < descriptorTable.NumDescriptorRanges; ++j) {
-                    m_DescriptorTableSize[i] += ranges[j].NumDescriptors;
+                    m_DescriptorTableSize[i] += descriptorTable.pDescriptorRanges[j].NumDescriptors;
                 }
             }
             else {

@@ -1,4 +1,5 @@
 #include "CommandList.h"
+#include "../DynamicDescriptorHeap.h"
 #include "../RenderContext.h"
 #include "../PipelineState.h"
 
@@ -9,13 +10,20 @@ namespace DSM {
         g_RenderContext.CreateCommandList(m_CmdListType, &m_CmdList, &m_CurrAllocator);
         m_CmdList->SetName(listName.c_str());
         m_ResourceBarriers.reserve(16);
+        
+        m_ViewDescriptorHeap = DynamicDescriptorHeap::AllocateDynamicDescriptorHeap(this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_SampleDescriptorHeap = DynamicDescriptorHeap::AllocateDynamicDescriptorHeap(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
 
     CommandList::~CommandList()
     {
         // 归还当前的命令堆
         auto& cmdQueue = g_RenderContext.GetCommandQueue(m_CmdListType);
-        cmdQueue.DiscardCommandAllocator(cmdQueue.GetNextFenceValue(), m_CurrAllocator);
+        auto fenceValue = cmdQueue.GetNextFenceValue();
+        cmdQueue.DiscardCommandAllocator(fenceValue, m_CurrAllocator);
+        
+        DynamicDescriptorHeap::FreeDynamicDescriptorHeap(fenceValue, m_ViewDescriptorHeap);
+        DynamicDescriptorHeap::FreeDynamicDescriptorHeap(fenceValue, m_SampleDescriptorHeap);
     }
 
     void CommandList::Reset()

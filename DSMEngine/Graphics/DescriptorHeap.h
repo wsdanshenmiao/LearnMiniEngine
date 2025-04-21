@@ -77,9 +77,9 @@ namespace DSM {
 
 
     protected:
-        static constexpr std::uint32_t sm_NumDescriptorsPerHeap = 256;
-        static std::vector<DescriptorHeap> sm_DescriptorHeapPool;
-        static std::mutex sm_Mutex;
+        inline static constexpr std::uint32_t sm_NumDescriptorsPerHeap = 256;
+        inline static std::vector<std::unique_ptr<DescriptorHeap>> sm_DescriptorHeapPool{};
+        inline static std::mutex sm_Mutex{};
 
 
         const D3D12_DESCRIPTOR_HEAP_TYPE m_HeapType{};

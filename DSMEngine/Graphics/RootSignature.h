@@ -30,7 +30,7 @@ namespace DSM{
         void InitAsBufferSRV(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
         void InitAsBufferUAV(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
         // 描述符堆
-        void InitAsDescriptorTable(std::uint32_t rangeCount, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL, std::uint32_t space = 0) noexcept;
+        void InitAsDescriptorTable(std::uint32_t rangeCount, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL) noexcept;
         void SetTableRange(std::uint32_t rangeIndex, D3D12_DESCRIPTOR_RANGE_TYPE type, std::uint32_t shaderRegister, std::uint32_t count, std::uint32_t space = 0);
         void InitAsDescriptorRange(
             D3D12_DESCRIPTOR_RANGE_TYPE type,
@@ -39,7 +39,7 @@ namespace DSM{
             D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL,
             std::uint32_t space = 0)
         {
-            InitAsDescriptorTable(count, visibility, space);
+            InitAsDescriptorTable(1, visibility);
             SetTableRange(0, type, shaderRegister, count, space);
         }
 

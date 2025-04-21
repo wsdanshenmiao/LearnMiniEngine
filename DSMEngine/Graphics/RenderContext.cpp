@@ -1,5 +1,6 @@
 #include "RenderContext.h"
-#include "CommandList/CommandList.h"
+#include "DynamicDescriptorHeap.h"
+#include "CommandList/GraphicsCommandList.h"
 #include "Resource/GpuBuffer.h"
 #include "GraphicsCommon.h"
 #include "RootSignature.h"
@@ -118,6 +119,31 @@ namespace DSM {
 
         m_CpuBufferAllocator.Create(DynamicBufferAllocator::AllocateMode::CpuExclusive, sm_CpuBufferPageSize);
         m_GpuBufferAllocator.Create(DynamicBufferAllocator::AllocateMode::GpuExclusive, sm_GpuAllocatorPageSize);
+
+        DescriptorHeap heap{L"testHeap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128};
+        GpuResourceDesc resourceDesc{};
+        resourceDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        resourceDesc.m_Desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.m_Desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.m_Desc.Width = 512;
+        resourceDesc.m_Desc.Height = 1;
+        resourceDesc.m_Desc.DepthOrArraySize = 1;
+        resourceDesc.m_Desc.MipLevels = 1;
+        resourceDesc.m_Desc.SampleDesc = {1,0};
+        GpuResource resource{L"Test", resourceDesc};
+        RootSignature testRootSig{1, 0};
+        testRootSig[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 0, 2);
+        testRootSig.Finalize(L"TestRootSig");
+        DynamicDescriptorHeap testHeap{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV};
+        testHeap.ParseComputeRootSignature(testRootSig);
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
+        cbvDesc.BufferLocation = resource.GetGpuVirtualAddress();
+        cbvDesc.SizeInBytes = 512;
+        auto handle = heap.Allocate();
+        m_pDevice->CreateConstantBufferView(&cbvDesc, handle);
+        GraphicsCommandList commandList{};
+        commandList.SetRootSignature(testRootSig);
+        commandList.SetDynamicDescriptor(0, 0, handle);
     }
 
     void RenderContext::Shutdown()
