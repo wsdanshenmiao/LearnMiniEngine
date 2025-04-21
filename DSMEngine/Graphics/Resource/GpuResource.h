@@ -44,7 +44,7 @@ namespace DSM {
 
         D3D12_RESOURCE_STATES GetUsageState() const noexcept { return m_UsageState; }
 
-        D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress() noexcept { return m_Resource->GetGPUVirtualAddress(); }
+        D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress() const noexcept { return m_Resource->GetGPUVirtualAddress(); }
 
         void SetUsageState(D3D12_RESOURCE_STATES usageState) noexcept { m_UsageState = usageState; }
         

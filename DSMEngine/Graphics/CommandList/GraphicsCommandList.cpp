@@ -1,10 +1,45 @@
 #include "GraphicsCommandList.h"
-
 #include "../DynamicDescriptorHeap.h"
 #include "../RootSignature.h"
-
+#include "../Resource/GpuResource.h"
+#include "../Resource/DynamicBufferAllocator.h"
 
 namespace DSM {
+    void GraphicsCommandList::ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const float* clearColor)
+    {
+        FlushResourceBarriers();
+
+        const float defaultColor[4] = {};
+        if (clearColor == nullptr) {
+            clearColor = defaultColor;
+        }
+        auto gpuHandle = m_ViewDescriptorHeap->UploadDirect(uav);
+        m_CmdList->ClearUnorderedAccessViewFloat(gpuHandle, uav, resource.GetResource(), clearColor, 0, nullptr);
+    }
+
+    void GraphicsCommandList::ClearUAv(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav,
+        const std::uint32_t* clearColor)
+    {
+        FlushResourceBarriers();
+
+        const std::uint32_t defaultColor[4] = {};
+        clearColor = clearColor == nullptr ? defaultColor : clearColor;
+        auto gpuHandle = m_ViewDescriptorHeap->UploadDirect(uav);
+        m_CmdList->ClearUnorderedAccessViewUint(gpuHandle, uav, resource.GetResource(), clearColor, 0, nullptr);
+    }
+
+    void GraphicsCommandList::ClearRenderTarget(
+        D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+        const float* clearColor,
+        const D3D12_RECT* clearRect)
+    {
+        FlushResourceBarriers();
+
+        const float defaultColor[4] = {};
+        clearColor = clearColor == nullptr ? defaultColor : clearColor;
+        m_CmdList->ClearRenderTargetView(rtv, clearColor, clearRect == nullptr ? 0 : 1, clearRect);
+    }
+
     void GraphicsCommandList::SetRootSignature(const RootSignature& rootSig)
     {
         if (m_CurrGraphicsRootSignature == rootSig.GetRootSignature()) return;
@@ -15,9 +50,40 @@ namespace DSM {
         m_SampleDescriptorHeap->ParseGraphicsRootSignature(rootSig);
     }
 
-    void GraphicsCommandList::SetDescriptorTable(std::uint32_t rootIndex, D3D12_GPU_DESCRIPTOR_HANDLE firstHandle)
+    void GraphicsCommandList::SetConstants(std::uint32_t rootIndex, DWParam x, DWParam y, DWParam z)
     {
-        m_CmdList->SetGraphicsRootDescriptorTable(rootIndex, firstHandle);
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, z.Uint, 2);
+    }
+
+    void GraphicsCommandList::SetConstants(std::uint32_t rootIndex, DWParam x, DWParam y, DWParam z, DWParam w)
+    {
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, x.Uint, 0);
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, y.Uint, 1);
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, z.Uint, 2);
+        m_CmdList->SetGraphicsRoot32BitConstant(rootIndex, w.Uint, 3);
+    }
+
+    void GraphicsCommandList::SetDynamicConstantBuffer(std::uint32_t rootIndex, std::size_t bufferSize, const void* pData)
+    {
+        ASSERT(pData != nullptr && bufferSize > 0);
+        auto uploadBuffer = GetUploadBuffer(bufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+        memcpy(uploadBuffer.m_MappedAddress, pData, bufferSize);
+        m_CmdList->SetGraphicsRootConstantBufferView(rootIndex, uploadBuffer.m_GpuAddress);
+    }
+
+    void GraphicsCommandList::SetShaderResource(std::uint32_t rootIndex, const GpuResource& resource, std::uint64_t offset)
+    {
+        auto state = (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        ASSERT(resource.GetUsageState() & state != 0);
+        m_CmdList->SetGraphicsRootShaderResourceView(rootIndex, resource.GetGpuVirtualAddress() + offset);
+    }
+
+    void GraphicsCommandList::SetUnorderedAccess(std::uint32_t rootIndex, const GpuResource& resource,std::uint64_t offset)
+    {
+        ASSERT(resource.GetUsageState() & D3D12_RESOURCE_STATE_UNORDERED_ACCESS != 0);
+        m_CmdList->SetGraphicsRootUnorderedAccessView(rootIndex, resource.GetGpuVirtualAddress() + offset);
     }
 
     void GraphicsCommandList::SetDynamicDescriptors(
@@ -26,6 +92,80 @@ namespace DSM {
         std::uint32_t count,
         D3D12_CPU_DESCRIPTOR_HANDLE handles[])
     {
-        m_ViewDescriptorHeap->SetGraphicsDescriptorHandle(rootIndex, offset, count , handles);
+        m_ViewDescriptorHeap->SetGraphicsDescriptorHandle(rootIndex, offset, count, handles);
+    }
+
+    void GraphicsCommandList::SetDynamicSamples(
+        std::uint32_t rootIndex,
+        std::uint32_t offset,
+        std::uint32_t count,
+        D3D12_CPU_DESCRIPTOR_HANDLE handles[])
+    {
+        m_SampleDescriptorHeap->SetGraphicsDescriptorHandle(rootIndex, offset, count, handles);
+    }
+
+    void GraphicsCommandList::SetDynamicIB(std::size_t indexCount, const std::uint16_t* indexData)
+    {
+        ASSERT(indexData != nullptr && indexCount > 0);
+        
+        auto bufferSize = indexCount * sizeof(std::uint16_t);
+        auto uploadBuffer = GetUploadBuffer(bufferSize);
+        memcpy(uploadBuffer.m_MappedAddress, indexData, bufferSize);
+
+        D3D12_INDEX_BUFFER_VIEW indexView = {};
+        indexView.Format = DXGI_FORMAT_R16_UINT;
+        indexView.BufferLocation = uploadBuffer.m_GpuAddress;
+        indexView.SizeInBytes = bufferSize;
+        m_CmdList->IASetIndexBuffer(&indexView);
+    }
+
+    void GraphicsCommandList::SetDynamicIB(std::size_t indexCount, const std::uint32_t* indexData)
+    {
+        ASSERT(indexData != nullptr && indexCount > 0);
+        
+        auto bufferSize = indexCount * sizeof(std::uint32_t);
+        auto uploadBuffer = GetUploadBuffer(bufferSize);
+        memcpy(uploadBuffer.m_MappedAddress, indexData, bufferSize);
+
+        D3D12_INDEX_BUFFER_VIEW indexView = {};
+        indexView.Format = DXGI_FORMAT_R32_UINT;
+        indexView.BufferLocation = uploadBuffer.m_GpuAddress;
+        indexView.SizeInBytes = bufferSize;
+        m_CmdList->IASetIndexBuffer(&indexView);
+    }
+
+    void GraphicsCommandList::SetDynamicSRV(std::uint32_t rootIndex, std::size_t bufferSize, const void* pData)
+    {
+        ASSERT(bufferSize > 0 && pData != nullptr);
+
+        auto uploadBuffer = GetUploadBuffer(bufferSize);
+        memcpy(uploadBuffer.m_MappedAddress, pData, bufferSize);
+
+        m_CmdList->SetGraphicsRootShaderResourceView(rootIndex, uploadBuffer.m_GpuAddress);
+    }
+
+    void GraphicsCommandList::DrawInstanced(std::uint32_t vertexCountPerInstance, std::uint32_t instanceCount,
+                                            std::uint32_t startVertexLocation, std::uint32_t startInstanceLocation)
+    {
+        FlushResourceBarriers();
+        
+        m_ViewDescriptorHeap->CommitGraphicsRootDescriptorTables();
+        m_SampleDescriptorHeap->CommitGraphicsRootDescriptorTables();
+        m_CmdList->DrawInstanced(vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
+    }
+
+    void GraphicsCommandList::DrawIndexedInstanced(
+        std::uint32_t indexCountPerInstance,
+        std::uint32_t instanceCount,
+        std::uint32_t startIndexLocation,
+        int baseVertexLocation,
+        std::uint32_t startInstanceLocation)
+    {
+        FlushResourceBarriers();
+
+        m_ViewDescriptorHeap->CommitGraphicsRootDescriptorTables();
+        m_SampleDescriptorHeap->CommitGraphicsRootDescriptorTables();
+        m_CmdList->DrawIndexedInstanced(
+            indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
     }
 }
