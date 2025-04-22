@@ -2,6 +2,8 @@
 #ifndef __GRAPHICSCOMMANDLIST_H__
 #define __GRAPHICSCOMMANDLIST_H__
 
+#include <algorithm>
+
 #include "CommandList.h"
 
 namespace DSM {
@@ -11,8 +13,6 @@ namespace DSM {
     class GraphicsCommandList : public CommandList
     {
     public:
-        void ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const float* clearColor = nullptr);
-        void ClearUAv(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor = nullptr);
         void ClearRenderTarget(
             D3D12_CPU_DESCRIPTOR_HANDLE rtv,
             const float* clearColor = nullptr,
@@ -35,20 +35,19 @@ namespace DSM {
         
         void SetRootSignature(const RootSignature& rootSig);
 
-        void SetRenderTargets(std::uint32_t numRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE rtvs[])
+        void SetRenderTargets(std::span<const D3D12_CPU_DESCRIPTOR_HANDLE> RTVs)
         {
-            m_CmdList->OMSetRenderTargets(numRTVs, rtvs, false, nullptr);
+            m_CmdList->OMSetRenderTargets(RTVs.size(), RTVs.empty() ? nullptr : RTVs.data(), false, nullptr);
         }
         void SetRenderTargets(
-            std::uint32_t numRTVs,
-            const D3D12_CPU_DESCRIPTOR_HANDLE rtvs[],
+            std::span<const D3D12_CPU_DESCRIPTOR_HANDLE> RTVs,
             const D3D12_CPU_DESCRIPTOR_HANDLE dsv)
         {
-            m_CmdList->OMSetRenderTargets(numRTVs, rtvs, false, &dsv);
+            m_CmdList->OMSetRenderTargets(RTVs.size(), RTVs.empty() ? nullptr : RTVs.data(), false, &dsv);
         }
-        void SetRenderTarget(const D3D12_CPU_DESCRIPTOR_HANDLE rtv){SetRenderTargets(1, &rtv);}
-        void SetRenderTarget(const D3D12_CPU_DESCRIPTOR_HANDLE rtv, const D3D12_CPU_DESCRIPTOR_HANDLE dsv){SetRenderTargets(1, &rtv, dsv);}
-        void SetDepthStencilTarget(const D3D12_CPU_DESCRIPTOR_HANDLE dsv) { SetRenderTargets(0, nullptr, dsv); }
+        void SetRenderTarget(const D3D12_CPU_DESCRIPTOR_HANDLE rtv){SetRenderTargets({&rtv, 1});}
+        void SetRenderTarget(const D3D12_CPU_DESCRIPTOR_HANDLE rtv, const D3D12_CPU_DESCRIPTOR_HANDLE dsv){SetRenderTargets({&rtv, 1}, dsv);}
+        void SetDepthStencilTarget(const D3D12_CPU_DESCRIPTOR_HANDLE dsv) { SetRenderTargets({}, dsv); }
 
         void SetViewport(const D3D12_VIEWPORT& viewport){ m_CmdList->RSSetViewports(1, &viewport);}
         void SetViewport(float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1)
@@ -80,6 +79,7 @@ namespace DSM {
         void SetBlendFactor(const float factor[4]){m_CmdList->OMSetBlendFactor(factor);}
         void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology){m_CmdList->IASetPrimitiveTopology(topology);}
 
+        template <typename T>
         void SetConstantArray(std::uint32_t rootIndex, std::uint32_t numConstants, const void * pConstants)
         {
             m_CmdList->SetGraphicsRoot32BitConstants(rootIndex, numConstants, pConstants, 0);
@@ -107,33 +107,32 @@ namespace DSM {
         void SetDynamicConstantBuffer(std::uint32_t rootIndex, std::size_t bufferSize, const void* pData);
         void SetShaderResource(std::uint32_t rootIndex, const GpuResource& resource, std::uint64_t offset = 0);
         void SetUnorderedAccess(std::uint32_t rootIndex, const GpuResource& resource, std::uint64_t offset = 0);
+        void SetDynamicSRV(std::uint32_t rootIndex, std::size_t bufferSize, const void* pData);
         
         void SetDynamicDescriptor(std::uint32_t rootIndex,
             std::uint32_t offset,
-            D3D12_CPU_DESCRIPTOR_HANDLE handle){ SetDynamicDescriptors(rootIndex, offset, 1, &handle); }
+            D3D12_CPU_DESCRIPTOR_HANDLE handle){ SetDynamicDescriptors(rootIndex, offset, {&handle, 1}); }
         void SetDynamicDescriptors(std::uint32_t rootIndex,
             std::uint32_t offset,
-            std::uint32_t count,
-            D3D12_CPU_DESCRIPTOR_HANDLE handles[]);
+            std::span<D3D12_CPU_DESCRIPTOR_HANDLE> handles);
         void SetDynamicSample(std::uint32_t rootIndex,
             std::uint32_t offset,
-            D3D12_CPU_DESCRIPTOR_HANDLE handle){ SetDynamicSamples(rootIndex, offset, 1, &handle); }
+            D3D12_CPU_DESCRIPTOR_HANDLE handle){ SetDynamicSamples(rootIndex, offset, {&handle, 1}); }
         void SetDynamicSamples(std::uint32_t rootIndex,
             std::uint32_t offset,
-            std::uint32_t count,
-            D3D12_CPU_DESCRIPTOR_HANDLE handles[]);
+            std::span<D3D12_CPU_DESCRIPTOR_HANDLE> handles);
 
         void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& ibv){m_CmdList->IASetIndexBuffer(&ibv);}
-        void SetVertexBuffer(std::uint32_t slot, const D3D12_VERTEX_BUFFER_VIEW& vbv) { SetVertexBuffers(slot, 1, &vbv); }
-        void SetVertexBuffers(std::uint32_t startSlot, std::uint32_t count, const D3D12_VERTEX_BUFFER_VIEW vbvs[])
+        void SetVertexBuffer(std::uint32_t slot, const D3D12_VERTEX_BUFFER_VIEW& vbv) { SetVertexBuffers(slot, {&vbv, 1}); }
+        void SetVertexBuffers(std::uint32_t startSlot, std::span<const D3D12_VERTEX_BUFFER_VIEW> VBVs)
         {
-            m_CmdList->IASetVertexBuffers(startSlot, count, vbvs);
+            ASSERT(VBVs.size() > 0);
+            m_CmdList->IASetVertexBuffers(startSlot, VBVs.size(), VBVs.data());
         }
         void SetDynamicIB(std::size_t indexCount, const std::uint16_t* indexData);
         void SetDynamicIB(std::size_t indexCount, const std::uint32_t* indexData);
         template <typename T>
         void SetDynamicVB(std::uint32_t slot, std::size_t numVertex, const T* pData);
-        void SetDynamicSRV(std::uint32_t rootIndex, std::size_t bufferSize, const void* pData);
 
         void Draw(std::uint32_t vertexCount, std::uint32_t vertexStartOffset = 0) { DrawInstanced(vertexCount, 1, vertexStartOffset, 0); }
         void DrawIndexed(std::uint32_t indexCount,

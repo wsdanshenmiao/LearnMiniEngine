@@ -50,7 +50,29 @@ namespace DSM {
         }
         m_ResourceBarriers.clear();
     }
+    
+    void CommandList::ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const float* clearColor)
+    {
+        FlushResourceBarriers();
 
+        const float defaultColor[4] = {};
+        if (clearColor == nullptr) {
+            clearColor = defaultColor;
+        }
+        auto gpuHandle = m_ViewDescriptorHeap->UploadDirect(uav);
+        m_CmdList->ClearUnorderedAccessViewFloat(gpuHandle, uav, resource.GetResource(), clearColor, 0, nullptr);
+    }
+
+    void CommandList::ClearUAv(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor)
+    {
+        FlushResourceBarriers();
+
+        const std::uint32_t defaultColor[4] = {};
+        clearColor = clearColor == nullptr ? defaultColor : clearColor;
+        auto gpuHandle = m_ViewDescriptorHeap->UploadDirect(uav);
+        m_CmdList->ClearUnorderedAccessViewUint(gpuHandle, uav, resource.GetResource(), clearColor, 0, nullptr);
+    }
+    
     void CommandList::CopyResource(GpuResource& dest, GpuResource& src)
     {
         TransitionResource(dest, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -224,9 +246,10 @@ namespace DSM {
 
     
 
-    void CommandList::InitTexture(GpuResource& dest, std::uint32_t numSubResource, D3D12_SUBRESOURCE_DATA subResources[])
+    void CommandList::InitTexture(GpuResource& dest, std::span<D3D12_SUBRESOURCE_DATA> subResources)
     {
         // 获取拷贝信息
+        auto numSubResource = subResources.size();
         Microsoft::WRL::ComPtr<ID3D12Device> pDevice;
         dest->GetDevice(IID_PPV_ARGS(pDevice.GetAddressOf()));
         std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprint(numSubResource);	// 子资源的宽高偏移等信息

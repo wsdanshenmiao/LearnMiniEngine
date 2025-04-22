@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 #include <vector>
 #include <array>
+#include <span>
 #include "../../Utilities/Macros.h"
 
 
@@ -60,7 +61,10 @@ namespace DSM {
 
         void Reset();
         void FlushResourceBarriers();
-
+        
+        void ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const float* clearColor = nullptr);
+        void ClearUAv(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor = nullptr);
+        
         void CopyResource(GpuResource& dest, GpuResource& src);
         void CopyBufferRegion(GpuResource& dest,
             std::size_t destOffset,
@@ -87,7 +91,7 @@ namespace DSM {
         void SetPipelineState(PSO& pso);
 
 
-        static void InitTexture(GpuResource& dest, std::uint32_t numSubResource, D3D12_SUBRESOURCE_DATA subResources[]);
+        static void InitTexture(GpuResource& dest, std::span<D3D12_SUBRESOURCE_DATA> subResources);
         static void InitBuffer(GpuResource& dest, const void* data, std::size_t byteSize, std::size_t destOffset = 0);
         static void InitTextureArraySlice(GpuResource& dest, std::uint32_t sliceIndex, GpuResource& src);
 

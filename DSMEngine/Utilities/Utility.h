@@ -88,6 +88,12 @@ namespace DSM::Utility {
         return wstr;
     }
 
+    template <typename T> requires std::is_arithmetic<T>::value
+    inline T DivideByMultiple(T value, std::uint64_t alignment)
+    {
+        return (T)((value + alignment - 1) / alignment);
+    }
+
 
 
     inline constexpr std::uint64_t INVALID_ALLOC_OFFSET = (std::numeric_limits<std::uint64_t>::max)();
