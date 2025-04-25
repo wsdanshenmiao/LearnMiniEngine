@@ -5,6 +5,8 @@ namespace DSM{
 
     void GpuBuffer::Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData)
     {
+        m_BufferDesc = bufferDesc;
+        
         // 从资源池中分配资源
         D3D12_RESOURCE_DESC resourceDesc{};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -33,6 +35,19 @@ namespace DSM{
         if (initData != nullptr) {
             CommandList::InitBuffer(*this, initData, bufferDesc.m_Size);
         }
+    }
+
+    void GpuBuffer::Create(const std::wstring& name, ID3D12Resource* resource, std::uint32_t stride)
+    {
+        D3D12_HEAP_PROPERTIES heapProp{};
+        D3D12_HEAP_FLAGS heapFlags{};
+        GpuResource::Create(name, resource);
+        m_MappedData = nullptr;
+        m_BufferDesc.m_Size = resource->GetDesc().Width;
+        resource->GetHeapProperties(&heapProp, &heapFlags);
+        m_BufferDesc.m_Flags = resource->GetDesc().Flags;
+        m_BufferDesc.m_HeapType = heapProp.Type;
+        m_BufferDesc.m_Stride = stride;
     }
 
     void GpuBuffer::Destroy()

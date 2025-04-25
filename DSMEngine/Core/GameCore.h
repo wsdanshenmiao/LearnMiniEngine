@@ -4,6 +4,10 @@
 
 #include "../pch.h"
 
+namespace DSM {
+    class RenderContext;
+}
+
 namespace DSM::GameCore {
     // 程序抽象类
     struct IGameApp
@@ -13,7 +17,7 @@ namespace DSM::GameCore {
         // 每帧调用一次更新函数
         virtual void Update(float deltaTime) = 0;
         // 自定义渲染场景
-        virtual void RenderScene() = 0;
+        virtual void RenderScene(RenderContext& renderContext) = 0;
         // 程序关闭时调用，清理资源
         virtual void Cleanup() = 0;
 
@@ -23,7 +27,13 @@ namespace DSM::GameCore {
     };
 
     
-    int RunApplication(IGameApp& app, const wchar_t* className, HINSTANCE hInstance, int nShowCmd);
+    int RunApplication(
+        IGameApp& app,
+        std::uint32_t width,
+        std::uint32_t height,
+        const wchar_t* className,
+        HINSTANCE hInstance,
+        int nShowCmd);
 }
 
 

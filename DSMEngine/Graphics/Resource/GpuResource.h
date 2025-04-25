@@ -24,12 +24,18 @@ namespace DSM {
         {
             Create(name, resourceDesc);
         }
+        GpuResource(const std::wstring& name, ID3D12Resource* resource)
+        {
+            Create(name, resource);
+        }
         ~GpuResource() { Destroy(); }
         GpuResource(GpuResource&& resource) noexcept = default;
         GpuResource& operator=(GpuResource&& resource) noexcept = default;
         DSM_NONCOPYABLE(GpuResource);
 
         void Create(const std::wstring& name, const GpuResourceDesc& resourceDesc);
+        void Create(const std::wstring& name, ID3D12Resource* resource);
+        void Create(const std::wstring& name, const GpuResourceDesc& resourceDesc, const D3D12_CLEAR_VALUE& clearValue);
         virtual void Destroy();
 
         ID3D12Resource* operator->() { return m_Resource.Get(); }

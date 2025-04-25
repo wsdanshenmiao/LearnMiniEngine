@@ -31,6 +31,7 @@ namespace DSM {
         DSM_NONCOPYABLE(GpuBuffer);
 
         void Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData = nullptr);
+        void Create(const std::wstring& name, ID3D12Resource* resource, std::uint32_t stride);
         virtual void Destroy() override;
 
         const GpuBufferDesc& GetDesc() const noexcept { return m_BufferDesc; }

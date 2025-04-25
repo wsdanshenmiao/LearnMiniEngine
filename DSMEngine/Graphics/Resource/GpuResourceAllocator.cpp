@@ -1,19 +1,23 @@
 #include "GpuResourceAllocator.h"
 #include "../RenderContext.h"
+#include "../../Utilities/FormatUtil.h"
 
 namespace DSM {
     //
     // GpuResourcePage Implementation
     //
-    ID3D12Resource* GpuResourcePage::Allocate(const D3D12_RESOURCE_DESC& resourceDesc, D3D12_RESOURCE_STATES resourceState)
+    ID3D12Resource* GpuResourcePage::Allocate(
+        const D3D12_RESOURCE_DESC& resourceDesc,
+        D3D12_RESOURCE_STATES resourceState,
+        const D3D12_CLEAR_VALUE* clearValue,
+        std::uint64_t resourceSize)
     {
-        auto resourceSize = resourceDesc.Width * resourceDesc.Height * resourceDesc.DepthOrArraySize;
         auto offset = m_Allocator.Allocate(resourceSize, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
         ID3D12Resource* resource = nullptr;
         if (offset != Utility::INVALID_ALLOC_OFFSET) {
             ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreatePlacedResource(
                 m_Heap.Get(), offset, &resourceDesc,
-                resourceState, nullptr, IID_PPV_ARGS(&resource)));
+                resourceState, clearValue, IID_PPV_ARGS(&resource)));
             m_SubResources.insert(resource);
         }
         return resource;
@@ -63,9 +67,12 @@ namespace DSM {
 
     ID3D12Resource* GpuResourceAllocator::CreateResource(
         const D3D12_RESOURCE_DESC& resourceDesc,
-        D3D12_RESOURCE_STATES resourceState)
+        D3D12_RESOURCE_STATES resourceState,
+            const D3D12_CLEAR_VALUE* clearValue)
     {
-        auto resourceSize = resourceDesc.Width * resourceDesc.Height * resourceDesc.DepthOrArraySize;
+        std::uint64_t resourceSize{};
+        g_RenderContext.GetDevice()->
+            GetCopyableFootprints(&resourceDesc, 0, 1, 0, nullptr, nullptr, nullptr, &resourceSize);
         
         std::lock_guard lock{m_Mutex};
         
@@ -73,20 +80,22 @@ namespace DSM {
         if (resourceSize > m_HeapSize) {    // 过大或过小的资源不创建堆
             D3D12_HEAP_PROPERTIES prop = {};
             prop.Type = m_HeapDesc.m_HeapType;
+            prop.CreationNodeMask = 1;
+            prop.VisibleNodeMask = 1;
             ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreateCommittedResource(
                 &prop,
                 m_HeapDesc.m_HeapFlags,
                 &resourceDesc,
                 resourceState,
-                nullptr,
+                clearValue,
                 IID_PPV_ARGS(&resource)));
         }
         else {
-            resource = m_CurrPage->Allocate(resourceDesc, resourceState);
+            resource = m_CurrPage->Allocate(resourceDesc, resourceState, clearValue, resourceSize);
             if (resource == nullptr) {
                 m_FullPages.insert(m_CurrPage);
                 m_CurrPage = RequestPage();
-                resource = m_CurrPage->Allocate(resourceDesc, resourceState);
+                resource = m_CurrPage->Allocate(resourceDesc, resourceState, clearValue, resourceSize);
             }
 
             // 只对在堆中分配的资源进行映射

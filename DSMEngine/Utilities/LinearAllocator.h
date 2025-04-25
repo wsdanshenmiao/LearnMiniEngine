@@ -2,6 +2,7 @@
 #ifndef __LINEARALLOCATOR_H__
 #define __LINEARALLOCATOR_H__
 
+#include "../Math/MathCommon.h"
 #include "../Utilities/Utility.h"
 
 namespace DSM {
@@ -16,7 +17,7 @@ namespace DSM {
         // 返回分配的资源所处的偏移量
         std::uint64_t Allocate(std::uint64_t size, std::uint32_t alignment = 0) noexcept
         {
-            auto alignOffset = Utility::AlignUp(m_CurrOffset, alignment);
+            auto alignOffset = Math::AlignUp(m_CurrOffset, alignment);
             m_CurrOffset = alignOffset + size;
             return (alignOffset + size) > m_MaxSize ? Utility::INVALID_ALLOC_OFFSET : alignOffset;
         }

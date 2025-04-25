@@ -32,8 +32,10 @@ namespace DSM {
         while (!m_DeletionPages.empty()) {
             m_DeletionPages.pop();
         }
-        for (auto& page : m_PagePool) {
-            page->m_Resource->GetResource()->Unmap(0, nullptr);
+        if (m_AllocateMode == AllocateMode::CpuExclusive) {
+            for (auto& page : m_PagePool) {
+                page->m_Resource->GetResource()->Unmap(0, nullptr);
+            }
         }
         m_PagePool.clear();
     }
@@ -45,7 +47,7 @@ namespace DSM {
         std::lock_guard lock(m_Mutex);
 
         // 过大的资源额外管理
-        if (auto alignSize = Utility::AlignUp(bufferSize, alignment) > m_PageSize) {
+        if (auto alignSize = Math::AlignUp(bufferSize, alignment) > m_PageSize) {
             ret.m_Resource = CreateNewBuffer(alignSize);
             ret.m_Size = alignSize;
             ret.m_GpuAddress = ret.m_Resource->GetGpuVirtualAddress();
@@ -68,11 +70,6 @@ namespace DSM {
     {
         std::lock_guard lock{m_Mutex};
         
-        if (m_CurrPage != nullptr) {
-            m_FullPages.push_back(m_CurrPage);
-            m_CurrPage = nullptr;
-        }
-
         for (auto& fullPage : m_FullPages) {
             fullPage->Reset();
             m_RetiredPages.push(std::make_pair(fenceValue, fullPage));

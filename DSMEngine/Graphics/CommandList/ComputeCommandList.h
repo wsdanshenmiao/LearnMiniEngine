@@ -3,6 +3,7 @@
 #define __COMPUTECOMMANDLIST_H__
 
 #include "CommandList.h"
+#include "../../Math/MathCommon.h"
 
 namespace DSM {
     class RootSignature;
@@ -10,6 +11,9 @@ namespace DSM {
     class ComputeCommandList : public CommandList
     {
     public:
+        ComputeCommandList(const std::wstring& id)
+            : CommandList(id) {}
+        
         void SetRootSignature(const RootSignature& rootSig);
 
         void SetConstantArray(std::uint32_t rootIndex, std::uint32_t numConstants, const void * pConstants)
@@ -59,18 +63,18 @@ namespace DSM {
         void Dispatch(std::size_t groupCountX = 1, std::size_t groupCountY = 1, std::size_t groupCountZ = 1 );
         void Dispatch1D(std::size_t threadCountX, std::size_t groupSizeX = 64)
         {
-            Dispatch(Utility::DivideByMultiple(threadCountX, groupSizeX), 1, 1);
+            Dispatch(Math::DivideByMultiple(threadCountX, groupSizeX), 1, 1);
         }
         void Dispatch2D(std::size_t threadCountX, std::size_t threadCountY, std::size_t groupSizeX = 8, std::size_t groupSizeY = 8)
         {
-            Dispatch(Utility::DivideByMultiple(threadCountX, groupSizeX), Utility::DivideByMultiple(threadCountY, groupSizeY), 1);
+            Dispatch(Math::DivideByMultiple(threadCountX, groupSizeX), Math::DivideByMultiple(threadCountY, groupSizeY), 1);
         }
         void Dispatch3D(std::size_t threadCountX, std::size_t threadCountY, std::size_t threadCountZ,
             std::size_t groupSizeX, std::size_t groupSizeY, std::size_t groupSizeZ )
         {
-            Dispatch(Utility::DivideByMultiple(threadCountX, groupSizeX),
-                Utility::DivideByMultiple(threadCountY, groupSizeY),
-                Utility::DivideByMultiple(threadCountZ, groupSizeZ));
+            Dispatch(Math::DivideByMultiple(threadCountX, groupSizeX),
+                Math::DivideByMultiple(threadCountY, groupSizeY),
+                Math::DivideByMultiple(threadCountZ, groupSizeZ));
         }
     };
 }

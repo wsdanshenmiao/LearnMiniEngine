@@ -4,6 +4,7 @@
 
 #include "Utility.h"
 #include <cstdio>
+#include <comdef.h>
 
 
 #define DSM_NONCOPYABLE(Class)  \
@@ -51,7 +52,9 @@
 #define ASSERT_SUCCEEDED( hr, ... ) \
     if (FAILED(hr)) { \
         DSM::Utility::Print("\nHRESULT failed in {} @ {}\n", __FILE__, __LINE__); \
-        DSM::Utility::PrintSubMessage("hr = {}", hr); \
+        _com_error err(hr);  \
+        std::wstring msg = err.ErrorMessage();  \
+        DSM::Utility::PrintSubMessage(L"Error = " + msg); \
         DSM::Utility::PrintSubMessage(__VA_ARGS__); \
         DSM::Utility::Print("\n"); \
         __debugbreak(); \
@@ -81,8 +84,8 @@
 #define D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN   ((D3D12_GPU_VIRTUAL_ADDRESS)-1)
 
 #define DEFAULT_ALIGN 256
-#define DEFAULT_BUFFER_PAGE_SIZE (D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 8)
-#define DEFAULT_PLACED_RESOURCE_PAGE_SIZE (D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 64)
+#define DEFAULT_BUFFER_PAGE_SIZE (D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 16)
+#define DEFAULT_PLACED_RESOURCE_PAGE_SIZE (D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 512)
 
 #define QUEUE_TYPE_MOVEBITS 56
 

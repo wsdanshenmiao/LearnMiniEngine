@@ -157,7 +157,7 @@ namespace DSM {
     {
         auto uploadBuffer = GetUploadBuffer(byteSize);
         std::vector<DWParam> data{};
-        data.resize(Utility::AlignUp(byteSize, sizeof(DWParam)) / sizeof(DWParam), value);
+        data.resize(Math::AlignUp(byteSize, sizeof(DWParam)) / sizeof(DWParam), value);
         memcpy(uploadBuffer.m_MappedAddress, data.data(), byteSize);
         CopyBufferRegion(dest, destOffset, *uploadBuffer.m_Resource, uploadBuffer.m_Offset, byteSize);
     }
@@ -188,7 +188,7 @@ namespace DSM {
             ASSERT(newState & valieComputeQueueResourceState == newState);
         }
 
-        if (preState == newState) {
+        if (preState != newState) {
             D3D12_RESOURCE_BARRIER resourceBarrier = {};
             resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
             resourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -238,7 +238,7 @@ namespace DSM {
     {
         auto pipelineState = pso.GetPipelineStateObject();
         if (pipelineState != m_CurrPipelineState) {
-            m_CmdList->SetPipelineState(m_CurrPipelineState);
+            m_CmdList->SetPipelineState(pipelineState);
             m_CurrPipelineState = pipelineState;
         }
     }

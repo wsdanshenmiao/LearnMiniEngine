@@ -85,8 +85,11 @@ namespace DSM {
 		m_DescriptorHeap->SetName(name.c_str());
 
 		m_DescriptorSize = pDevice->GetDescriptorHandleIncrementSize(heapDesc.Type);
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = heapDesc.Flags == D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE ? 
+			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() :
+			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_NULL };
 		m_FirstHandle = { m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() };
+			gpuHandle };
 	}
 
 	void DescriptorHeap::Clear()
@@ -118,7 +121,10 @@ namespace DSM {
 	{
 		ASSERT(HasValidSpace(count));
 		auto offset = m_Allocator.Allocate(count);
-		auto handle = m_FirstHandle + offset * m_DescriptorSize;
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_DescriptorHeap->GetDesc().Flags == D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE ? 
+			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() :
+			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_NULL };
+		auto handle = DescriptorHandle{m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(), gpuHandle} + offset * m_DescriptorSize;
 		return handle;
 	}
 
@@ -146,20 +152,64 @@ namespace DSM {
 	}
 
 
-
 	//
 	// DescriptorAllocator Implementation
 	//
-	D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocator::Allocate(std::uint32_t count)
+	DescriptorAllocator::~DescriptorAllocator()
 	{
-		if (m_CurrHeap == nullptr || !m_CurrHeap->HasValidSpace(count)) {
-			auto newHeap = std::make_unique<DescriptorHeap>(
-				L"DescriptorAllocator::DescriptorHeap", m_HeapType, sm_NumDescriptorsPerHeap);
-			m_CurrHeap = newHeap.get();
-			sm_DescriptorHeapPool.emplace_back(std::move(newHeap));
+		std::lock_guard lock{sm_Mutex};
+		for (auto& page : m_FullPages) {
+			sm_AvailablePages[m_HeapType].push(page);
 		}
-
-		return m_CurrHeap->Allocate(count);
+		if (m_CurrHeap != nullptr) {
+			sm_AvailablePages[m_HeapType].push(m_CurrHeap);
+		}
 	}
 
+	DescriptorHandle DescriptorAllocator::AllocateDescriptor(std::uint32_t count)
+	{
+		if (m_CurrHeap == nullptr || !m_CurrHeap->m_Heap.HasValidSpace(count)) {
+			std::lock_guard lock{sm_Mutex};
+			if (m_CurrHeap != nullptr) {
+				m_CurrHeap->m_Heap.Clear();
+				m_FullPages.push_back(m_CurrHeap);
+			}
+			
+			if (sm_AvailablePages[m_HeapType].empty()) {
+				DescriptorPage* newPage = new DescriptorPage{
+					{L"DescriptorAllocator::DescriptorHeap", m_HeapType, sm_NumDescriptorsPerHeap}, 0 };
+				m_CurrHeap = newPage;
+				sm_DescriptorPagePool.emplace_back(newPage);
+			}
+			else {
+				m_CurrHeap = sm_AvailablePages[m_HeapType].front();
+				sm_AvailablePages[m_HeapType].pop();
+			}
+		}
+
+		m_CurrHeap->m_UsedCount += count;
+		return m_CurrHeap->m_Heap.Allocate(count);
+	}
+
+	void DescriptorAllocator::FreeDescriptor(const DescriptorHandle& handle, std::uint32_t count)
+	{
+		std::lock_guard lock{ sm_Mutex };
+
+		if (m_CurrHeap != nullptr && m_CurrHeap->m_Heap.IsValidHandle(handle)) {
+			m_CurrHeap->m_UsedCount -= count;
+		}
+		else {
+			auto it = std::find_if(m_FullPages.begin(), m_FullPages.end(),[&handle](DescriptorPage* page) {
+				return page->m_Heap.IsValidHandle(handle);
+			});
+			if (it != m_FullPages.end()) {
+				(*it)->m_UsedCount -= count;
+				if ((*it)->m_UsedCount <=0) {
+					sm_AvailablePages[m_HeapType].push(*it);
+					*it = std::move(m_FullPages.back());
+					m_FullPages.pop_back();
+				}
+			}
+		}
+	}
 }

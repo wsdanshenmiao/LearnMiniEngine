@@ -1,9 +1,11 @@
 #include "RenderContext.h"
 #include "DynamicDescriptorHeap.h"
 #include "CommandList/GraphicsCommandList.h"
-#include "Resource/GpuBuffer.h"
 #include "GraphicsCommon.h"
 #include "RootSignature.h"
+#include "SwapChain.h"
+#include "../Core/Window.h"
+#include <dxgidebug.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -13,10 +15,10 @@ namespace DSM {
         m_ComputeQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE),
         m_CopyQueue(D3D12_COMMAND_LIST_TYPE_COPY) {}
 
-    void RenderContext::Create(bool requireDXRSupport)
+    void RenderContext::Create(bool requireDXRSupport, const Window& window)
     {
         DWORD factoryFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG) || 1
         // 开启调试层
         ComPtr<ID3D12Debug> pDebug{};
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(pDebug.GetAddressOf())))) {
@@ -69,7 +71,7 @@ namespace DSM {
             }
 
             // 是否支持光追
-            if (requireDXRSupport && !IsDirectXRaytracingSupported(m_pDevice.Get())) {
+            if (requireDXRSupport && !Graphics::IsDirectXRaytracingSupported(m_pDevice.Get())) {
                 continue;
             }
 
@@ -120,30 +122,18 @@ namespace DSM {
         m_CpuBufferAllocator.Create(DynamicBufferAllocator::AllocateMode::CpuExclusive, sm_CpuBufferPageSize);
         m_GpuBufferAllocator.Create(DynamicBufferAllocator::AllocateMode::GpuExclusive, sm_GpuAllocatorPageSize);
 
-        DescriptorHeap heap{L"testHeap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128};
-        GpuResourceDesc resourceDesc{};
-        resourceDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
-        resourceDesc.m_Desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        resourceDesc.m_Desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        resourceDesc.m_Desc.Width = 512;
-        resourceDesc.m_Desc.Height = 1;
-        resourceDesc.m_Desc.DepthOrArraySize = 1;
-        resourceDesc.m_Desc.MipLevels = 1;
-        resourceDesc.m_Desc.SampleDesc = {1,0};
-        GpuResource resource{L"Test", resourceDesc};
-        RootSignature testRootSig{1, 0};
-        testRootSig[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 0, 2);
-        testRootSig.Finalize(L"TestRootSig");
-        DynamicDescriptorHeap testHeap{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV};
-        testHeap.ParseComputeRootSignature(testRootSig);
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
-        cbvDesc.BufferLocation = resource.GetGpuVirtualAddress();
-        cbvDesc.SizeInBytes = 512;
-        auto handle = heap.Allocate();
-        m_pDevice->CreateConstantBufferView(&cbvDesc, handle);
-        GraphicsCommandList commandList{};
-        commandList.SetRootSignature(testRootSig);
-        commandList.SetDynamicDescriptor(0, 0, handle);
+        for (int i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i) {
+            m_DescriptorAllocator[i] = std::make_unique<DescriptorAllocator>(static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i));
+        }
+        
+        SwapChainDesc swapChainDesc = {};
+        swapChainDesc.m_Width = window.GetWidth();
+        swapChainDesc.m_Height = window.GetHeight();
+        swapChainDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swapChainDesc.m_FullScreen = false;
+        swapChainDesc.m_hWnd = window.GetHandle();
+        m_SwapChain = std::make_unique<SwapChain>(swapChainDesc);
+
     }
 
     void RenderContext::Shutdown()
@@ -157,6 +147,17 @@ namespace DSM {
         m_GraphicsQueue.Shutdown();
         m_ComputeQueue.Shutdown();
         m_CopyQueue.Shutdown();
+
+        m_SwapChain = nullptr;
+
+        DescriptorAllocator::DestroyAll();
+    }
+
+    void RenderContext::OnResize(std::uint32_t width, std::uint32_t height)
+    {
+        if (m_SwapChain != nullptr) {
+            m_SwapChain->OnResize(width, height);
+        }
     }
 
     CommandQueue& DSM::RenderContext::GetCommandQueue(D3D12_COMMAND_LIST_TYPE listType) noexcept
@@ -167,7 +168,17 @@ namespace DSM {
             default:return m_GraphicsQueue;
         }
     }
-    
+
+    DescriptorHandle RenderContext::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE heapType, std::uint32_t count)
+    {
+        return m_DescriptorAllocator[heapType]->AllocateDescriptor(count);
+    }
+
+    void RenderContext::FreeDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE heapType, DescriptorHandle descriptor, std::uint32_t count)
+    {
+        m_DescriptorAllocator[heapType]->FreeDescriptor(descriptor, count);
+    }
+
     void RenderContext::CreateCommandList(
         D3D12_COMMAND_LIST_TYPE listType,
         ID3D12GraphicsCommandList** ppList,
@@ -193,6 +204,13 @@ namespace DSM {
             1, listType, *ppAllocator, nullptr, IID_PPV_ARGS(ppList)));
     }
 
+    void RenderContext::IdleGPU()
+    {
+        m_GraphicsQueue.WaitForIdle();
+        m_ComputeQueue.WaitForIdle();
+        m_CopyQueue.WaitForIdle();
+    }
+
     void RenderContext::ExecuteCommandList(CommandList* cmdList, bool waitForCompletion)
     {
         ASSERT(cmdList != nullptr);
@@ -205,8 +223,9 @@ namespace DSM {
         auto& cmdQueue = GetCommandQueue(cmdList->m_CmdListType);
         auto fenceValue = cmdQueue.ExecuteCommandList(cmdList->GetCommandList());
 
-        m_CpuBufferAllocator.Cleanup(fenceValue);
-        m_GpuBufferAllocator.Cleanup(fenceValue);
+        CleanupDynamicBuffer(fenceValue);
+        cmdList->m_ViewDescriptorHeap->Cleanup(fenceValue);
+        cmdList->m_SampleDescriptorHeap->Cleanup(fenceValue);
         
         if (waitForCompletion) {
             cmdQueue.WaitForFence(fenceValue);

@@ -56,7 +56,7 @@ namespace DSM {
             DXGI_FORMAT dsvFormat,
             std::uint32_t msaaCount = 1,
             std::uint32_t msaaQuality = 0 );
-        void SetInputLayout( std::uint32_t numElements, const D3D12_INPUT_ELEMENT_DESC* pInputElementDescs );
+        void SetInputLayout(std::span<const D3D12_INPUT_ELEMENT_DESC> inputElements);
         void SetPrimitiveRestart( D3D12_INDEX_BUFFER_STRIP_CUT_VALUE ibProps );
 
         void SetVertexShader(const void* binary, std::size_t size){ m_PSODesc.VS = {binary, size}; }

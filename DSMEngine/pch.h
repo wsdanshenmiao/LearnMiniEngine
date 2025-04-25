@@ -45,6 +45,7 @@
 #include <format>
 #include <string_view>
 #include <concepts>
+#include <span>
 
 #include "Utilities/Macros.h"
 #include "Utilities/EnumUtil.h"

@@ -25,7 +25,11 @@ namespace DSM {
         ~GpuResourcePage() = default;
         DSM_NONCOPYABLE_NONMOVABLE(GpuResourcePage);
 
-        ID3D12Resource* Allocate(const D3D12_RESOURCE_DESC& resourceDesc, D3D12_RESOURCE_STATES resourceState);
+        ID3D12Resource* Allocate(
+            const D3D12_RESOURCE_DESC& resourceDesc,
+            D3D12_RESOURCE_STATES resourceState,
+            const D3D12_CLEAR_VALUE* clearValue,
+            std::uint64_t resourceSize);
         bool ReleaseResource(ID3D12Resource* resource);
         void Reset() noexcept
         {
@@ -56,7 +60,8 @@ namespace DSM {
 
         ID3D12Resource* CreateResource(
             const D3D12_RESOURCE_DESC& resourceDesc,
-            D3D12_RESOURCE_STATES resourceState);
+            D3D12_RESOURCE_STATES resourceState,
+            const D3D12_CLEAR_VALUE* clearValue = nullptr);
         void ReleaseResource(ID3D12Resource* resource);
         
         ID3D12Heap* CreateNewHeap(std::uint64_t heapSize = 0);

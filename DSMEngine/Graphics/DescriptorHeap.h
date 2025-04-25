@@ -2,10 +2,13 @@
 #ifndef __D3D12DESCRIPTORHANDLE__H__
 #define __D3D12DESCRIPTORHANDLE__H__
 
+#include <array>
 #include <d3d12.h>
 #include <vector>
 #include <wrl/client.h>
 #include <mutex>
+#include <queue>
+#include <set>
 #include "../Utilities/LinearAllocator.h"
 #include "../Utilities/Macros.h"
 
@@ -51,6 +54,7 @@ namespace DSM {
         DescriptorHandle Allocate(std::uint32_t count = 1);
         
         ID3D12DescriptorHeap* GetHeap() const noexcept;
+        std::uint32_t GetHeapSize() const noexcept { return m_Allocator.MaxSize(); }
         std::uint32_t GetOffsetOfHandle(const DescriptorHandle& handle) const noexcept; 
         std::uint32_t GetDescriptorSize() const noexcept;
 
@@ -64,26 +68,40 @@ namespace DSM {
         LinearAllocator m_Allocator;
     };
 
-    // 无上限的描述符堆，储存cpu可见的描述符
+
+    
     class DescriptorAllocator
     {
+    private:
+        struct DescriptorPage
+        {
+            DescriptorHeap m_Heap;
+            std::uint32_t m_UsedCount = 0;
+        };
+        
     public:
         DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE heapTyep)
             :m_HeapType(heapTyep){}
+        ~DescriptorAllocator();
         
-        D3D12_CPU_DESCRIPTOR_HANDLE Allocate(std::uint32_t count);
+        DescriptorHandle AllocateDescriptor(std::uint32_t count);
+        void FreeDescriptor(const DescriptorHandle& handle, std::uint32_t count);
 
-        static void DetroyAll(){ sm_DescriptorHeapPool.clear(); }
-
+        static void DestroyAll()
+        {
+            sm_DescriptorPagePool.clear();
+            sm_AvailablePages.fill({});
+        }
 
     protected:
         inline static constexpr std::uint32_t sm_NumDescriptorsPerHeap = 256;
-        inline static std::vector<std::unique_ptr<DescriptorHeap>> sm_DescriptorHeapPool{};
+        inline static std::vector<std::unique_ptr<DescriptorPage>> sm_DescriptorPagePool{};
+        inline static std::array<std::queue<DescriptorPage*>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> sm_AvailablePages{};
         inline static std::mutex sm_Mutex{};
-
-
+        
         const D3D12_DESCRIPTOR_HEAP_TYPE m_HeapType{};
-        DescriptorHeap* m_CurrHeap{};
+        DescriptorPage* m_CurrHeap{};
+        std::vector<DescriptorPage*> m_FullPages{};
     };
     
 }

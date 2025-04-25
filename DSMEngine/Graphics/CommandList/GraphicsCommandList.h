@@ -13,6 +13,8 @@ namespace DSM {
     class GraphicsCommandList : public CommandList
     {
     public:
+        GraphicsCommandList(const std::wstring& id)
+            : CommandList(id){}
         void ClearRenderTarget(
             D3D12_CPU_DESCRIPTOR_HANDLE rtv,
             const float* clearColor = nullptr,
@@ -52,7 +54,8 @@ namespace DSM {
         void SetViewport(const D3D12_VIEWPORT& viewport){ m_CmdList->RSSetViewports(1, &viewport);}
         void SetViewport(float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1)
         {
-            D3D12_VIEWPORT viewport{x,y,width,height,minDepth,maxDepth};
+            D3D12_VIEWPORT viewport{.TopLeftX = x,.TopLeftY = y,
+                .Width = width, .Height = height, .MinDepth = minDepth, .MaxDepth = maxDepth};
             m_CmdList->RSSetViewports(1, &viewport);
         }
         void SetScissor(const D3D12_RECT& rect)
@@ -60,9 +63,9 @@ namespace DSM {
             ASSERT(rect.left < rect.right && rect.top < rect.bottom);
             m_CmdList->RSSetScissorRects(1, &rect);
         }
-        void SetScissor(long left, long top, long right, long button)
+        void SetScissor(long left, long top, long right, long botton)
         {
-            D3D12_RECT rect{left, top, right, button};
+            D3D12_RECT rect{.left = left, .top = top, .right = right, .bottom = botton};
             SetScissor(rect);
         }
         void SetViewportAndScissor(const D3D12_VIEWPORT& viewport, const D3D12_RECT& rect)
@@ -136,16 +139,16 @@ namespace DSM {
 
         void Draw(std::uint32_t vertexCount, std::uint32_t vertexStartOffset = 0) { DrawInstanced(vertexCount, 1, vertexStartOffset, 0); }
         void DrawIndexed(std::uint32_t indexCount,
-            std::uint32_t startIndexLocation,
-            int baseVertexLocation)
+            std::uint32_t startIndexLocation = 0,
+            int baseVertexLocation = 0)
         {
             DrawIndexedInstanced(indexCount, 1, startIndexLocation, baseVertexLocation, 0);
         }
         void DrawInstanced(
             std::uint32_t vertexCountPerInstance,
             std::uint32_t instanceCount,
-            std::uint32_t startVertexLocation,
-            std::uint32_t startInstanceLocation);
+            std::uint32_t startVertexLocation = 0,
+            std::uint32_t startInstanceLocation = 0);
         void DrawIndexedInstanced(
             std::uint32_t indexCountPerInstance,
             std::uint32_t instanceCount,

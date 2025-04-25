@@ -56,20 +56,6 @@ namespace DSM::Utility {
  
     inline void PrintSubMessage(){}
 
-
-    template <typename T> 
-    inline constexpr T AlignUp( T value, std::uint64_t alignment ) noexcept
-    {
-        if (alignment == 0 || alignment == 1) return value;
-        else return (T)(((std::uint64_t)value + (alignment - 1)) & ~(alignment - 1));
-    }
-
-    template <typename T>
-    inline constexpr T IsAligned(T value, std::uint64_t alignment ) noexcept
-    {
-        return 0 == ((std::uint64_t)value & (alignment - 1));
-    }
-
     inline std::wstring UTF8ToWString(const std::string& str) 
     {
         wchar_t wstr[MAX_PATH];
@@ -79,23 +65,17 @@ namespace DSM::Utility {
         return wstr;
     }
 
-    inline std::wstring WStringToUTF8(const std::wstring& wstr)
+    inline std::string WStringToUTF8(const std::wstring& wstr)
     {
         char str[MAX_PATH];
         if (!WideCharToMultiByte(CP_ACP, MB_PRECOMPOSED, wstr.c_str(), -1, str, MAX_PATH, nullptr, nullptr)) {
             str[0] = '\0';
         }
-        return wstr;
-    }
-
-    template <typename T> requires std::is_arithmetic<T>::value
-    inline T DivideByMultiple(T value, std::uint64_t alignment)
-    {
-        return (T)((value + alignment - 1) / alignment);
+        return str;
     }
 
 
-
+    
     inline constexpr std::uint64_t INVALID_ALLOC_OFFSET = (std::numeric_limits<std::uint64_t>::max)();
     
     

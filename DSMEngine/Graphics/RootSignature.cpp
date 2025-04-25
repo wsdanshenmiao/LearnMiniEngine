@@ -192,6 +192,10 @@ namespace DSM{
                 serializedRootSig.GetAddressOf(),
                 errorBlob.GetAddressOf()));
 
+            if (errorBlob != nullptr) {
+                ERROR("Failed to serialize root signature" + std::string((char*)errorBlob->GetBufferPointer()));
+            }
+
             ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreateRootSignature(0,
                 serializedRootSig->GetBufferPointer(),
                 serializedRootSig->GetBufferSize(),

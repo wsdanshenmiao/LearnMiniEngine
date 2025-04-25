@@ -72,7 +72,7 @@ namespace DSM {
         std::uint32_t msaaCount,
         std::uint32_t msaaQuality)
     {
-        ASSERT(numRTVs == 0 && rtvFormats != nullptr);
+        ASSERT(numRTVs == 0 || rtvFormats != nullptr);
 
         for (std::uint32_t i = 0; i < numRTVs; ++i) {
             ASSERT(rtvFormats[i] != DXGI_FORMAT_UNKNOWN);
@@ -87,13 +87,13 @@ namespace DSM {
         m_PSODesc.DSVFormat = dsvFormat;
     }
 
-    void GraphicsPSO::SetInputLayout(std::uint32_t numElements, const D3D12_INPUT_ELEMENT_DESC* pInputElementDescs)
+    void GraphicsPSO::SetInputLayout(std::span<const D3D12_INPUT_ELEMENT_DESC> inputElements)
     {
-        m_PSODesc.InputLayout.NumElements = numElements;
+        m_PSODesc.InputLayout.NumElements = inputElements.size();
 
-        if (numElements > 0) {
-            m_InputLayouts.resize(numElements);
-            memcpy(m_InputLayouts.data(), pInputElementDescs, numElements * sizeof(D3D12_INPUT_ELEMENT_DESC));
+        if (inputElements.size() > 0) {
+            m_InputLayouts.resize(inputElements.size());
+            memcpy(m_InputLayouts.data(), inputElements.data(), inputElements.size() * sizeof(D3D12_INPUT_ELEMENT_DESC));
         }
         else {
             m_InputLayouts.clear();

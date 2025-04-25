@@ -42,7 +42,7 @@ namespace DSM {
         if (m_pCommandQueue == nullptr) return;
 
         m_CommandAllocatorPool.Shutdown();
-        CloseHandle(m_FenceEventHandle);
+        //CloseHandle(m_FenceEventHandle);
     }
 
     std::uint64_t CommandQueue::IncrementFence()
