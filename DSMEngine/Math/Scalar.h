@@ -13,40 +13,36 @@ namespace DSM::Math {
         INLINE Scalar(float v) noexcept { m_Vector = DirectX::XMVectorReplicate(v);}
         INLINE explicit Scalar(DirectX::FXMVECTOR v) noexcept : m_Vector(v) {}
 
-        INLINE Scalar(const Scalar&) noexcept = default;
-        INLINE Scalar& operator=(const Scalar&) noexcept = default;
+        INLINE Scalar(const Scalar& other) noexcept : m_Vector(other) {};
+        INLINE Scalar& operator=(const Scalar& other) noexcept { m_Vector = other; return *this; };
 
-        INLINE Scalar& operator+=(DirectX::FXMVECTOR v) noexcept
+        INLINE Scalar& operator+=(const Scalar& other) noexcept
         {
-            DirectX::XMVectorAdd(m_Vector, v);
+            m_Vector = DirectX::XMVectorAdd(m_Vector, other);
             return *this;
         }
-        INLINE Scalar& operator+=(const Scalar& other) noexcept{ return operator+=(other.m_Vector); }
-        INLINE Scalar& operator+=(float v) noexcept{return operator+=(DirectX::XMVectorReplicate(v));}
+        INLINE Scalar& operator+=(float v) noexcept{return operator+=(Scalar{v});}
         
-        INLINE Scalar& operator-=(DirectX::FXMVECTOR v) noexcept
+        INLINE Scalar& operator-=(const Scalar& other) noexcept
         {
-            DirectX::XMVectorSubtract(m_Vector, v);
+            m_Vector = DirectX::XMVectorSubtract(m_Vector, other);
             return *this;
         }
-        INLINE Scalar& operator-=(const Scalar& other) noexcept { return operator-=(other.m_Vector); }
-        INLINE Scalar& operator-=(float v) noexcept { return operator-=(DirectX::XMVectorReplicate(v)); }
+        INLINE Scalar& operator-=(float v) noexcept { return operator-=(Scalar{v}); }
         
-        INLINE Scalar& operator*=(DirectX::FXMVECTOR v) noexcept
+        INLINE Scalar& operator*=(const Scalar& other) noexcept
         {
-            DirectX::XMVectorMultiply(m_Vector, v);
+            DirectX::XMVectorMultiply(m_Vector, other);
             return *this;
         }
-        INLINE Scalar& operator*=(const Scalar& other) noexcept{ return operator*=(other.m_Vector); }
-        INLINE Scalar& operator*=(float v) noexcept { return operator*=(DirectX::XMVectorReplicate(v)); }
+        INLINE Scalar& operator*=(float v) noexcept { return operator*=(Scalar{v}); }
 
-        INLINE Scalar& operator/=(DirectX::FXMVECTOR v) noexcept
+        INLINE Scalar& operator/=(const Scalar& other) noexcept
         {
-            DirectX::XMVectorDivide(m_Vector, v);
+            DirectX::XMVectorDivide(m_Vector, other);
             return *this;
         }
-        INLINE Scalar& operator/=(const Scalar& other) noexcept { return operator/=(other.m_Vector); }
-        INLINE Scalar& operator/=(float v) noexcept { return operator/=(DirectX::XMVectorReplicate(v)); }
+        INLINE Scalar& operator/=(float v) noexcept { return operator/=(Scalar{v}); }
         
         
         INLINE operator DirectX::XMVECTOR() const noexcept { return m_Vector; }
