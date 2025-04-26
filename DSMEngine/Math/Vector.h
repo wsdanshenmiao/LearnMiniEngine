@@ -2,9 +2,6 @@
 #ifndef __VECTOR_H__
 #define __VECTOR_H__
 
-#include <initializer_list>
-#include <vector>
-
 #include "Scalar.h"
 
 namespace DSM::Math {
