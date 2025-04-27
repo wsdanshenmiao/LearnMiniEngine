@@ -122,7 +122,7 @@ namespace DSM {
         {
             static std::mutex psoMutex{};
             // 加锁互斥锁
-            std::lock_guard<std::mutex>{psoMutex};
+            std::lock_guard{psoMutex};
             
             if (auto it = s_GraphicsPSOs.find(hash); it != s_GraphicsPSOs.end()) {
                 ppPSO = it->second.GetAddressOf();

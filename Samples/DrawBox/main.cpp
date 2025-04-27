@@ -7,6 +7,9 @@
 #include "Graphics/ShaderCompiler.h"
 #include "Graphics/CommandList/GraphicsCommandList.h"
 #include "Graphics/Resource/GpuBuffer.h"
+#include "Math/Matrix.h"
+#include "Math/Random.h"
+#include "Math/Transform.h"
 #include "Utilities/Utility.h"
 
 using namespace DSM;
@@ -14,17 +17,17 @@ using namespace DirectX;
 
 struct ObjectConstants
 {
-    XMFLOAT4X4 World;
-    XMFLOAT4X4 WorldInvTranspose;
+    Math::Matrix4 World;
+    Math::Matrix4 WorldInvTranspose;
 };
 
 struct PassConstants
 {
-    XMFLOAT4X4 View;
-    XMFLOAT4X4 InvView;
-    XMFLOAT4X4 Proj;
-    XMFLOAT4X4 InvProj;
-    XMFLOAT3 EyePosW;
+    Math::Matrix4 View;
+    Math::Matrix4 InvView;
+    Math::Matrix4 Proj;
+    Math::Matrix4 InvProj;
+    Math::Vector3 EyePosW;
     float pad;
 };
 
@@ -154,19 +157,18 @@ public:
     }
     virtual void Update(float deltaTime) override
     {
-        static float phi = 0, theta = 0;
-        phi += 0.01;
-        theta += 0.01;
         auto& swapChain = g_RenderContext.GetSwapChain();
-        XMMATRIX view = XMMatrixLookAtLH(
-        XMVectorSet(0.0f, 0.0f, 10.0f, 1.0f),
-        XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
-        XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
-        auto world = XMMatrixRotationX(phi) * XMMatrixRotationY(theta);
+        static Transform objTrans{};
+        //objTrans.SetScale(g_RandomGenerator.NextFloat(), g_RandomGenerator.NextFloat(), g_RandomGenerator.NextFloat());
+        objTrans.Rotate(0.01, 0.01, 0);
         XMMATRIX proj = XMMatrixPerspectiveFovLH(XM_PIDIV4, swapChain.GetWidth() / swapChain.GetHeight(), 1.0f, 1000.0f);
-        XMStoreFloat4x4(&m_ObjectConstants.World, XMMatrixTranspose(world));
-        XMStoreFloat4x4(&m_PassConstants.View, XMMatrixTranspose(view));
-        XMStoreFloat4x4(&m_PassConstants.Proj, XMMatrixTranspose(proj));
+        m_ObjectConstants.World = Math::Matrix4::Transpose(objTrans.GetLocalToWorld());
+        m_ObjectConstants.WorldInvTranspose = Math::Matrix4::Transpose(Math::Matrix4::Inverse(m_ObjectConstants.World));
+        Transform cameraTrans{};
+        cameraTrans.SetPosition(0,0,-10);
+        cameraTrans.LookAt({ 0,0,0 });
+        m_PassConstants.View = Math::Matrix4::Transpose(cameraTrans.GetWorldToLocal());
+        m_PassConstants.Proj = Math::Matrix4::Transpose(Math::Matrix4{proj});
         
     }
     virtual void RenderScene(RenderContext& renderContext) override

@@ -89,7 +89,7 @@ namespace DSM {
 
     
 
-#define g_RenderContext	RenderContext::GetInstance()
+#define g_RenderContext	(RenderContext::GetInstance())
 }
 
 #endif
