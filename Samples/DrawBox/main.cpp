@@ -89,6 +89,9 @@ public:
             4, 0, 3,
             4, 3, 7
         };
+        
+        m_ObjectTransform.SetPosition({ 2.0f, 0.0f, 0.0f });
+        m_ObjectTransform.SetScale({ 0.5f, 0.5f, 0.5f });
 
         TextureDesc dsTexDesc{};
         dsTexDesc.m_Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -159,11 +162,9 @@ public:
     virtual void Update(float deltaTime) override
     {
         auto& swapChain = g_RenderContext.GetSwapChain();
-        static Transform objTrans{};
-        //objTrans.SetScale(g_RandomGenerator.NextFloat(), g_RandomGenerator.NextFloat(), g_RandomGenerator.NextFloat());
-        objTrans.Rotate(0.01, 0.01, 0);
+        m_ObjectTransform.Rotate({0,0,0}, {0,0,1}, 0.01);
         XMMATRIX proj = XMMatrixPerspectiveFovLH(XM_PIDIV4, swapChain.GetWidth() / swapChain.GetHeight(), 1.0f, 1000.0f);
-        m_ObjectConstants.World = Math::Matrix4::Transpose(objTrans.GetLocalToWorld());
+        m_ObjectConstants.World = Math::Matrix4::Transpose(m_ObjectTransform.GetLocalToWorld());
         m_ObjectConstants.WorldInvTranspose = Math::Matrix4::Transpose(Math::Matrix4::Inverse(m_ObjectConstants.World));
         Transform cameraTrans{};
         cameraTrans.SetPosition(0,0,-10);
@@ -175,31 +176,6 @@ public:
     virtual void RenderScene(RenderContext& renderContext) override
     {
         auto& swapChain = renderContext.GetSwapChain();
-        std::array<VertexPosColor, 8> vertexs = {
-            VertexPosColor({ XMFLOAT3(-1.0f, -1.0f, 1.0f),XMFLOAT4(Colors::White) }),
-            VertexPosColor({ XMFLOAT3(-1.0f, +1.0f, 1.0f),XMFLOAT4(Colors::Black) }),
-            VertexPosColor({ XMFLOAT3(+1.0f, +1.0f, 1.0f),XMFLOAT4(Colors::Red) }),
-            VertexPosColor({ XMFLOAT3(+1.0f, -1.0f, 1.0f),XMFLOAT4(Colors::Green) }),
-            VertexPosColor({ XMFLOAT3(-1.0f, -1.0f, +3.0f),XMFLOAT4(Colors::Blue) }),
-            VertexPosColor({ XMFLOAT3(-1.0f, +1.0f, +3.0f),XMFLOAT4(Colors::Yellow) }),
-            VertexPosColor({ XMFLOAT3(+1.0f, +1.0f, +3.0f),XMFLOAT4(Colors::Cyan) }),
-            VertexPosColor({ XMFLOAT3(+1.0f, -1.0f, +3.0f),XMFLOAT4(Colors::Magenta) })
-        };
-
-        std::array<std::uint16_t, 36> indices ={
-            0, 1, 2,
-            0, 2, 3,
-            4, 6, 5,
-            4, 7, 6,
-            4, 5, 1,
-            4, 1, 0,
-            3, 2, 6,
-            3, 6, 7,
-            1, 5, 6,
-            1, 6, 2,
-            4, 0, 3,
-            4, 3, 7
-        };
         
         GraphicsCommandList cmdList{L"Draw Box"};
 
@@ -217,9 +193,8 @@ public:
         cmdList.SetRootSignature(m_RootSig);
         cmdList.SetPipelineState(m_PSO);
 
-        
-        //cmdList.SetDynamicVB(0, vertexs.size(), vertexs.data());
-        //cmdList.SetDynamicIB(indices.size(), indices.data());
+        cmdList.TransitionResource(m_VertexBuffer, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        cmdList.TransitionResource(m_IndexBuffer, D3D12_RESOURCE_STATE_INDEX_BUFFER);
         cmdList.SetVertexBuffer(0, m_VertexBufferView);
         cmdList.SetIndexBuffer(m_IndexBufferView);
         
@@ -246,6 +221,7 @@ private:
     GraphicsPSO m_PSO{L"Color PSO"};
     ObjectConstants m_ObjectConstants{};
     PassConstants m_PassConstants{};
+    Transform m_ObjectTransform{};
 };
 
 int WinMain(

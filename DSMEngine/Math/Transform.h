@@ -40,7 +40,7 @@ namespace DSM {
         void Translate(Math::Vector3 translation) noexcept { m_Position += translation; }
         void Rotate(float angle, Math::Vector3 axis) noexcept
         {
-            m_Rotation *= Math::Quaternion(axis, angle);
+            m_Rotation *= Math::Quaternion{axis, angle};
         }
         // 根据 俯仰角、偏航角、滚动角 进行旋转
         void Rotate(float pitch, float yaw, float roll) noexcept
