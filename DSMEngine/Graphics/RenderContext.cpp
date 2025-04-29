@@ -211,26 +211,11 @@ namespace DSM {
         m_CopyQueue.WaitForIdle();
     }
 
-    void RenderContext::ExecuteCommandList(CommandList* cmdList, bool waitForCompletion)
+    void RenderContext::WaitForFence(uint64_t FenceValue)
     {
-        ASSERT(cmdList != nullptr);
-        ASSERT(cmdList->m_CmdListType == D3D12_COMMAND_LIST_TYPE_DIRECT ||
-            cmdList->m_CmdListType == D3D12_COMMAND_LIST_TYPE_COMPUTE);
-
-        // 清空屏障
-        cmdList->FlushResourceBarriers();
-
-        auto& cmdQueue = GetCommandQueue(cmdList->m_CmdListType);
-        auto fenceValue = cmdQueue.ExecuteCommandList(cmdList->GetCommandList());
-
-        CleanupDynamicBuffer(fenceValue);
-        cmdList->m_ViewDescriptorHeap->Cleanup(fenceValue);
-        cmdList->m_SampleDescriptorHeap->Cleanup(fenceValue);
-        
-        if (waitForCompletion) {
-            cmdQueue.WaitForFence(fenceValue);
-        }
-
-        cmdList->Reset();
+        CommandQueue& Producer = GetCommandQueue((D3D12_COMMAND_LIST_TYPE)(FenceValue >> 56));
+        Producer.WaitForFence(FenceValue);
     }
+
+
 }

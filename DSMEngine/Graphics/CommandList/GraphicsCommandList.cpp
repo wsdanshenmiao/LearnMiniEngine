@@ -25,6 +25,8 @@ namespace DSM {
 
         m_ViewDescriptorHeap->ParseGraphicsRootSignature(rootSig);
         m_SampleDescriptorHeap->ParseGraphicsRootSignature(rootSig);
+
+        m_CurrGraphicsRootSignature = rootSig.GetRootSignature();
     }
 
     void GraphicsCommandList::SetConstants(std::uint32_t rootIndex, DWParam x, DWParam y, DWParam z)

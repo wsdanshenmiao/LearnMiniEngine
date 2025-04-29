@@ -10,9 +10,10 @@ namespace DSM {
         const D3D12_RESOURCE_DESC& resourceDesc,
         D3D12_RESOURCE_STATES resourceState,
         const D3D12_CLEAR_VALUE* clearValue,
-        std::uint64_t resourceSize)
+        std::uint64_t resourceSize,
+        std::uint32_t alignment)
     {
-        auto offset = m_Allocator.Allocate(resourceSize, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
+        auto offset = m_Allocator.Allocate(resourceSize, alignment);
         ID3D12Resource* resource = nullptr;
         if (offset != Utility::INVALID_ALLOC_OFFSET) {
             ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreatePlacedResource(
@@ -70,14 +71,12 @@ namespace DSM {
         D3D12_RESOURCE_STATES resourceState,
             const D3D12_CLEAR_VALUE* clearValue)
     {
-        std::uint64_t resourceSize{};
-        g_RenderContext.GetDevice()->
-            GetCopyableFootprints(&resourceDesc, 0, 1, 0, nullptr, nullptr, nullptr, &resourceSize);
+        auto allocInfo = g_RenderContext.GetDevice()->GetResourceAllocationInfo(0, 1, &resourceDesc);
         
         std::lock_guard lock{m_Mutex};
         
         ID3D12Resource* resource = nullptr;
-        if (resourceSize > m_HeapSize) {    // 过大或过小的资源不创建堆
+        if (allocInfo.SizeInBytes > m_HeapSize) {    // 过大或过小的资源不创建堆
             D3D12_HEAP_PROPERTIES prop = {};
             prop.Type = m_HeapDesc.m_HeapType;
             prop.CreationNodeMask = 1;
@@ -91,11 +90,13 @@ namespace DSM {
                 IID_PPV_ARGS(&resource)));
         }
         else {
-            resource = m_CurrPage->Allocate(resourceDesc, resourceState, clearValue, resourceSize);
+            resource = m_CurrPage->Allocate(resourceDesc, resourceState, clearValue, 
+                allocInfo.SizeInBytes, allocInfo.Alignment);
             if (resource == nullptr) {
                 m_FullPages.insert(m_CurrPage);
                 m_CurrPage = RequestPage();
-                resource = m_CurrPage->Allocate(resourceDesc, resourceState, clearValue, resourceSize);
+                resource = m_CurrPage->Allocate(resourceDesc, resourceState, clearValue, 
+                    allocInfo.SizeInBytes, allocInfo.Alignment);
             }
 
             // 只对在堆中分配的资源进行映射
@@ -154,7 +155,8 @@ namespace DSM {
 
         ID3D12Heap* heap = nullptr;
         ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap)));
-        heap->SetName(L"PlacedResourceAllocator Heap");
+        auto heapName = L"PlacedResourceAllocator Heap" + std::to_wstring(m_PagePool.size());
+        heap->SetName(heapName.c_str());
         
         return heap;
     }

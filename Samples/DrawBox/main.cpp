@@ -11,6 +11,7 @@
 #include "Math/Random.h"
 #include "Math/Transform.h"
 #include "Utilities/Utility.h"
+#include <iostream>
 
 using namespace DSM;
 using namespace DirectX;
@@ -128,7 +129,7 @@ public:
         m_IndexBufferView.BufferLocation = m_IndexBuffer.GetGpuVirtualAddress();
         m_IndexBufferView.SizeInBytes = ibDesc.m_Size;
         m_IndexBufferView.Format = DXGI_FORMAT_R16_UINT;
-
+        
         ShaderDesc vsDesc{};
         vsDesc.m_FileName = "Shaders\\Color.hlsl";
         vsDesc.m_EnterPoint = "VS";
@@ -199,6 +200,7 @@ public:
             4, 0, 3,
             4, 3, 7
         };
+        
         GraphicsCommandList cmdList{L"Draw Box"};
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -215,10 +217,11 @@ public:
         cmdList.SetRootSignature(m_RootSig);
         cmdList.SetPipelineState(m_PSO);
 
-        cmdList.SetDynamicVB(0, vertexs.size(), vertexs.data());
-        cmdList.SetDynamicIB(indices.size(), indices.data());
-        //cmdList.SetVertexBuffer(0, m_VertexBufferView);
-        //cmdList.SetIndexBuffer(m_IndexBufferView);
+        
+        //cmdList.SetDynamicVB(0, vertexs.size(), vertexs.data());
+        //cmdList.SetDynamicIB(indices.size(), indices.data());
+        cmdList.SetVertexBuffer(0, m_VertexBufferView);
+        cmdList.SetIndexBuffer(m_IndexBufferView);
         
         cmdList.SetDynamicConstantBuffer(0, sizeof(ObjectConstants), &m_ObjectConstants);
         cmdList.SetDynamicConstantBuffer(1, sizeof(PassConstants), &m_PassConstants);
@@ -226,7 +229,7 @@ public:
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 
-        renderContext.ExecuteCommandList(&cmdList);
+        cmdList.ExecuteCommandList();
         
         swapChain.Present();
     }

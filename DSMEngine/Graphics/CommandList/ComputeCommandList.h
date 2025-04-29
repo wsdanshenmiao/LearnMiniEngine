@@ -11,8 +11,8 @@ namespace DSM {
     class ComputeCommandList : public CommandList
     {
     public:
-        ComputeCommandList(const std::wstring& id)
-            : CommandList(id) {}
+        ComputeCommandList(const std::wstring& id, bool async = false)
+            :CommandList(id, async ? D3D12_COMMAND_LIST_TYPE_COMPUTE : D3D12_COMMAND_LIST_TYPE_DIRECT){}
         
         void SetRootSignature(const RootSignature& rootSig);
 

@@ -4,8 +4,8 @@
 #include "../PipelineState.h"
 
 namespace DSM {
-    CommandList::CommandList(const std::wstring& id)
-    {
+    CommandList::CommandList(const std::wstring& id, D3D12_COMMAND_LIST_TYPE type)
+        :m_CmdListType(type){
         auto listName = id + L" CommandList";
         g_RenderContext.CreateCommandList(m_CmdListType, &m_CmdList, &m_CurrAllocator);
         m_CmdList->SetName(listName.c_str());
@@ -243,8 +243,29 @@ namespace DSM {
         }
     }
 
+    void CommandList::ExecuteCommandList(bool waitForCompletion)
+    {
+        ASSERT(m_CmdList != nullptr);
+        ASSERT(m_CmdListType == D3D12_COMMAND_LIST_TYPE_DIRECT ||
+            m_CmdListType == D3D12_COMMAND_LIST_TYPE_COMPUTE);
 
-    
+        // 清空屏障
+        FlushResourceBarriers();
+
+        auto& cmdQueue = g_RenderContext.GetCommandQueue(m_CmdListType);
+        auto fenceValue = cmdQueue.ExecuteCommandList(GetCommandList());
+
+        g_RenderContext.CleanupDynamicBuffer(fenceValue);
+        m_ViewDescriptorHeap->Cleanup(fenceValue);
+        m_SampleDescriptorHeap->Cleanup(fenceValue);
+        
+        if (waitForCompletion) {
+            cmdQueue.WaitForFence(fenceValue);
+        }
+
+        Reset();
+    }
+
 
     void CommandList::InitTexture(GpuResource& dest, std::span<D3D12_SUBRESOURCE_DATA> subResources)
     {
@@ -307,14 +328,15 @@ namespace DSM {
         cmdList.TransitionResource(dest, D3D12_RESOURCE_STATE_GENERIC_READ);
 
         // 等待GPU完成拷贝工作
-        g_RenderContext.ExecuteCommandList(&cmdList, true);
+        cmdList.ExecuteCommandList(true);
     }
 
     void CommandList::InitBuffer(GpuResource& dest, const void* data, std::size_t byteSize, std::size_t destOffset)
     {
         CommandList cmdList{L"InitBuffer"};
         cmdList.WriteBuffer(dest, destOffset, data, byteSize);
-        g_RenderContext.ExecuteCommandList(&cmdList, true);
+        cmdList.TransitionResource(dest, D3D12_RESOURCE_STATE_GENERIC_READ);
+        cmdList.ExecuteCommandList(true);
     }
 
     void CommandList::InitTextureArraySlice(GpuResource& dest, std::uint32_t sliceIndex, GpuResource& src)
@@ -340,7 +362,7 @@ namespace DSM {
         
         cmdList.TransitionResource(src, D3D12_RESOURCE_STATE_GENERIC_READ);
 
-        g_RenderContext.ExecuteCommandList(&cmdList, true);
+        cmdList.ExecuteCommandList(true);
     }
 
 

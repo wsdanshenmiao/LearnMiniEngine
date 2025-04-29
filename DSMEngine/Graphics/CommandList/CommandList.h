@@ -8,6 +8,7 @@
 #include <array>
 #include <span>
 #include "../../Utilities/Macros.h"
+#include "Graphics/RenderContext.h"
 
 
 namespace DSM {
@@ -43,7 +44,7 @@ namespace DSM {
     {
         friend class RenderContext;
     public:
-        CommandList(const std::wstring& id = L"");
+        CommandList(const std::wstring& id = L"", D3D12_COMMAND_LIST_TYPE type = D3D12_COMMAND_LIST_TYPE_DIRECT);
         ~CommandList();
         DSM_NONCOPYABLE(CommandList);
 
@@ -90,6 +91,7 @@ namespace DSM {
         void SetDescriptorHeaps(std::uint32_t count , ID3D12DescriptorHeap** descriptorHeaps);
         void SetPipelineState(PSO& pso);
 
+        void ExecuteCommandList(bool waitForCompletion = false);
 
         static void InitTexture(GpuResource& dest, std::span<D3D12_SUBRESOURCE_DATA> subResources);
         static void InitBuffer(GpuResource& dest, const void* data, std::size_t byteSize, std::size_t destOffset = 0);

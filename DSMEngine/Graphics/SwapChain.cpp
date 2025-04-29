@@ -65,7 +65,8 @@ namespace DSM {
         g_RenderContext.IdleGPU();
         
         ASSERT(m_SwapChain != nullptr);
-        m_Width = width;
+        m_Width = std::max<std::uint32_t>(width, 8);
+        m_Height = std::max<std::uint32_t>(height, 8);
         m_Height = height;
 
         for (auto& buffer : m_BackBuffers) {

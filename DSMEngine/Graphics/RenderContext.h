@@ -47,6 +47,7 @@ namespace DSM {
             ID3D12CommandAllocator** ppAllocator);
 
         void IdleGPU();
+        void WaitForFence(uint64_t FenceValue);
         
         bool IsFenceComplete(std::uint64_t fenceValue) noexcept
         {
@@ -58,8 +59,6 @@ namespace DSM {
             m_CpuBufferAllocator.Cleanup(fenceValue);
             m_GpuBufferAllocator.Cleanup(fenceValue);
         }
-
-        void ExecuteCommandList(CommandList* cmdList, bool waitForCompletion = false);
 
     public:
         inline static bool sm_bTypedUAVLoadSupport_R11G11B10_FLOAT = false;

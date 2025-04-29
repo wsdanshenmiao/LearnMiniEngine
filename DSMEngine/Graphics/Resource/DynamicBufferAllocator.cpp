@@ -34,7 +34,10 @@ namespace DSM {
         }
         if (m_AllocateMode == AllocateMode::CpuExclusive) {
             for (auto& page : m_PagePool) {
-                page->m_Resource->GetResource()->Unmap(0, nullptr);
+                if (page->m_MappedAddress != nullptr) {
+                    page->m_Resource->GetResource()->Unmap(0, nullptr);
+                    page->m_MappedAddress = nullptr;
+                }
             }
         }
         m_PagePool.clear();

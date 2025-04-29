@@ -5,6 +5,7 @@
 
 
 namespace DSM {
+
     void ComputeCommandList::SetRootSignature(const RootSignature& rootSig)
     {
         if (m_CurrComputeRootSignature == rootSig.GetRootSignature()) return;
@@ -13,6 +14,8 @@ namespace DSM {
         
         m_ViewDescriptorHeap->ParseComputeRootSignature(rootSig);
         m_SampleDescriptorHeap->ParseComputeRootSignature(rootSig);
+
+        m_CurrComputeRootSignature = rootSig.GetRootSignature();
     }
 
     

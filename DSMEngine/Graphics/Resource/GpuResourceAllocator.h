@@ -29,7 +29,8 @@ namespace DSM {
             const D3D12_RESOURCE_DESC& resourceDesc,
             D3D12_RESOURCE_STATES resourceState,
             const D3D12_CLEAR_VALUE* clearValue,
-            std::uint64_t resourceSize);
+            std::uint64_t resourceSize,
+            std::uint32_t alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
         bool ReleaseResource(ID3D12Resource* resource);
         void Reset() noexcept
         {

@@ -27,6 +27,9 @@ namespace DSM {
         void Shutdown() noexcept
         {
             m_Allocators.clear();
+            while (!m_ReadyAllocators.empty()) {
+                m_ReadyAllocators.pop();
+            }
         }
 
         // 请求一个命令分配
