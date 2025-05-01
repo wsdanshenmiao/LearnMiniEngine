@@ -11,6 +11,7 @@
 #include "Math/Random.h"
 #include "Math/Transform.h"
 #include "Utilities/Utility.h"
+#include "Graphics/CommandSignature.h"
 #include <iostream>
 
 using namespace DSM;
@@ -158,6 +159,22 @@ public:
         m_PSO.SetVertexShader(vsByteCode);
         m_PSO.SetPixelShader(psByteCode);
         m_PSO.Finalize();
+
+        m_DrawCommands = std::make_unique<CommandSignature>(1);
+        (*m_DrawCommands)[0].DrawIndex();
+        m_DrawCommands->Finalize();
+
+        D3D12_DRAW_INDEXED_ARGUMENTS drawArgs = {};
+        drawArgs.InstanceCount = 1;
+        drawArgs.StartInstanceLocation = 0;
+        drawArgs.StartIndexLocation = 0;
+        drawArgs.BaseVertexLocation = 0;
+        drawArgs.IndexCountPerInstance = m_IndexBuffer.GetCount();
+        GpuBufferDesc dbDesc{};
+        dbDesc.m_Size = sizeof(D3D12_DRAW_INDEXED_ARGUMENTS);
+        dbDesc.m_Stride = sizeof(D3D12_DRAW_INDEXED_ARGUMENTS);
+        dbDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        m_ArgumentBuffer.Create(L"DrawCommandBuffer", dbDesc, &drawArgs);
     }
     virtual void Update(float deltaTime) override
     {
@@ -200,12 +217,13 @@ public:
         
         cmdList.SetDynamicConstantBuffer(0, sizeof(ObjectConstants), &m_ObjectConstants);
         cmdList.SetDynamicConstantBuffer(1, sizeof(PassConstants), &m_PassConstants);
-        cmdList.DrawIndexed(m_IndexBufferView.SizeInBytes / sizeof(std::uint16_t));
+        //cmdList.DrawIndexed(m_IndexBufferView.SizeInBytes / sizeof(std::uint16_t));
+        cmdList.ExecuteIndirect(*m_DrawCommands, m_ArgumentBuffer, 0);
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 
         cmdList.ExecuteCommandList();
-        
+
         swapChain.Present();
     }
     virtual void Cleanup() override{};
@@ -222,6 +240,9 @@ private:
     ObjectConstants m_ObjectConstants{};
     PassConstants m_PassConstants{};
     Transform m_ObjectTransform{};
+
+    std::unique_ptr<CommandSignature> m_DrawCommands{};
+     GpuBuffer m_ArgumentBuffer{};
 };
 
 int WinMain(

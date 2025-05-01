@@ -7,6 +7,7 @@
 
 namespace DSM {
     class RootSignature;
+    class CommandSignature;
     
     class ComputeCommandList : public CommandList
     {
@@ -76,6 +77,13 @@ namespace DSM {
                 Math::DivideByMultiple(threadCountY, groupSizeY),
                 Math::DivideByMultiple(threadCountZ, groupSizeZ));
         }
+        void ExecuteIndirect(
+            CommandSignature& cmdSig,
+            GpuResource& argumentBuffer,
+            std::uint64_t argumentOffset,
+            std::uint32_t maxCommands = 1,
+            GpuResource* counterBuffer = nullptr,
+            std::uint64_t counterOffset = 0);
     };
 }
 

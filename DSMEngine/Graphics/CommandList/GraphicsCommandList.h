@@ -7,6 +7,7 @@
 #include "CommandList.h"
 
 namespace DSM {
+    class CommandSignature;
     class RootSignature;
 
     
@@ -155,6 +156,13 @@ namespace DSM {
             std::uint32_t startIndexLocation,
             int baseVertexLocation,
             std::uint32_t startInstanceLocation);
+        void ExecuteIndirect(
+            CommandSignature& cmdSig,
+            GpuResource& argumentBuffer,
+            std::uint64_t argumentOffset,
+            std::uint32_t maxCommands = 1,
+            GpuResource* counterBuffer = nullptr,
+            std::uint64_t counterOffset = 0);
     };
 
     template <typename T>

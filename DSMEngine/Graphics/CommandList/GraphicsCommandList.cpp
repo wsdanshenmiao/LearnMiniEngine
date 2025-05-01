@@ -3,6 +3,7 @@
 #include "../RootSignature.h"
 #include "../Resource/GpuResource.h"
 #include "../Resource/DynamicBufferAllocator.h"
+#include "Graphics/CommandSignature.h"
 
 namespace DSM {
     void GraphicsCommandList::ClearRenderTarget(
@@ -146,5 +147,21 @@ namespace DSM {
         m_SampleDescriptorHeap->CommitGraphicsRootDescriptorTables();
         m_CmdList->DrawIndexedInstanced(
             indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+    }
+
+    void GraphicsCommandList::ExecuteIndirect(
+        CommandSignature& cmdSig,
+        GpuResource& argumentBuffer,
+        std::uint64_t argumentOffset,
+        std::uint32_t maxCommands,
+        GpuResource* counterBuffer,
+        std::uint64_t counterOffset)
+    {
+        FlushResourceBarriers();
+        m_ViewDescriptorHeap->CommitGraphicsRootDescriptorTables();
+        m_SampleDescriptorHeap->CommitGraphicsRootDescriptorTables();
+        m_CmdList->ExecuteIndirect(
+            cmdSig.GetCommandSignature(), maxCommands, argumentBuffer.GetResource(), argumentOffset,
+            counterBuffer == nullptr ? nullptr : counterBuffer->GetResource(), counterOffset);
     }
 }

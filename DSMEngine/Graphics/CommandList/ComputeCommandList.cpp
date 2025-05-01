@@ -2,10 +2,9 @@
 #include "../DynamicDescriptorHeap.h"
 #include "../RootSignature.h"
 #include "../Resource/DynamicBufferAllocator.h"
-
+#include "../CommandSignature.h"
 
 namespace DSM {
-
     void ComputeCommandList::SetRootSignature(const RootSignature& rootSig)
     {
         if (m_CurrComputeRootSignature == rootSig.GetRootSignature()) return;
@@ -89,5 +88,21 @@ namespace DSM {
         m_ViewDescriptorHeap->CommitComputeRootDescriptorTables();
         m_SampleDescriptorHeap->CommitComputeRootDescriptorTables();
         m_CmdList->Dispatch(groupCountX, groupCountY, groupCountZ);
+    }
+
+    void ComputeCommandList::ExecuteIndirect(
+        CommandSignature& cmdSig,
+        GpuResource& argumentBuffer,
+        std::uint64_t argumentOffset,
+        std::uint32_t maxCommands,
+        GpuResource* counterBuffer,
+        std::uint64_t counterOffset)
+    {
+        FlushResourceBarriers();
+        m_ViewDescriptorHeap->CommitComputeRootDescriptorTables();
+        m_SampleDescriptorHeap->CommitComputeRootDescriptorTables();
+        m_CmdList->ExecuteIndirect(
+            cmdSig.GetCommandSignature(), maxCommands, argumentBuffer.GetResource(),
+            argumentOffset, counterBuffer->GetResource(), counterOffset);
     }
 }
