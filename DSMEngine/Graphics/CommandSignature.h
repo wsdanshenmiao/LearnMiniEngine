@@ -7,6 +7,7 @@
 #include <wrl/client.h>
 #include "RenderContext.h"
 #include "Utilities/Macros.h"
+#include "RootSignature.h"
 
 
 namespace DSM {

@@ -150,19 +150,15 @@ public:
         m_RootSig.Finalize(L"ColorRootSig", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
         m_PSO.SetRootSignature(m_RootSig);
-        m_PSO.SetBlendState(Graphics::GetDefaultBlendState());
-        m_PSO.SetRasterizerState(Graphics::GetDefaultRasterizerState());
-        m_PSO.SetDepthStencilState(Graphics::GetDefaultDepthStencilState());
+        m_PSO.SetBlendState(Graphics::DefaultAlphaBlend);
+        m_PSO.SetRasterizerState(Graphics::DefaultRasterizer);
+        m_PSO.SetDepthStencilState(Graphics::ReadWriteDepthStencil);
         m_PSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
         m_PSO.SetRenderTargetFormat(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT);
         m_PSO.SetInputLayout(VertexPosColor::GetInputLayout());
         m_PSO.SetVertexShader(vsByteCode);
         m_PSO.SetPixelShader(psByteCode);
         m_PSO.Finalize();
-
-        m_DrawCommands = std::make_unique<CommandSignature>(1);
-        (*m_DrawCommands)[0].DrawIndex();
-        m_DrawCommands->Finalize();
 
         D3D12_DRAW_INDEXED_ARGUMENTS drawArgs = {};
         drawArgs.InstanceCount = 1;
@@ -218,7 +214,7 @@ public:
         cmdList.SetDynamicConstantBuffer(0, sizeof(ObjectConstants), &m_ObjectConstants);
         cmdList.SetDynamicConstantBuffer(1, sizeof(PassConstants), &m_PassConstants);
         //cmdList.DrawIndexed(m_IndexBufferView.SizeInBytes / sizeof(std::uint16_t));
-        cmdList.ExecuteIndirect(*m_DrawCommands, m_ArgumentBuffer, 0);
+        cmdList.ExecuteIndirect(Graphics::DrawIndexedCommandSignature, m_ArgumentBuffer, 0);
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 
@@ -241,7 +237,6 @@ private:
     PassConstants m_PassConstants{};
     Transform m_ObjectTransform{};
 
-    std::unique_ptr<CommandSignature> m_DrawCommands{};
      GpuBuffer m_ArgumentBuffer{};
 };
 

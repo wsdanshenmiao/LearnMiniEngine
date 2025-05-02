@@ -37,7 +37,7 @@ namespace DSM {
         void CreateBackBuffers();
 
     public:
-        inline static constexpr int sm_BackBufferCount = 2;
+        inline static constexpr int sm_BackBufferCount = 3;
         inline static bool sm_EnableHDROutput = false;
         
     protected:

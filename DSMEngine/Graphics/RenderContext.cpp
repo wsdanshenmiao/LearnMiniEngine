@@ -134,10 +134,13 @@ namespace DSM {
         swapChainDesc.m_hWnd = window.GetHandle();
         m_SwapChain = std::make_unique<SwapChain>(swapChainDesc);
 
+        Graphics::InitializeCommon();
     }
 
     void RenderContext::Shutdown()
     {
+        Graphics::DestroyCommon();
+        
         m_pFactory = nullptr;
         m_pDevice = nullptr;
 
