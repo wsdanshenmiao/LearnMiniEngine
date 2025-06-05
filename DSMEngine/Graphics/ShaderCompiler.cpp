@@ -109,9 +109,6 @@ namespace DSM {
         std::wstring enterPoint = Utility::UTF8ToWString(shaderDesc.m_EnterPoint);
         std::wstring target = GetComileTarget(shaderDesc.m_Type, shaderDesc.m_Mode);
         auto defines = shaderDesc.m_Defines.Finish();
-        if (defines.size() <= 1) {
-            defines.clear();
-        }
         
         ComPtr<IDxcBlob> shaderByteCode = s_ShaderCompiler.CompilerShader(fileName, enterPoint, target, defines);
         m_ByteCode.resize(shaderByteCode->GetBufferSize());

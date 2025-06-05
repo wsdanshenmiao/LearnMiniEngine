@@ -43,8 +43,21 @@ namespace DSM {
     class DescriptorHeap
     {
     public:
-        DescriptorHeap(const std::wstring& name, D3D12_DESCRIPTOR_HEAP_TYPE heapType, std::uint32_t heapSize);
+        DescriptorHeap(
+            const std::wstring& name,
+            D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+            std::uint32_t heapSize);
+        DescriptorHeap(
+            const std::wstring& name, 
+            D3D12_DESCRIPTOR_HEAP_TYPE heapType, 
+            std::uint32_t heapSize,
+            D3D12_DESCRIPTOR_HEAP_FLAGS flags)
+            :m_Allocator(heapSize) {
+            Create(name, heapType, heapSize, flags);
+        }
         ~DescriptorHeap() = default;
+        DescriptorHeap(DescriptorHeap&&) = default;
+        DescriptorHeap& operator=(DescriptorHeap&&) = default;
         DSM_NONCOPYABLE(DescriptorHeap);
 
         void Clear();
@@ -61,6 +74,14 @@ namespace DSM {
         DescriptorHandle operator[](std::uint32_t index) const noexcept;
         
     private:
+        void Create(
+            const std::wstring& name,
+            D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+            std::uint32_t heapSize,
+            D3D12_DESCRIPTOR_HEAP_FLAGS flags);
+
+
+    private:
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
         std::uint32_t m_DescriptorSize{};
         
@@ -70,6 +91,9 @@ namespace DSM {
 
 
     
+    /// <summary>
+    /// 存放CPU可见的描述符
+    /// </summary>
     class DescriptorAllocator
     {
     private:

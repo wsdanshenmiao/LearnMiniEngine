@@ -5,6 +5,7 @@
 #include "../Graphics/RenderContext.h"
 
 namespace DSM::GameCore{
+    IGameApp* g_CurrGameApp = nullptr;
     
     bool IGameApp::IsDown()
     {
@@ -26,7 +27,6 @@ namespace DSM::GameCore{
 
         app.Update(0);
         app.RenderScene(g_RenderContext);
-
         
         return !app.IsDown();
     }
@@ -37,8 +37,16 @@ namespace DSM::GameCore{
 
         g_RenderContext.Shutdown();
     }
-    
-    
+
+
+    void OnResize(std::uint32_t width, std::uint32_t height)
+    {
+        g_RenderContext.OnResize(width, height);
+        if (g_CurrGameApp != nullptr) {
+            g_CurrGameApp->OnResize(width, height);
+        }
+    }
+
     int RunApplication(
         IGameApp& app,
         std::uint32_t width,
@@ -60,6 +68,8 @@ namespace DSM::GameCore{
         winDesc.m_HInstance = hInstance;
         Window win{winDesc};
 
+        g_CurrGameApp = &app;
+        
         InitializeApplication(app, win);
 
         while (win.Loop()) {

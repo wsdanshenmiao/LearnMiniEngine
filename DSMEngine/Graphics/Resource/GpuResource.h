@@ -28,7 +28,7 @@ namespace DSM {
         {
             Create(name, resource);
         }
-        ~GpuResource() { Destroy(); }
+        virtual ~GpuResource() { Destroy(); }
         GpuResource(GpuResource&& resource) noexcept = default;
         GpuResource& operator=(GpuResource&& resource) noexcept = default;
         DSM_NONCOPYABLE(GpuResource);
@@ -40,8 +40,6 @@ namespace DSM {
 
         ID3D12Resource* operator->() { return m_Resource.Get(); }
         const ID3D12Resource* operator->() const { return m_Resource.Get(); }
-        ID3D12Resource** operator&() { return m_Resource.GetAddressOf(); }
-        ID3D12Resource* const * operator&() const { return m_Resource.GetAddressOf(); }
         
         ID3D12Resource* GetResource(){ return m_Resource.Get(); }
         const ID3D12Resource* GetResource() const { return m_Resource.Get(); }

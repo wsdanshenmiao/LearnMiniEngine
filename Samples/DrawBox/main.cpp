@@ -13,25 +13,12 @@
 #include "Utilities/Utility.h"
 #include "Graphics/CommandSignature.h"
 #include <iostream>
+#include "Renderer/ConstantData.h"
+
 
 using namespace DSM;
 using namespace DirectX;
 
-struct ObjectConstants
-{
-    Math::Matrix4 World;
-    Math::Matrix4 WorldInvTranspose;
-};
-
-struct PassConstants
-{
-    Math::Matrix4 View;
-    Math::Matrix4 InvView;
-    Math::Matrix4 Proj;
-    Math::Matrix4 InvProj;
-    Math::Vector3 EyePosW;
-    float pad;
-};
 
 class Sandbox : public GameCore::IGameApp
 {
@@ -177,13 +164,13 @@ public:
         auto& swapChain = g_RenderContext.GetSwapChain();
         m_ObjectTransform.Rotate({0,0,0}, {0,0,1}, 0.01);
         XMMATRIX proj = XMMatrixPerspectiveFovLH(XM_PIDIV4, swapChain.GetWidth() / swapChain.GetHeight(), 1.0f, 1000.0f);
-        m_ObjectConstants.World = Math::Matrix4::Transpose(m_ObjectTransform.GetLocalToWorld());
-        m_ObjectConstants.WorldInvTranspose = Math::Matrix4::Transpose(Math::Matrix4::Inverse(m_ObjectConstants.World));
+        m_ObjectConstants.m_World = Math::Matrix4::Transpose(m_ObjectTransform.GetLocalToWorld());
+        m_ObjectConstants.m_WorldIT = Math::Matrix4::Transpose(Math::Matrix4::Inverse(m_ObjectConstants.m_World));
         Transform cameraTrans{};
         cameraTrans.SetPosition(0,0,-10);
         cameraTrans.LookAt({ 0,0,0 });
-        m_PassConstants.View = Math::Matrix4::Transpose(cameraTrans.GetWorldToLocal());
-        m_PassConstants.Proj = Math::Matrix4::Transpose(Math::Matrix4{proj});
+        m_PassConstants.m_View = Math::Matrix4::Transpose(cameraTrans.GetWorldToLocal());
+        m_PassConstants.m_Proj = Math::Matrix4::Transpose(Math::Matrix4{proj});
         
     }
     virtual void RenderScene(RenderContext& renderContext) override
@@ -211,7 +198,7 @@ public:
         cmdList.SetVertexBuffer(0, m_VertexBufferView);
         cmdList.SetIndexBuffer(m_IndexBufferView);
         
-        cmdList.SetDynamicConstantBuffer(0, sizeof(ObjectConstants), &m_ObjectConstants);
+        cmdList.SetDynamicConstantBuffer(0, sizeof(MeshConstants), &m_ObjectConstants);
         cmdList.SetDynamicConstantBuffer(1, sizeof(PassConstants), &m_PassConstants);
         //cmdList.DrawIndexed(m_IndexBufferView.SizeInBytes / sizeof(std::uint16_t));
         cmdList.ExecuteIndirect(Graphics::DrawIndexedCommandSignature, m_ArgumentBuffer, 0);
@@ -233,7 +220,7 @@ private:
     DescriptorHandle m_DepthStencilHandle{};
     RootSignature m_RootSig{2, 0};
     GraphicsPSO m_PSO{L"Color PSO"};
-    ObjectConstants m_ObjectConstants{};
+    MeshConstants m_ObjectConstants{};
     PassConstants m_PassConstants{};
     Transform m_ObjectTransform{};
 

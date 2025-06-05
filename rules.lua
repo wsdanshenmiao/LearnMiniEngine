@@ -28,6 +28,18 @@ rule("ShaderCopy")
         end)
 rule_end()
 
+rule("EngineShderCopy")
+    set_extensions(".hlsl", ".hlsli")
+    after_build(
+        function(target)
+            shaderFiles = path.join(target:scriptdir(), "../../DSMEngine/Shaders");
+            -- 判断文件是否存在
+            if(os.exists(shaderFiles)) then
+                os.cp(shaderFiles, target:targetdir())
+            end
+        end)
+rule_end()
+
 rule("ModelCopy")
     after_build(
         function(target)

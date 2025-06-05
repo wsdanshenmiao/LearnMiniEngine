@@ -64,11 +64,15 @@ namespace DSM::Math {
 
             return Matrix3{inv0, inv1, inv2} *= rDet;
         }
+
+        static const Matrix3 Identity;
         
         
     private:
         std::array<Vector3, 3> m_Matrix;
     };
+
+	inline const Matrix3 Matrix3::Identity = Matrix3{ Vector3{1, 0, 0}, Vector3{0, 1, 0}, Vector3{0, 0, 1} };
 
     __forceinline Vector3 operator*(Vector3 v, const Matrix3& m) noexcept { return Vector3{DirectX::XMVector3Transform(v, m)}; }
     // 行矩阵相乘
@@ -160,11 +164,15 @@ namespace DSM::Math {
         static __forceinline Matrix4 GetScale(Vector3 s) noexcept { return Matrix4{DirectX::XMMatrixScalingFromVector(s)}; }
         static __forceinline Matrix4 Inverse(Matrix4 m) noexcept { return Matrix4{DirectX::XMMatrixInverse(nullptr, m)}; }
         static __forceinline Matrix4 Transpose(Matrix4 m) noexcept { return Matrix4{DirectX::XMMatrixTranspose(m)}; }
-        static __forceinline Matrix4 InverseTranspose(Matrix4 m) noexcept { return Inverse(Transpose(m)); }
+        static __forceinline Matrix4 InverseTranspose(Matrix4 m) noexcept { return Transpose(Inverse(m)); }
         
+		static const Matrix4 Identity;
+
     private:
         DirectX::XMMATRIX m_Matrix;
     };
+
+    inline const Matrix4 Matrix4::Identity = Matrix4{ DirectX::XMMatrixIdentity() };
 
     __forceinline Vector4 operator*(Vector4 v, const Matrix4& m) noexcept { return Vector4{DirectX::XMVector4Transform(v, m)}; }
     // 行矩阵相乘
@@ -175,7 +183,7 @@ namespace DSM::Math {
     __forceinline Matrix4 operator*(const Matrix4& m, Scalar s) noexcept { return Matrix4{m} *= s; }
     __forceinline Matrix4 operator*(Scalar s, const Matrix4& rhs) noexcept { return rhs * s; }
 
-    bool operator==(const Matrix4& m0, const Matrix4& m1) noexcept
+    /*bool operator==(const Matrix4& m0, const Matrix4& m1) noexcept
     {
         BoolVector equalX = m0.GetX() == m1.GetX();
         BoolVector equalZ = (m0.GetZ() == m1.GetZ());
@@ -192,7 +200,7 @@ namespace DSM::Math {
         else {
             return false;
         }
-    }
+    }*/
 
 }
 

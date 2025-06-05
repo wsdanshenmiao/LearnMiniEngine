@@ -44,6 +44,8 @@ namespace DSM {
         Color ToREC709() const noexcept;
         Color FromREC709() const noexcept;
 
+        uint32_t R8G8B8A8() const noexcept;
+
         operator DirectX::XMVECTOR() const noexcept { return m_Color; }
 
     private:

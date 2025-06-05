@@ -2,6 +2,7 @@
 #ifndef __PIPELINESTATE_H__
 #define __PIPELINESTATE_H__
 
+#include "GraphicsCommon.h"
 #include "../pch.h"
 
 
@@ -13,6 +14,13 @@ namespace DSM {
     public:
         PSO(const std::wstring& name)
             :m_Name(name), m_pRootSignature(nullptr), m_pPSO(nullptr){}
+        PSO(const PSO&) = default;
+        PSO& operator=(const PSO& other) 
+        { 
+            m_pPSO = other.m_pPSO; 
+            m_pRootSignature = other.m_pRootSignature;
+            return *this; 
+        }
 
         const RootSignature& GetRootSignature() const
         {

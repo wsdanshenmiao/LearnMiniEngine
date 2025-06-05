@@ -6,13 +6,27 @@
 #include <dxcapi.h>
 #include <vector>
 #include <map>
+#include <string>
+#include <unordered_map>
 #include <d3d12.h>
-#include "../Utilities/Utility.h"
+#include "Utilities/Utility.h"
 
 namespace DSM {
     class ShaderDefines
     {
     public:
+        ShaderDefines() = default;
+        ShaderDefines(std::initializer_list<std::pair<std::string, std::string>> initList)
+        {
+			for (const auto& pair : initList) {
+				AddDefine(pair.first, pair.second);
+			}
+        }
+        ShaderDefines(const ShaderDefines& other) = default;
+		ShaderDefines& operator=(const ShaderDefines& other) = default;
+        ShaderDefines(ShaderDefines&&) = default;
+        ShaderDefines& operator=(ShaderDefines&&) = default;
+
         void AddDefine(const std::string& name, const std::string& value)
         {
             m_Defines[Utility::UTF8ToWString(name)] = Utility::UTF8ToWString(value);
@@ -31,7 +45,6 @@ namespace DSM {
             for (const auto& define : m_Defines) {
                 result.emplace_back(DxcDefine{.Name = define.first.c_str(), .Value = define.second.c_str()});
             }
-            result.emplace_back(DxcDefine{nullptr, nullptr});
             return result;
         }
     private:

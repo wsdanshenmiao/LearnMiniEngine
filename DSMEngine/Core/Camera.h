@@ -10,7 +10,7 @@ namespace DSM {
     class Camera
     {
     public:
-        const Transform& GetTransform() const noexcept;
+		const Transform& GetTransform() const noexcept { return m_Transform; }
         
         Math::Matrix4 GetViewMatrix() const noexcept { return m_Transform.GetWorldToLocal(); }
         Math::Matrix4 GetProjMatrix() const noexcept
@@ -36,7 +36,6 @@ namespace DSM {
         void LookTo(Math::Vector3 to, Math::Vector3 up) noexcept { m_Transform.LookTo(to, up); }
         void RotateX(float angle) noexcept { m_Transform.Rotate(angle, 0, 0); }
         void RotateY(float angle) noexcept { m_Transform.Rotate(0, angle, 0); }
-        void SetFrustum(float fovY, float aspect, float nearZ, float farZ) noexcept;
 
         // 设置视口
         void SetViewPort(const D3D12_VIEWPORT& viewPort) noexcept { m_ViewPort = viewPort; }
@@ -48,15 +47,23 @@ namespace DSM {
             m_ViewPort = {topLeftX, topLeftY, width, height, minDepth, maxDepth};
         }
 
+        void SetFrustum(float fovY, float aspect, float nearZ, float farZ) 
+        {
+			m_FovY = fovY;
+			m_Aspect = aspect;
+			m_NearZ = nearZ;
+			m_FarZ = farZ;
+        }
+
         void ReverseZ(bool enable) { m_ReversedZ = enable; }
     
     protected:
         Transform m_Transform{};
         D3D12_VIEWPORT m_ViewPort{};
-        float m_NearZ = 0.0f;
-        float m_FarZ = 0.0f;
+        float m_NearZ = 0.1f;
+        float m_FarZ = 1000.0f;
         float m_Aspect = 0.0f;
-        float m_FovY = 0.0f;
+        float m_FovY = DirectX::XM_PIDIV2;
 
         bool m_ReversedZ = false;
     };

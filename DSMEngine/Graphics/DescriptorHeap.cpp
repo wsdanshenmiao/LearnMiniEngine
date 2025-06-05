@@ -67,29 +67,16 @@ namespace DSM {
 		return m_GPUHandle;
 	}
 
-	DescriptorHeap::DescriptorHeap(const std::wstring& name, D3D12_DESCRIPTOR_HEAP_TYPE heapType,std::uint32_t heapSize)
+	DescriptorHeap::DescriptorHeap(const std::wstring& name, D3D12_DESCRIPTOR_HEAP_TYPE heapType, std::uint32_t heapSize)
 		:m_Allocator(heapSize){
-		D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+		D3D12_DESCRIPTOR_HEAP_FLAGS flags;
 		if (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || heapType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
-			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		}
 		else {
-			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+			flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		}
-		heapDesc.Type = heapType;
-		heapDesc.NumDescriptors = heapSize;
-
-		auto pDevice = g_RenderContext.GetDevice();
-		ASSERT_SUCCEEDED(pDevice->CreateDescriptorHeap(
-			&heapDesc, IID_PPV_ARGS(m_DescriptorHeap.GetAddressOf())));
-		m_DescriptorHeap->SetName(name.c_str());
-
-		m_DescriptorSize = pDevice->GetDescriptorHandleIncrementSize(heapDesc.Type);
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = heapDesc.Flags == D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE ? 
-			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() :
-			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_NULL };
-		m_FirstHandle = { m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-			gpuHandle };
+		Create(name, heapType, heapSize, flags);
 	}
 
 	void DescriptorHeap::Clear()
@@ -151,6 +138,30 @@ namespace DSM {
 		return m_FirstHandle + index * m_DescriptorSize;
 	}
 
+	void DescriptorHeap::Create(
+		const std::wstring& name, 
+		D3D12_DESCRIPTOR_HEAP_TYPE heapType, 
+		std::uint32_t heapSize, 
+		D3D12_DESCRIPTOR_HEAP_FLAGS flags)
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+		heapDesc.Type = heapType;
+		heapDesc.NumDescriptors = heapSize;
+		heapDesc.Flags = flags;
+
+		auto pDevice = g_RenderContext.GetDevice();
+		ASSERT_SUCCEEDED(pDevice->CreateDescriptorHeap(
+			&heapDesc, IID_PPV_ARGS(m_DescriptorHeap.GetAddressOf())));
+		m_DescriptorHeap->SetName(name.c_str());
+
+		m_DescriptorSize = pDevice->GetDescriptorHandleIncrementSize(heapDesc.Type);
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = heapDesc.Flags == D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE ?
+			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() :
+			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_NULL };
+		m_FirstHandle = { m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+			gpuHandle };
+	}
+
 
 	//
 	// DescriptorAllocator Implementation
@@ -176,8 +187,12 @@ namespace DSM {
 			}
 			
 			if (sm_AvailablePages[m_HeapType].empty()) {
-				DescriptorPage* newPage = new DescriptorPage{
-					{L"DescriptorAllocator::DescriptorHeap", m_HeapType, sm_NumDescriptorsPerHeap}, 0 };
+				DescriptorHeap newHeap{
+					L"DescriptorAllocator::DescriptorHeap",
+					m_HeapType,
+					sm_NumDescriptorsPerHeap,
+					D3D12_DESCRIPTOR_HEAP_FLAG_NONE };
+				DescriptorPage* newPage = new DescriptorPage{ .m_Heap = std::move(newHeap), .m_UsedCount = 0 };
 				m_CurrHeap = newPage;
 				sm_DescriptorPagePool.emplace_back(newPage);
 			}

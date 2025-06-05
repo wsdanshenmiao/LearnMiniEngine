@@ -50,11 +50,13 @@ namespace DSM {
         std::lock_guard lock(m_Mutex);
 
         // 过大的资源额外管理
-        if (auto alignSize = Math::AlignUp(bufferSize, alignment) > m_PageSize) {
+        if (auto alignSize = Math::AlignUp(bufferSize, alignment); alignSize > m_PageSize) {
             ret.m_Resource = CreateNewBuffer(alignSize);
             ret.m_Size = alignSize;
             ret.m_GpuAddress = ret.m_Resource->GetGpuVirtualAddress();
-            ASSERT_SUCCEEDED(ret.m_Resource->GetResource()->Map(0, nullptr, &ret.m_MappedAddress));
+            if (m_AllocateMode == AllocateMode::CpuExclusive) {
+                ASSERT_SUCCEEDED(ret.m_Resource->GetResource()->Map(0, nullptr, &ret.m_MappedAddress));
+            }
             m_LargePages.push_back(ret.m_Resource);
         }
         else if (m_CurrPage == nullptr || !m_CurrPage->Allocate(bufferSize, alignment, ret)) {    // 创建新的Page
@@ -88,6 +90,7 @@ namespace DSM {
             page->GetResource()->Unmap(0, nullptr);
             m_DeletionPages.push(std::make_pair(fenceValue, page));
         }
+        m_LargePages.clear();
     }
 
     DynamicBufferPage* DynamicBufferAllocator::RequestPage()

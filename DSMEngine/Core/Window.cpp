@@ -1,4 +1,6 @@
 #include "Window.h"
+
+#include "GameCore.h"
 #include "../Graphics/RenderContext.h"
 
 
@@ -60,14 +62,12 @@ namespace DSM {
     {
         switch( message )
         {
-        case WM_SIZE:
-            g_RenderContext.OnResize((UINT)(UINT64)lParam & 0xFFFF, (UINT)(UINT64)lParam >> 16);
-            break;
-
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            break;
-
+        case WM_SIZE: {
+            GameCore::OnResize((UINT)(UINT64)lParam & 0xFFFF, (UINT)(UINT64)lParam >> 16); break;
+        }
+        case WM_DESTROY: {
+            PostQuitMessage(0); break;
+        }
         default:
             return DefWindowProc( hWnd, message, wParam, lParam );
         }

@@ -63,7 +63,7 @@ namespace DSM {
         m_CmdList->ClearUnorderedAccessViewFloat(gpuHandle, uav, resource.GetResource(), clearColor, 0, nullptr);
     }
 
-    void CommandList::ClearUAv(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor)
+    void CommandList::ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor)
     {
         FlushResourceBarriers();
 

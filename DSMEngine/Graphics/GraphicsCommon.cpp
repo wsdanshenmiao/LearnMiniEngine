@@ -1,4 +1,5 @@
 #include "GraphicsCommon.h"
+#include "CommandSignature.h"
 
 namespace DSM::Graphics {
 
@@ -43,6 +44,8 @@ namespace DSM::Graphics {
     CommandSignature DrawIndexedCommandSignature{1};
     CommandSignature DispatchCommandSignature{1};
 
+    std::array<Texture, kNumDefaultTexture> DefaultTextures;
+    std::array<DescriptorHandle, kNumDefaultTexture> DefaultTextureHandles;
     
     bool IsDirectXRaytracingSupported(ID3D12Device* device)
     {
@@ -51,6 +54,12 @@ namespace DSM::Graphics {
             return false;
 
         return featureSupport.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDefaultTexture(eDefaultTexture texID)
+    {
+        ASSERT(texID < kNumDefaultTexture);
+        return DefaultTextureHandles[texID];
     }
 
     void InitializeCommon()
@@ -222,7 +231,58 @@ namespace DSM::Graphics {
 
         DispatchCommandSignature[0].Dispatch();
         DispatchCommandSignature.Finalize();
-        
+
+
+        // 创建默认纹理
+        uint32_t MagentaPixel = 0xFFFF00FF;
+        TextureDesc texDesc{};
+        texDesc.m_Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        texDesc.m_Flags = D3D12_RESOURCE_FLAG_NONE;
+        texDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        texDesc.m_Height = 1;
+        texDesc.m_Width = 1;
+        texDesc.m_MipLevels = 1;
+        texDesc.m_SampleDesc = { 1, 0};
+        texDesc.m_DepthOrArraySize = 1;
+        D3D12_SUBRESOURCE_DATA subresourceData{};
+        subresourceData.pData = &MagentaPixel;
+        subresourceData.RowPitch = 4;
+        subresourceData.SlicePitch = subresourceData.RowPitch * 4;
+        DefaultTextures[kMagenta2D].Create(L"Magenta Tex", texDesc, {&subresourceData, 1});
+        uint32_t BlackOpaqueTexel = 0xFF000000;
+        subresourceData.pData = &BlackOpaqueTexel;
+        DefaultTextures[kBlackOpaque2D].Create(L"BlackOpaque Tex", texDesc, {&subresourceData, 1});
+        uint32_t BlackTransparentTexel = 0x00000000;
+        subresourceData.pData = &BlackTransparentTexel;
+        DefaultTextures[kBlackTransparent2D].Create(L"BlackTransparent Tex", texDesc, {&subresourceData, 1});
+        uint32_t WhiteOpaqueTexel = 0xFFFFFFFF;
+        subresourceData.pData = &WhiteOpaqueTexel;
+        DefaultTextures[kWhiteOpaque2D].Create(L"WhiteOpaque Tex", texDesc, {&subresourceData, 1});
+        uint32_t WhiteTransparentTexel = 0x00FFFFFF;
+        subresourceData.pData = &WhiteTransparentTexel;
+        DefaultTextures[kWhiteTransparent2D].Create(L"WhiteTransparent Tex", texDesc, {&subresourceData, 1});
+        uint32_t FlatNormalTexel = 0x00FF8080;
+        subresourceData.pData = &FlatNormalTexel;
+        DefaultTextures[kDefaultNormalTex].Create(L"DefaultNormal Tex", texDesc, {&subresourceData, 1});
+        uint32_t BlackCubeTexels[6] = {};
+        subresourceData.pData = BlackCubeTexels;
+        texDesc.m_DepthOrArraySize = 6;
+        DefaultTextures[kBlackCubeTex].Create(L"BlackCube Tex", texDesc, {&subresourceData, 1}, true);
+
+        // 创建默认纹理的描述符
+        for (int i = 0; i < kNumDefaultTexture; ++i) {
+            DefaultTextureHandles[i] = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            if (i != kBlackCubeTex) {
+                g_RenderContext.GetDevice()->CreateShaderResourceView(DefaultTextures[i].GetResource(), nullptr, DefaultTextureHandles[i]);
+            }
+        }
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = DefaultTextures[kBlackCubeTex].GetFormat();
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.TextureCube.MipLevels = 1;
+        g_RenderContext.GetDevice()->CreateShaderResourceView(
+            DefaultTextures[kBlackCubeTex].GetResource(), &srvDesc, DefaultTextureHandles[kBlackCubeTex]);
     }
 
     void DestroyCommon()
@@ -230,5 +290,9 @@ namespace DSM::Graphics {
         DrawCommandSignature.Destroy();
         DrawIndexedCommandSignature.Destroy();
         DispatchCommandSignature.Destroy();
+
+        for (int i = 0; i < kNumDefaultTexture; ++i) {
+            g_RenderContext.FreeDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, DefaultTextureHandles[i]);
+        }
     }
 }

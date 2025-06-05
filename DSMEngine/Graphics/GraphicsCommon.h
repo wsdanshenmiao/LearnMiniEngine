@@ -3,11 +3,32 @@
 #define __GRAPHICSCOMMON_H__
 
 #include <d3d12.h>
-#include <memory>
 
-#include "CommandSignature.h"
+namespace DSM {
+    class CommandSignature;
+}
 
 namespace DSM::Graphics {
+
+    enum eDefaultTexture
+    {
+        kMagenta2D,
+        kBlackOpaque2D,
+        kWhiteOpaque2D,
+        kBlackTransparent2D,
+        kWhiteTransparent2D,
+        kDefaultNormalTex,
+        kBlackCubeTex,
+
+        kNumDefaultTexture
+    };
+
+    void InitializeCommon();
+    void DestroyCommon();
+    
+    bool IsDirectXRaytracingSupported(ID3D12Device* device);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDefaultTexture(eDefaultTexture texID);
 
     extern D3D12_SAMPLER_DESC SamplerLinearWrap;
     extern D3D12_SAMPLER_DESC SamplerLinearBorder;
@@ -49,11 +70,6 @@ namespace DSM::Graphics {
     extern CommandSignature DrawCommandSignature;
     extern CommandSignature DrawIndexedCommandSignature;
     extern CommandSignature DispatchCommandSignature;
-    
-    bool IsDirectXRaytracingSupported(ID3D12Device* device);
-
-    void InitializeCommon();
-    void DestroyCommon();
     
 }
 
