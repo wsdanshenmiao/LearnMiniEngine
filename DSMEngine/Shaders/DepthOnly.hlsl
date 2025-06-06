@@ -34,7 +34,7 @@ void DepthOnlyPassPS(Attributes i)
 {
 	float4 col = _DiffuseTex.Sample(defaultSampler, i.uv);
 	float alpha = col.a * _MaterialConstants.BaseColor.a;
-#if defined(ALPHA_TEST)
+#ifdef ALPHA_TEST
 	clip(alpha - 0.1f);
 #endif
 }

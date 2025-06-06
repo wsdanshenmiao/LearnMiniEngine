@@ -26,31 +26,15 @@ namespace DSM {
         m_RootSignature.Finalize(L"RendererRootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
         const auto& swapChain = g_RenderContext.GetSwapChain();
-        TextureDesc texDesc{};
-        texDesc.m_Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        texDesc.m_Format = g_RenderContext.GetSwapChain().GetBackBuffer()->GetFormat();
-        texDesc.m_Height = swapChain.GetHeight();
-        texDesc.m_Width = swapChain.GetWidth();
-        texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        m_SceneColorTexture.Create(L"SceneColorTexture", texDesc);
+        m_CommonTexture = m_TextureHeap.Allocate(1);
         m_SceneColorSRV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         m_SceneColorRTV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        m_SceneColorTexture.CreateShaderResourceView(m_SceneColorSRV);
-        m_SceneColorTexture.CreateRenderTargetView(m_SceneColorRTV);
-        
-        texDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-        texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        D3D12_CLEAR_VALUE clearValue{};
-        clearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-        clearValue.DepthStencil.Depth = 1.f;
-        clearValue.DepthStencil.Stencil = 0;
-        m_SceneDepthTexture.Create(L"SceneDepthTexture", texDesc, clearValue);
         m_SceneDepthSRV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         m_SceneDepthDSV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-        m_SceneDepthDSVReadOnly = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-        m_SceneDepthTexture.CreateShaderResourceView(m_SceneDepthSRV);
-        m_SceneDepthTexture.CreateDepthStencilView(m_SceneDepthDSV);
-        m_SceneDepthTexture.CreateDepthStencilView(m_SceneDepthDSVReadOnly, D3D12_DSV_FLAG_READ_ONLY_DEPTH);
+        m_ShadowMapSRV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_ShadowMapDSV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+        m_ShadowMapDSVReadOnly = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		OnResize(swapChain.GetWidth(), swapChain.GetHeight());
 
         D3D12_INPUT_ELEMENT_DESC posOnly[] = {
             {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
@@ -84,15 +68,6 @@ namespace DSM {
 		m_LitNoTangentPS = std::make_unique<ShaderByteCode>(litPSDesc);
 
         // 仅深度写入
-        GraphicsPSO depthOnlyPSO{L"DepthOnlyPSO"};
-        depthOnlyPSO.SetRootSignature(m_RootSignature);
-        depthOnlyPSO.SetRasterizerState(Graphics::DefaultRasterizer);
-        depthOnlyPSO.SetBlendState(Graphics::DisableBlend);
-        depthOnlyPSO.SetDepthStencilState(Graphics::ReadWriteDepthStencil);
-        depthOnlyPSO.SetInputLayout(posAndUV);
-        depthOnlyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-        depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_SceneDepthTexture.GetFormat());
-        // TODO:编写深度写入的Shader之后插入绑定着色器
 		ShaderByteCode depthOnlyVS{ ShaderDesc{
 			.m_Type = ShaderType::Vertex,
 			.m_Mode = ShaderMode::SM_6_1,
@@ -106,30 +81,34 @@ namespace DSM {
             .m_EnterPoint = "DepthOnlyPassPS"
         };
 		ShaderByteCode depthOnlyPS{depthOnlyPSDesc};
+        GraphicsPSO depthOnlyPSO{L"DepthOnlyPSO"};
+        depthOnlyPSO.SetRootSignature(m_RootSignature);
+        depthOnlyPSO.SetRasterizerState(Graphics::DefaultRasterizer);
+        depthOnlyPSO.SetBlendState(Graphics::DisableBlend);
+        depthOnlyPSO.SetDepthStencilState(Graphics::ReadWriteDepthStencil);
+        depthOnlyPSO.SetInputLayout(posAndUV);
+        depthOnlyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+        depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_SceneDepthTexture.GetFormat());
+        // TODO:编写深度写入的Shader之后插入绑定着色器
 		depthOnlyPSO.SetVertexShader(depthOnlyVS);
 		depthOnlyPSO.SetPixelShader(depthOnlyPS);
         depthOnlyPSO.Finalize();
         m_PSOs.push_back(depthOnlyPSO);
 
         // AlphaTest的深度写入
+        auto depthOnlyAlphaTestPSDesc = depthOnlyPSDesc;
+		depthOnlyAlphaTestPSDesc.m_Defines = ShaderDefines{ { "ALPHA_TEST", "1" } };
+        ShaderByteCode depthOnlyAlphaTestPS{ depthOnlyAlphaTestPSDesc };
         GraphicsPSO cutoutDepthOnlyPSO{L"CutoutDepthOnlyPSO"};
         cutoutDepthOnlyPSO = depthOnlyPSO;
         cutoutDepthOnlyPSO.SetInputLayout(posAndUV);
         cutoutDepthOnlyPSO.SetRasterizerState(Graphics::BothSidedRasterizer);
         // TODO:后续插入绑定着色器
-        auto depthOnlyAlphaTestPSDesc = depthOnlyPSDesc;
-		depthOnlyAlphaTestPSDesc.m_Defines = ShaderDefines{ { "ALPHA_TEST", "1" } };
         cutoutDepthOnlyPSO.SetVertexShader(depthOnlyVS);
-        cutoutDepthOnlyPSO.SetPixelShader(ShaderByteCode{ depthOnlyAlphaTestPSDesc });
+        cutoutDepthOnlyPSO.SetPixelShader(depthOnlyAlphaTestPS);
         cutoutDepthOnlyPSO.Finalize();
         m_PSOs.push_back(cutoutDepthOnlyPSO);
         
-        m_CommonTexture = m_TextureHeap.Allocate(1);
-
-        m_ShadowMapSRV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        m_ShadowMapDSV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-        m_ShadowMapDSVReadOnly = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-        ResizeShadowMap(swapChain.GetWidth(), swapChain.GetHeight());
         
         // 绘制ShadowMap时使用
         depthOnlyPSO.SetRasterizerState(Graphics::ShadowRasterizer);
@@ -241,20 +220,28 @@ namespace DSM {
 
     void Renderer::OnResize(std::uint32_t width, std::uint32_t height)
     {
-        TextureDesc texDesc;
+        TextureDesc texDesc{};
         texDesc.m_Width = width;
         texDesc.m_Height = height;
         texDesc.m_Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        texDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UINT;
-        g_Renderer.m_SceneColorTexture.Create(L"Renderer::SceneColorTexture", texDesc);
+        texDesc.m_Format = g_RenderContext.GetSwapChain().GetBackBuffer()->GetFormat();
+        texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        m_SceneColorTexture.Create(L"Renderer::SceneColorTexture", texDesc);
         m_SceneColorTexture.CreateShaderResourceView(m_SceneColorSRV);
         m_SceneColorTexture.CreateRenderTargetView(m_SceneColorRTV);
-        
+
         texDesc.m_Format = DXGI_FORMAT_R24G8_TYPELESS;
-        g_Renderer.m_SceneDepthTexture.Create(
-            L"Renderer::SceneDepthTexture", texDesc, D3D12_CLEAR_VALUE{DXGI_FORMAT_D24_UNORM_S8_UINT, 1, 0});
+        texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        clearValue.DepthStencil.Depth = 1.f;
+        clearValue.DepthStencil.Stencil = 0;
+        m_SceneDepthTexture.Create(L"Renderer::SceneDepthTexture", texDesc, clearValue);
+        m_SceneDepthDSVReadOnly = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
         m_SceneDepthTexture.CreateShaderResourceView(m_SceneDepthSRV);
         m_SceneDepthTexture.CreateDepthStencilView(m_SceneDepthDSV);
+        m_SceneDepthTexture.CreateDepthStencilView(m_SceneDepthDSVReadOnly, D3D12_DSV_FLAG_READ_ONLY_DEPTH);
+
         ResizeShadowMap(width, height);
     }
     

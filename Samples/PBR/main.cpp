@@ -117,7 +117,7 @@ public:
         m_Model->Render(sorter, m_MeshConstants, m_SceneTrans);
 
         sorter.Sort();
-		sorter.Render(MeshSorter::kZPass, cmdList, m_PassConstants);
+		//sorter.Render(MeshSorter::kZPass, cmdList, m_PassConstants);
 
 
         //for (const auto& mesh : m_Model->m_Meshes) {
