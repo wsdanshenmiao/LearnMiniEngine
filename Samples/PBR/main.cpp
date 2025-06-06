@@ -117,23 +117,20 @@ public:
         m_Model->Render(sorter, m_MeshConstants, m_SceneTrans);
 
         sorter.Sort();
-		//sorter.Render(MeshSorter::kZPass, cmdList, m_PassConstants);
 
+        sorter.Render(MeshSorter::kZPass, cmdList, m_PassConstants);
 
-        //for (const auto& mesh : m_Model->m_Meshes) {
-        //    D3D12_VERTEX_BUFFER_VIEW vbView[] = {
-        //        mesh->m_PositionStream,
-        //        mesh->m_UVStream
-        //    };
-        //    cmdList.SetVertexBuffers(0, vbView);
-        //    cmdList.SetIndexBuffer(mesh->m_IndexBufferViews);
+		cmdList.TransitionResource(g_Renderer.m_SceneColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        cmdList.ClearRenderTarget(g_Renderer.m_SceneColorRTV);
 
-        //    for (const auto& [name, submesh] : mesh->m_SubMeshes) {
-        //        cmdList.DrawIndexed(submesh.m_IndexCount, submesh.m_IndexOffset, submesh.m_VertexOffset);
-        //    }
-        //}
+		cmdList.TransitionResource(g_Renderer.m_SceneDepthTexture, D3D12_RESOURCE_STATE_DEPTH_READ);
+		cmdList.SetRenderTarget(g_Renderer.m_SceneColorRTV, g_Renderer.m_SceneDepthDSVReadOnly);
+		cmdList.SetViewportAndScissor(m_Camera->GetViewPort(), m_Scissor);
 
-		cmdList.CopyResource(*swapChain.GetBackBuffer(), g_Renderer.m_SceneColorTexture);
+		sorter.Render(MeshSorter::kOpaque, cmdList, m_PassConstants);
+		sorter.Render(MeshSorter::kTransparent, cmdList, m_PassConstants);
+
+        cmdList.CopyResource(*swapChain.GetBackBuffer(), g_Renderer.m_SceneColorTexture);
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 

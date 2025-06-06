@@ -220,6 +220,8 @@ namespace DSM {
 
     void Renderer::OnResize(std::uint32_t width, std::uint32_t height)
     {
+		width = max(width, 1u);
+		height = max(height, 1u);
         TextureDesc texDesc{};
         texDesc.m_Width = width;
         texDesc.m_Height = height;
@@ -230,7 +232,7 @@ namespace DSM {
         m_SceneColorTexture.CreateShaderResourceView(m_SceneColorSRV);
         m_SceneColorTexture.CreateRenderTargetView(m_SceneColorRTV);
 
-        texDesc.m_Format = DXGI_FORMAT_R24G8_TYPELESS;
+        texDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
         D3D12_CLEAR_VALUE clearValue{};
         clearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -280,7 +282,7 @@ namespace DSM {
         D3D12_GPU_VIRTUAL_ADDRESS matCBV)
     {
         SortKey key;
-        key.m_Value = m_SortKey.size();
+        key.m_Value = m_SortObjects.size();
 
         bool alphaBlend = (mesh.m_PSOFlags & kAlphaBlend) == kAlphaBlend;
         bool alphaTest = (mesh.m_PSOFlags & kAlphaTest) == kAlphaTest;
@@ -352,7 +354,7 @@ namespace DSM {
         passConstants.m_CameraPos[2] = cameraPos.GetZ();
 
         if (m_BatchType == kShadows) {
-            cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+            cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_WRITE);
             cmdList.ClearDepth(m_DSV);
             cmdList.SetDepthStencilTarget(m_DSV);
         }
@@ -426,13 +428,13 @@ namespace DSM {
             for (int i = 0; i < passCount; ++i, ++m_CurrDraw) {
                 SortKey key{};
                 key.m_Value  = m_SortKey[m_CurrDraw];
-                const SortObject& sortObject = m_SortObjects[m_CurrDraw];
+                const SortObject& sortObject = m_SortObjects[key.m_ObjIndex];
                 const Mesh* mesh = sortObject.m_Mesh;
 
                 cmdList.SetConstantBuffer(Renderer::kMeshConstants, sortObject.m_MeshCBV);
                 cmdList.SetConstantBuffer(Renderer::kMaterialConstants, sortObject.m_MaterialCBV);
 
-                cmdList.SetPipelineState(g_Renderer.m_PSOs[mesh->m_PSOIndex]);
+                cmdList.SetPipelineState(g_Renderer.m_PSOs[key.m_PSOIndex]);
 
                 std::vector<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews{};
                 vertexBufferViews.emplace_back(mesh->m_PositionStream);
