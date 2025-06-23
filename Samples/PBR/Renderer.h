@@ -125,10 +125,13 @@ namespace DSM {
             m_DSVReadOnly = dsvReadOnly;
         }
 
-        void AddRenderTarget(Texture& renderTarget)
+        void AddRenderTarget(Texture& renderTarget, DescriptorHandle rtv, DescriptorHandle srv)
         {
             ASSERT(m_NumRTVs <= 8);
-            m_RTVs[m_NumRTVs++] = &renderTarget;
+            auto& renderTex = m_RenderTexs[m_NumRTVs++];
+            renderTex.m_RenderTex = &renderTarget;
+            renderTex.m_RTV = rtv;
+            renderTex.m_SRV = srv;
         }
 
         void AddMesh(const Mesh& mesh,
@@ -163,20 +166,28 @@ namespace DSM {
             D3D12_GPU_VIRTUAL_ADDRESS m_MaterialCBV;
         };
 
+        struct RenderResource
+        {
+            Texture* m_RenderTex;
+            DescriptorHandle m_RTV;
+            DescriptorHandle m_SRV;
+        };
+
         std::vector<SortObject> m_SortObjects{};
         std::vector<std::uint64_t> m_SortKey{};
         BatchType m_BatchType{};
         std::array<std::uint32_t, kNumDrawPasses> m_PassCounts{};
-        DrawPass m_CurrPass = kZPass;
-        std::uint32_t m_CurrDraw = 0;
 
         const Camera* m_Camera = nullptr;
         D3D12_RECT m_Scissor{};
+        
         std::uint32_t m_NumRTVs = 0;
-        std::array<Texture*, 8> m_RTVs{};
+        std::array<RenderResource, 8> m_RenderTexs{};
+
         Texture* m_DepthTex = nullptr;
         DescriptorHandle m_DSV{};
         DescriptorHandle m_DSVReadOnly{};
+        
         DirectX::BoundingFrustum m_Frustum{};
     };
 

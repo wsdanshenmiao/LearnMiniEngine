@@ -52,7 +52,7 @@ namespace DSM {
         void Unmap();
         template <typename T = void>
         T* GetMappedData() const { return reinterpret_cast<T*>(m_MappedData); }
-        void Update(void* data, std::uint64_t size, std::uint64_t offset = 0);
+        void Update(const void* data, std::uint64_t size, std::uint64_t offset = 0);
         template <typename T>
         void Update(const T& data) { Update(&data, sizeof(T)); }
 

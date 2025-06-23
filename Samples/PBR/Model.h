@@ -3,7 +3,7 @@
 #define __MODEL_H__
 
 #include "Mesh.h"
-#include "TextureManager.h"
+#include "Renderer/TextureManager.h"
 #include "Math/Transform.h"
 
 namespace DSM {

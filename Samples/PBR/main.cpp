@@ -13,9 +13,11 @@
 #include "Utilities/Utility.h"
 #include "Graphics/CommandSignature.h"
 #include <iostream>
-#include "Renderer/ModelLoader.h"
-#include "Renderer/Renderer.h"
-#include "Renderer/ConstantData.h"
+#include "ModelLoader.h"
+#include "Renderer.h"
+#include "ConstantData.h"
+#include "Geometry.h"
+#include "Material.h"
 
 using namespace DSM;
 using namespace DirectX;
@@ -54,21 +56,102 @@ public:
     virtual void Startup()override
     {
         g_Renderer.Create();
+
+        Geometry::GeometryMesh boxGeometry = Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1);
+        auto vertexSize = boxGeometry.m_Vertices.size();
+        std::vector<XMFLOAT3> boxPos;
+        std::vector<XMFLOAT3> boxNormal;
+        std::vector<XMFLOAT2> boxUV;
+        for (const auto& vertex : boxGeometry.m_Vertices) {
+            boxPos.emplace_back(vertex.m_Position);
+            boxNormal.emplace_back(vertex.m_Normal);
+            boxUV.emplace_back(vertex.m_TexCoord);
+        }
+
+        auto posByteSize = vertexSize * sizeof(XMFLOAT3);
+        auto normalByteSize = vertexSize * sizeof(XMFLOAT3);
+        auto uvByteSize = vertexSize * sizeof(XMFLOAT2);
+        auto indexByteSize = boxGeometry.m_Indices32.size() * sizeof(uint32_t);
+        GpuBufferDesc meshBufferDesc{};
+        meshBufferDesc.m_Flags = D3D12_RESOURCE_FLAG_NONE;
+        meshBufferDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        meshBufferDesc.m_Stride = 1;
+        meshBufferDesc.m_Size = posByteSize + normalByteSize + uvByteSize + indexByteSize;
+        m_BoxMesh.m_MeshData.Create(L"BoxMeshData", meshBufferDesc);
+
+        D3D12_GPU_VIRTUAL_ADDRESS bufferLocation = m_BoxMesh.m_MeshData.GetGpuVirtualAddress();
+        std::uint32_t offset = 0;
+        CommandList::InitBuffer(m_BoxMesh.m_MeshData, boxPos.data(), posByteSize, offset);
+        m_BoxMesh.m_PositionStream = { bufferLocation + offset, (UINT)posByteSize, sizeof(XMFLOAT3) };
+        offset += posByteSize;
+
+        CommandList::InitBuffer(m_BoxMesh.m_MeshData, boxNormal.data(), normalByteSize, offset);
+        m_BoxMesh.m_NormalStream = { bufferLocation + offset, (UINT)normalByteSize, sizeof(XMFLOAT3) };
+        offset += normalByteSize;
+
+        CommandList::InitBuffer(m_BoxMesh.m_MeshData, boxUV.data(), uvByteSize, offset);
+        m_BoxMesh.m_UVStream = { bufferLocation + offset, (UINT)uvByteSize, sizeof(XMFLOAT2)};
+        offset += uvByteSize;
+
+        CommandList::InitBuffer(m_BoxMesh.m_MeshData, boxGeometry.m_Indices32.data(), indexByteSize, offset);
+        m_BoxMesh.m_IndexBufferViews = D3D12_INDEX_BUFFER_VIEW{ bufferLocation + offset, (UINT)indexByteSize, DXGI_FORMAT_R32_UINT };
+        offset += indexByteSize;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE defaultTexture[kNumTextures] = {
+            Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+            Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+            Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+            Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+            Graphics::GetDefaultTexture(Graphics::kBlackTransparent2D),
+            Graphics::GetDefaultTexture(Graphics::kDefaultNormalTex)
+        };
+
+        DescriptorHandle texHandle = g_Renderer.m_TextureHeap.Allocate(kNumTextures);
+        std::uint32_t destCount = kNumTextures;
+        std::uint32_t srcCount[kNumTextures] = { 1,1,1,1,1,1 };
+        g_RenderContext.GetDevice()->CopyDescriptors(
+            1, &texHandle, &destCount, destCount, defaultTexture, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        
+        m_BoxMesh.m_Name = "Box";
+        m_BoxMesh.m_PSOFlags = kHasPosition | kHasNormal | kHasUV;
+        m_BoxMesh.m_PSOIndex = g_Renderer.GetPSO(m_BoxMesh.m_PSOFlags);
+        m_BoxMesh.m_SubMeshes.emplace(m_BoxMesh.m_Name, Mesh::SubMesh{
+            .m_IndexCount = (UINT)boxGeometry.m_Indices32.size(),
+            .m_IndexOffset = 0,
+            .m_VertexOffset = 0,
+            .m_MaterialIndex = 0,
+            .m_SRVTableOffset = (uint16_t)g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle) });
+
+
+        MaterialConstants materialConstant{};
+        GpuBufferDesc bufferDesc = {};
+        bufferDesc.m_Size = sizeof(MaterialConstants);
+        bufferDesc.m_Stride = sizeof(MaterialConstants);
+        bufferDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        m_BoxMaterial.Create(L"BoxMat", bufferDesc, &materialConstant);
+
+
         std::uint64_t width = g_Renderer.m_SceneColorTexture.GetWidth();
         std::uint32_t height = g_Renderer.m_SceneColorTexture.GetHeight();
 
 		m_Scissor = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
         m_Camera = std::make_unique<Camera>();
 		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
-		m_Camera->SetFrustum(DirectX::XM_PIDIV2, width / height, 0.1f, 1000.0f);
+        float aspect = float(width) / height;
+        m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 0.1f, 1000.0f);
+        m_Camera->SetPosition({ 100, 100, -100 });
+        //m_Camera->SetPosition({ 0, 0, -10 });
+        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
+        m_SceneTrans.SetScale({ 0.05f, 0.05f, 0.05f });
         MeshConstants meshConstants{};
-		meshConstants.m_World = m_SceneTrans.GetLocalToWorld();
-        meshConstants.m_WorldIT = Math::Matrix4::InverseTranspose(meshConstants.m_World);
+		meshConstants.m_World = Math::Matrix4::Transpose(m_SceneTrans.GetLocalToWorld());
+        meshConstants.m_WorldIT = Math::Matrix4::InverseTranspose(m_SceneTrans.GetLocalToWorld());
 		GpuBufferDesc meshConstantsDesc{};
         meshConstantsDesc.m_Size = sizeof(MeshConstants);
 		meshConstantsDesc.m_Stride = sizeof(MeshConstants);
-		meshConstantsDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+		meshConstantsDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
 		m_MeshConstants.Create(L"MeshConstants", meshConstantsDesc, &meshConstants);
 
         m_Model = LoadModel("Models//Sponza//sponza.gltf");
@@ -79,56 +162,38 @@ public:
         g_Renderer.OnResize(width, height);
 		m_Scissor = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
         m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
-        m_Camera->SetFrustum(DirectX::XM_PIDIV2, width / height, 0.1f, 1000.0f);
+        float aspect = float(width) / height;
+        m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 0.1f, 1000.0f);
     }
     virtual void Update(float deltaTime) override
     {
-        
-        m_PassConstants.m_View = m_Camera->GetViewMatrix();
-        m_PassConstants.m_ViewInv = Math::Matrix4::Inverse(m_PassConstants.m_View);
-        m_PassConstants.m_Proj = m_Camera->GetProjMatrix();
-        m_PassConstants.m_ProjInv = Math::Matrix4::Inverse(m_PassConstants.m_Proj);
         m_PassConstants.m_ShadowTrans = Math::Matrix4::Identity;
-		Math::Vector3 cameraPos = m_Camera->GetTransform().GetPosition();
-		m_PassConstants.m_CameraPos[0] = cameraPos.GetX();
-		m_PassConstants.m_CameraPos[1] = cameraPos.GetY();
-		m_PassConstants.m_CameraPos[2] = cameraPos.GetZ();
 		m_PassConstants.m_TotalTime = 0;
 		m_PassConstants.m_DeltaTime = deltaTime;
 	}
     virtual void RenderScene(RenderContext& renderContext) override
     {
         auto& swapChain = renderContext.GetSwapChain();
-        
-        GraphicsCommandList cmdList{L"Render Scene"};
 
-        cmdList.TransitionResource(g_Renderer.m_SceneDepthTexture, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-        cmdList.ClearDepth(g_Renderer.m_SceneDepthDSV);
+        g_Renderer.m_SeparateZPass = false;
+
+        GraphicsCommandList cmdList{ L"Render Scene" };
 
         MeshSorter sorter{ MeshSorter::kDefault };
         sorter.SetCamera(*m_Camera);
         sorter.SetScissor(m_Scissor);
-        sorter.SetDepthStencilTarget(
-            g_Renderer.m_SceneDepthTexture, 
-            g_Renderer.m_SceneDepthDSV, 
-            g_Renderer.m_SceneDepthDSVReadOnly);
-        sorter.AddRenderTarget(g_Renderer.m_SceneColorTexture);
+        sorter.SetDepthStencilTarget(g_Renderer.m_SceneDepthTexture, 
+            g_Renderer.m_SceneDepthDSV, g_Renderer.m_SceneDepthDSVReadOnly);
+
+        sorter.AddRenderTarget(g_Renderer.m_SceneColorTexture,
+            g_Renderer.m_SceneColorRTV, g_Renderer.m_SceneColorSRV);
 
         m_Model->Render(sorter, m_MeshConstants, m_SceneTrans);
+        /*sorter.AddMesh(m_BoxMesh, 2, 
+            m_MeshConstants.GetGpuVirtualAddress(), 
+            m_BoxMaterial.GetGpuVirtualAddress());*/
 
-        sorter.Sort();
-
-        sorter.Render(MeshSorter::kZPass, cmdList, m_PassConstants);
-
-		cmdList.TransitionResource(g_Renderer.m_SceneColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        cmdList.ClearRenderTarget(g_Renderer.m_SceneColorRTV);
-
-		cmdList.TransitionResource(g_Renderer.m_SceneDepthTexture, D3D12_RESOURCE_STATE_DEPTH_READ);
-		cmdList.SetRenderTarget(g_Renderer.m_SceneColorRTV, g_Renderer.m_SceneDepthDSVReadOnly);
-		cmdList.SetViewportAndScissor(m_Camera->GetViewPort(), m_Scissor);
-
-		sorter.Render(MeshSorter::kOpaque, cmdList, m_PassConstants);
-		sorter.Render(MeshSorter::kTransparent, cmdList, m_PassConstants);
+        sorter.Render(MeshSorter::kOpaque, cmdList, m_PassConstants);
 
         cmdList.CopyResource(*swapChain.GetBackBuffer(), g_Renderer.m_SceneColorTexture);
 
@@ -154,6 +219,9 @@ private:
     PassConstants m_PassConstants{};
 
     std::shared_ptr<Model> m_Model{};
+    Mesh m_BoxMesh{};
+    GpuBuffer m_BoxMaterial{};
+
 };
 
 int WinMain(

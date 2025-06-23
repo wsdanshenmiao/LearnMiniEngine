@@ -102,7 +102,7 @@ namespace DSM {
         auto tableBitMap = m_RootDescriptorTableBitMap;
         unsigned long rootParamSize{};
         unsigned long rootIndex{};
-        if (_BitScanForward(&rootParamSize, tableBitMap)) {
+        if (_BitScanReverse(&rootParamSize, tableBitMap)) {
             m_DescriptorTables.resize(rootParamSize + 1);
         }
         // 从最前面的位开始解析根签名的布局

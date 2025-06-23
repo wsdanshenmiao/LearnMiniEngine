@@ -8,21 +8,21 @@ ConstantBuffer<PassConstants> _PassConstants : register(b2);
 
 Texture2D<float4> _DiffuseTex : register(t0);
 
-struct Varyings
+struct Attributes
 {
 	float3 posOS : POSITION;
 	float2 uv : TEXCOORD0;
 };
 
-struct Attributes
+struct Varyings
 {
 	float4 posCS : SV_POSITION;
 	float2 uv : TEXCOORD0;
 };
 
-Attributes DepthOnlyPassVS(Varyings i)
+Varyings DepthOnlyPassVS(Attributes i)
 {
-	Attributes o;
+	Varyings o;
 	float4x4 viewProj = mul(_PassConstants.View, _PassConstants.Proj);
 	float3 posWS = mul(float4(i.posOS, 1), _MeshConstants.World).xyz;
 	o.posCS = mul(float4(posWS, 1), viewProj);
@@ -30,7 +30,7 @@ Attributes DepthOnlyPassVS(Varyings i)
 	return o;
 }
 
-void DepthOnlyPassPS(Attributes i)
+void DepthOnlyPassPS(Varyings i)
 {
 	float4 col = _DiffuseTex.Sample(defaultSampler, i.uv);
 	float alpha = col.a * _MaterialConstants.BaseColor.a;

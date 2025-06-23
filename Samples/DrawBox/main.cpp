@@ -13,7 +13,7 @@
 #include "Utilities/Utility.h"
 #include "Graphics/CommandSignature.h"
 #include <iostream>
-#include "Renderer/ConstantData.h"
+#include "ConstantData.h"
 
 
 using namespace DSM;
@@ -162,7 +162,7 @@ public:
     virtual void Update(float deltaTime) override
     {
         auto& swapChain = g_RenderContext.GetSwapChain();
-        m_ObjectTransform.Rotate({0,0,0}, {0,0,1}, 0.01);
+        //m_ObjectTransform.Rotate({0,0,0}, {0,0,1}, 0.01);
         XMMATRIX proj = XMMatrixPerspectiveFovLH(XM_PIDIV4, swapChain.GetWidth() / swapChain.GetHeight(), 1.0f, 1000.0f);
         m_ObjectConstants.m_World = Math::Matrix4::Transpose(m_ObjectTransform.GetLocalToWorld());
         m_ObjectConstants.m_WorldIT = Math::Matrix4::Transpose(Math::Matrix4::Inverse(m_ObjectConstants.m_World));

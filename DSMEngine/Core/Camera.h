@@ -11,6 +11,8 @@ namespace DSM {
     {
     public:
 		const Transform& GetTransform() const noexcept { return m_Transform; }
+
+        Math::Vector3 GetPosition() const noexcept { return m_Transform.GetPosition(); }
         
         Math::Matrix4 GetViewMatrix() const noexcept { return m_Transform.GetWorldToLocal(); }
         Math::Matrix4 GetProjMatrix() const noexcept

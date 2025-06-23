@@ -112,7 +112,8 @@ namespace DSM {
         
         std::lock_guard lock{m_Mutex};
 
-        if (!m_CurrPage->ReleaseResource(resource) && m_ResourceMappings.contains(resource)) {
+        if (m_CurrPage != nullptr && !m_CurrPage->ReleaseResource(resource) && 
+            m_ResourceMappings.contains(resource)) {
             auto it = m_FullPages.find(m_ResourceMappings[resource]);
             ASSERT((*it)->ReleaseResource(resource));
             if ((*it)->Empty()) {

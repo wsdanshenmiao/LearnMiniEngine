@@ -24,9 +24,8 @@ namespace DSM {
 
         m_CmdList->SetGraphicsRootSignature(rootSig.GetRootSignature());
 
-        //TODO:取消注释后会报错
-        //m_ViewDescriptorHeap->ParseGraphicsRootSignature(rootSig);
-        //m_SampleDescriptorHeap->ParseGraphicsRootSignature(rootSig);
+        m_ViewDescriptorHeap->ParseGraphicsRootSignature(rootSig);
+        m_SampleDescriptorHeap->ParseGraphicsRootSignature(rootSig);
 
         m_CurrGraphicsRootSignature = rootSig.GetRootSignature();
     }

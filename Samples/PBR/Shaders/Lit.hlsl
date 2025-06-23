@@ -16,7 +16,7 @@ Texture2D<float3> _NormalTex : register(t5);
 // 从第十个纹理开始
 Texture2D<float> _ShadowTex : register(t10);
 
-struct Varyings
+struct Attributes
 {
     float3 posOS : POSITION;
     float2 uv : TEXCOORD0;
@@ -26,7 +26,7 @@ struct Varyings
 #endif
 };
 
-struct Attributes
+struct Varyings
 {
     float4 posCS : SV_POSITION;
     float3 normal : NORMAL;
@@ -40,16 +40,18 @@ struct Attributes
 
 
 
-Attributes LitPassVS(Varyings i)
+Varyings LitPassVS(Attributes i)
 {
-    Attributes o;
+    Varyings o;
 
     float4x4 viewProj = mul(_PassConstants.View, _PassConstants.Proj);
 
-    o.posWS = mul(float4(i.posOS, 1), _MeshConstants.World).xyz;
-    o.posCS = mul(float4(o.posWS, 1), viewProj);
+    float4 posWS = mul(float4(i.posOS, 1), _MeshConstants.World);
+    float3 normal = mul(i.normal, (float3x3)_MeshConstants.WorldIT);
+    o.posWS = posWS.xyz;
+    o.posCS = mul(posWS, viewProj);
     o.uv = i.uv;
-    o.normal = mul(i.normal, (float3x3)_MeshConstants.WorldIT);
+    o.normal = normalize(normal);
 #if defined(USE_TANGENT)
     o.tangent.xyz = mul(i.tangent.xyz, (float3x3)_MeshConstants.WorldIT).xyz;
 #endif
@@ -60,7 +62,20 @@ Attributes LitPassVS(Varyings i)
 
 
 
-float4 LitPassPS(Attributes i) : SV_TARGET0
+float4 LitPassPS(Varyings i) : SV_TARGET0
 {
-    return dot(float3(0,-1,0), i.normal);
+    float4 baseCol = _BaseColorTex.Sample(defaultSampler, i.uv);
+    float4 diffuseRoughness = _DiffuseRoughnessTex.Sample(defaultSampler, i.uv);
+    float metalness = _MetalnessTex.Sample(defaultSampler, i.uv);
+    float occlusion = _OcclusionTex.Sample(defaultSampler, i.uv);
+    float3 emissive = _EmissiveTex.Sample(defaultSampler, i.uv);
+    float3 normal = _NormalTex.Sample(defaultSampler, i.uv);
+
+    baseCol.rgb += emissive;
+    baseCol.rgb *= occlusion;
+    baseCol.rgb *= metalness;
+    baseCol.rgb *= diffuseRoughness.rgb;
+    normal *= i.normal;
+
+    return float4(dot(float3(0,1,0), normalize(normal)) * baseCol.rgb, baseCol.a);
 }

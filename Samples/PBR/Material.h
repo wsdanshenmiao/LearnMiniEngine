@@ -2,7 +2,7 @@
 #ifndef __MATERIAL_H__
 #define __MATERIAL_H__
 
-#include "TextureManager.h"
+#include <array>
 
 
 namespace DSM {

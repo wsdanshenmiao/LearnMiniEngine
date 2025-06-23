@@ -2,7 +2,7 @@
 
 #include "ConstantData.h"
 #include "Mesh.h"
-#include "TextureManager.h"
+#include "Renderer/TextureManager.h"
 #include "Graphics/GraphicsCommon.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/CommandList/GraphicsCommandList.h"
@@ -36,13 +36,13 @@ namespace DSM {
         m_ShadowMapDSVReadOnly = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 		OnResize(swapChain.GetWidth(), swapChain.GetHeight());
 
-        D3D12_INPUT_ELEMENT_DESC posOnly[] = {
-            {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
-        };
-        D3D12_INPUT_ELEMENT_DESC posAndUV[] = {
-            {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-            {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-        };
+        //D3D12_INPUT_ELEMENT_DESC posOnly[] = {
+        //    {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+        //};
+        //D3D12_INPUT_ELEMENT_DESC posAndUV[] = {
+        //    {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        //    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        //};
 
 
         // 编译Shader
@@ -67,70 +67,69 @@ namespace DSM {
 		m_LitNoTangentVS = std::make_unique<ShaderByteCode>(litVSDesc);
 		m_LitNoTangentPS = std::make_unique<ShaderByteCode>(litPSDesc);
 
-        // 仅深度写入
-		ShaderByteCode depthOnlyVS{ ShaderDesc{
-			.m_Type = ShaderType::Vertex,
-			.m_Mode = ShaderMode::SM_6_1,
-			.m_FileName = "Shaders\\DepthOnly.hlsl",
-			.m_EnterPoint = "DepthOnlyPassVS"
-		} };
-        ShaderDesc depthOnlyPSDesc{
-            .m_Type = ShaderType::Pixel,
-            .m_Mode = ShaderMode::SM_6_1,
-            .m_FileName = "Shaders\\DepthOnly.hlsl",
-            .m_EnterPoint = "DepthOnlyPassPS"
-        };
-		ShaderByteCode depthOnlyPS{depthOnlyPSDesc};
-        GraphicsPSO depthOnlyPSO{L"DepthOnlyPSO"};
-        depthOnlyPSO.SetRootSignature(m_RootSignature);
-        depthOnlyPSO.SetRasterizerState(Graphics::DefaultRasterizer);
-        depthOnlyPSO.SetBlendState(Graphics::DisableBlend);
-        depthOnlyPSO.SetDepthStencilState(Graphics::ReadWriteDepthStencil);
-        depthOnlyPSO.SetInputLayout(posAndUV);
-        depthOnlyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-        depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_SceneDepthTexture.GetFormat());
-        // TODO:编写深度写入的Shader之后插入绑定着色器
-		depthOnlyPSO.SetVertexShader(depthOnlyVS);
-		depthOnlyPSO.SetPixelShader(depthOnlyPS);
-        depthOnlyPSO.Finalize();
-        m_PSOs.push_back(depthOnlyPSO);
+  //      // 仅深度写入
+		//ShaderByteCode depthOnlyVS{ ShaderDesc{
+		//	.m_Type = ShaderType::Vertex,
+		//	.m_Mode = ShaderMode::SM_6_1,
+		//	.m_FileName = "Shaders\\DepthOnly.hlsl",
+		//	.m_EnterPoint = "DepthOnlyPassVS"
+		//} };
+  //      ShaderDesc depthOnlyPSDesc{
+  //          .m_Type = ShaderType::Pixel,
+  //          .m_Mode = ShaderMode::SM_6_1,
+  //          .m_FileName = "Shaders\\DepthOnly.hlsl",
+  //          .m_EnterPoint = "DepthOnlyPassPS"
+  //      };
+		//ShaderByteCode depthOnlyPS{depthOnlyPSDesc};
+  //      GraphicsPSO depthOnlyPSO{L"DepthOnlyPSO"};
+  //      depthOnlyPSO.SetRootSignature(m_RootSignature);
+  //      depthOnlyPSO.SetRasterizerState(Graphics::DefaultRasterizer);
+  //      depthOnlyPSO.SetBlendState(Graphics::DisableBlend);
+  //      depthOnlyPSO.SetDepthStencilState(Graphics::ReadWriteDepthStencil);
+  //      depthOnlyPSO.SetInputLayout(posAndUV);
+  //      depthOnlyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+  //      depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_SceneDepthTexture.GetFormat());
+  //      // TODO:编写深度写入的Shader之后插入绑定着色器
+		//depthOnlyPSO.SetVertexShader(depthOnlyVS);
+		//depthOnlyPSO.SetPixelShader(depthOnlyPS);
+  //      depthOnlyPSO.Finalize();
+  //      m_PSOs.push_back(depthOnlyPSO);
 
-        // AlphaTest的深度写入
-        auto depthOnlyAlphaTestPSDesc = depthOnlyPSDesc;
-		depthOnlyAlphaTestPSDesc.m_Defines = ShaderDefines{ { "ALPHA_TEST", "1" } };
-        ShaderByteCode depthOnlyAlphaTestPS{ depthOnlyAlphaTestPSDesc };
-        GraphicsPSO cutoutDepthOnlyPSO{L"CutoutDepthOnlyPSO"};
-        cutoutDepthOnlyPSO = depthOnlyPSO;
-        cutoutDepthOnlyPSO.SetInputLayout(posAndUV);
-        cutoutDepthOnlyPSO.SetRasterizerState(Graphics::BothSidedRasterizer);
-        // TODO:后续插入绑定着色器
-        cutoutDepthOnlyPSO.SetVertexShader(depthOnlyVS);
-        cutoutDepthOnlyPSO.SetPixelShader(depthOnlyAlphaTestPS);
-        cutoutDepthOnlyPSO.Finalize();
-        m_PSOs.push_back(cutoutDepthOnlyPSO);
+  //      // AlphaTest的深度写入
+  //      auto depthOnlyAlphaTestPSDesc = depthOnlyPSDesc;
+		//depthOnlyAlphaTestPSDesc.m_Defines = ShaderDefines{ { "ALPHA_TEST", "1" } };
+  //      ShaderByteCode depthOnlyAlphaTestPS{ depthOnlyAlphaTestPSDesc };
+  //      GraphicsPSO cutoutDepthOnlyPSO{L"CutoutDepthOnlyPSO"};
+  //      cutoutDepthOnlyPSO = depthOnlyPSO;
+  //      cutoutDepthOnlyPSO.SetInputLayout(posAndUV);
+  //      cutoutDepthOnlyPSO.SetRasterizerState(Graphics::BothSidedRasterizer);
+  //      // TODO:后续插入绑定着色器
+  //      cutoutDepthOnlyPSO.SetVertexShader(depthOnlyVS);
+  //      cutoutDepthOnlyPSO.SetPixelShader(depthOnlyAlphaTestPS);
+  //      cutoutDepthOnlyPSO.Finalize();
+  //      m_PSOs.push_back(cutoutDepthOnlyPSO);
         
         
-        // 绘制ShadowMap时使用
-        depthOnlyPSO.SetRasterizerState(Graphics::ShadowRasterizer);
-        depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_ShadowMap.GetFormat());
-        depthOnlyPSO.Finalize();
-        m_PSOs.push_back(depthOnlyPSO);
+        //// 绘制ShadowMap时使用
+        //depthOnlyPSO.SetRasterizerState(Graphics::ShadowRasterizer);
+        //depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_ShadowMap.GetFormat());
+        //depthOnlyPSO.Finalize();
+        //m_PSOs.push_back(depthOnlyPSO);
 
-        GraphicsPSO cutoutShadowMapPSO{L"CutoutShadowMapPSO"};
-        cutoutShadowMapPSO = cutoutDepthOnlyPSO;
-        depthOnlyPSO.SetRasterizerState(Graphics::ShadowBothSidedRasterizer);
-        depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_ShadowMap.GetFormat());
-        cutoutDepthOnlyPSO.Finalize();
-        m_PSOs.push_back(cutoutShadowMapPSO);
+        //GraphicsPSO cutoutShadowMapPSO{L"CutoutShadowMapPSO"};
+        //cutoutShadowMapPSO = cutoutDepthOnlyPSO;
+        //depthOnlyPSO.SetRasterizerState(Graphics::ShadowBothSidedRasterizer);
+        //depthOnlyPSO.SetRenderTargetFormats(0, nullptr, m_ShadowMap.GetFormat());
+        //cutoutDepthOnlyPSO.Finalize();
+        //m_PSOs.push_back(cutoutShadowMapPSO);
 
         m_DefaultPSO.SetRootSignature(m_RootSignature);
-        m_DefaultPSO.SetRasterizerState(Graphics::DefaultRasterizer);
         m_DefaultPSO.SetBlendState(Graphics::DefaultAlphaBlend);
+        m_DefaultPSO.SetRasterizerState(Graphics::DefaultRasterizer);
         m_DefaultPSO.SetDepthStencilState(Graphics::ReadWriteDepthStencil);
-        m_DefaultPSO.SetInputLayout({});
         m_DefaultPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
         m_DefaultPSO.SetRenderTargetFormats(1, &m_SceneColorTexture.GetFormat(), m_SceneDepthTexture.GetFormat());
-        // TODO:添加着色器绑定
+        m_DefaultPSO.SetInputLayout({});
         m_DefaultPSO.SetVertexShader(*m_LitNoTangentVS);
         m_DefaultPSO.SetPixelShader(*m_LitNoTangentPS);
         
@@ -194,12 +193,12 @@ namespace DSM {
 			colorPSO.SetPixelShader(*m_LitNoTangentPS);
 		}
         
-        if (psoFlags & kBothSide) {
-            colorPSO.SetRasterizerState(Graphics::BothSidedRasterizer);
-        }
-        if (psoFlags & kAlphaBlend) {
-            colorPSO.SetBlendState(Graphics::PreMultipliedBlend);
-        }
+        //if (psoFlags & kBothSide) {
+        //    colorPSO.SetRasterizerState(Graphics::BothSidedRasterizer);
+        //}
+        //if (psoFlags & kAlphaBlend) {
+        //    colorPSO.SetBlendState(Graphics::PreMultipliedBlend);
+        //}
         colorPSO.Finalize();
 
         for (std::size_t i = 0; i < m_PSOs.size(); ++i) {
@@ -210,12 +209,12 @@ namespace DSM {
 
         m_PSOs.push_back(colorPSO);
 
-        // PreZ Pass
-        colorPSO.SetDepthStencilState(Graphics::TestEqualDepthStencil);
-        colorPSO.Finalize();
-        m_PSOs.push_back(colorPSO);
+        //// PreZ Pass
+        //colorPSO.SetDepthStencilState(Graphics::TestEqualDepthStencil);
+        //colorPSO.Finalize();
+        //m_PSOs.push_back(colorPSO);
         
-        return m_PSOs.size() - 2;
+        return m_PSOs.size() - 1;
     }
 
     void Renderer::OnResize(std::uint32_t width, std::uint32_t height)
@@ -228,13 +227,14 @@ namespace DSM {
         texDesc.m_Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         texDesc.m_Format = g_RenderContext.GetSwapChain().GetBackBuffer()->GetFormat();
         texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        m_SceneColorTexture.Create(L"Renderer::SceneColorTexture", texDesc);
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format = texDesc.m_Format;
+        m_SceneColorTexture.Create(L"Renderer::SceneColorTexture", texDesc, clearValue);
         m_SceneColorTexture.CreateShaderResourceView(m_SceneColorSRV);
         m_SceneColorTexture.CreateRenderTargetView(m_SceneColorRTV);
 
         texDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        D3D12_CLEAR_VALUE clearValue{};
         clearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         clearValue.DepthStencil.Depth = 1.f;
         clearValue.DepthStencil.Stencil = 0;
@@ -343,91 +343,42 @@ namespace DSM {
     {
         ASSERT(m_DepthTex != nullptr);
 
-        // 更新常量缓冲区数据
-        Math::Vector3 cameraPos = m_Camera->GetTransform().GetPosition();
+        auto pos = m_Camera->GetPosition();
+        passConstants.m_CameraPos[0] = pos.GetX();
+        passConstants.m_CameraPos[1] = pos.GetY();
+        passConstants.m_CameraPos[2] = pos.GetZ();
+        passConstants.m_Proj = Math::Matrix4::Transpose(m_Camera->GetProjMatrix());
         passConstants.m_View = Math::Matrix4::Transpose(m_Camera->GetViewMatrix());
-        passConstants.m_ViewInv = Math::Matrix4::InverseTranspose(passConstants.m_View);
-        passConstants.m_Proj = m_Camera->GetProjMatrix();
-        passConstants.m_ProjInv = Math::Matrix4::InverseTranspose(passConstants.m_Proj);
-        passConstants.m_CameraPos[0] = cameraPos.GetX();
-        passConstants.m_CameraPos[1] = cameraPos.GetY();
-        passConstants.m_CameraPos[2] = cameraPos.GetZ();
+        passConstants.m_ProjInv = Math::Matrix4::InverseTranspose(m_Camera->GetProjMatrix());
+        passConstants.m_ViewInv = Math::Matrix4::InverseTranspose(m_Camera->GetViewMatrix());
 
-        if (m_BatchType == kShadows) {
-            cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-            cmdList.ClearDepth(m_DSV);
-            cmdList.SetDepthStencilTarget(m_DSV);
-        }
-        else {
-            for (std::uint32_t i = 0; i < m_NumRTVs; ++i) {
-                ASSERT(m_RTVs[i] != nullptr);
-                ASSERT(m_DepthTex->GetWidth() == m_RTVs[i]->GetWidth());
-                ASSERT(m_DepthTex->GetHeight() == m_RTVs[i]->GetHeight());
-            }
+        cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        cmdList.ClearDepth(m_DSV);
+
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> RTVs{};
+        for (int i = 0; i < m_NumRTVs; ++i) {
+            auto& renderTex = m_RenderTexs[i];
+            cmdList.TransitionResource(*renderTex.m_RenderTex, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            cmdList.ClearRenderTarget(renderTex.m_RTV);
+            RTVs.emplace_back(renderTex.m_RTV);
         }
 
-        auto viewport = m_Camera->GetViewPort();
-        if (m_Camera->GetViewPort().Width == 0) {
-            viewport.TopLeftX = 0;
-            viewport.TopLeftY = 0;
-            viewport.Width = m_DepthTex->GetWidth();
-            viewport.Height = m_DepthTex->GetHeight();
-            viewport.MinDepth = 0;
-            viewport.MaxDepth = 1;
-
-            m_Scissor.left = 0;
-            m_Scissor.top = 0;
-            m_Scissor.right = viewport.Width;
-            m_Scissor.bottom = viewport.Height;
-        }
-        
+        cmdList.SetRenderTargets(RTVs, m_DSV);
+        cmdList.SetViewportAndScissor(m_Camera->GetViewPort(), m_Scissor);
+    
         cmdList.SetRootSignature(g_Renderer.m_RootSignature);
         cmdList.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
         cmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
-
-        // 设置通用纹理
-        cmdList.SetDescriptorTable(Renderer::kCommonSRVs, g_Renderer.m_CommonTexture);
         cmdList.SetDynamicConstantBuffer(Renderer::kPassConstants, sizeof(PassConstants), &passConstants);
+        cmdList.SetDescriptorTable(Renderer::kCommonSRVs, g_Renderer.m_CommonTexture);
 
-        // 绘制所有的Pass
-        for (;m_CurrPass <= pass; m_CurrPass = static_cast<DrawPass>(m_CurrPass + 1)) {
-            const std::uint32_t passCount = m_PassCounts[m_CurrPass];
-            if (passCount == 0) continue;
+        for (uint32_t currPass = kOpaque; currPass < kTransparent; ++currPass) {
+            const uint32_t passCount = m_PassCounts[currPass];
 
-            if (m_BatchType == kDefault) {
-                switch (m_CurrPass) {
-                    case kZPass: {
-                        cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-                        cmdList.SetDepthStencilTarget(m_DSV);
-                        break;
-                    }
-                    case kOpaque: {
-                        cmdList.TransitionResource(g_Renderer.m_SceneColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                        if (g_Renderer.m_SeparateZPass) {   // 使用PreZPass
-                            cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_READ);
-                            cmdList.SetRenderTarget(g_Renderer.m_SceneColorRTV, m_DSVReadOnly);
-                        }
-                        else {
-                            cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-                            cmdList.SetRenderTarget(g_Renderer.m_SceneColorRTV, m_DSV);
-                        }
-                        break;
-                    }
-                    case kTransparent: {
-                        cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_DEPTH_READ);
-                        cmdList.TransitionResource(g_Renderer.m_SceneColorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                        cmdList.SetRenderTarget(g_Renderer.m_SceneColorRTV, m_DSVReadOnly);
-                        break;
-                    }
-                }
-            }
-            
-            cmdList.SetViewportAndScissor(viewport, m_Scissor);
-            cmdList.FlushResourceBarriers();
-        
-            for (int i = 0; i < passCount; ++i, ++m_CurrDraw) {
+            for (uint32_t currDraw = 0; currDraw < passCount; ++currDraw) {
                 SortKey key{};
-                key.m_Value  = m_SortKey[m_CurrDraw];
+                key.m_Value = m_SortKey[currDraw];
                 const SortObject& sortObject = m_SortObjects[key.m_ObjIndex];
                 const Mesh* mesh = sortObject.m_Mesh;
 
@@ -438,11 +389,11 @@ namespace DSM {
 
                 std::vector<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews{};
                 vertexBufferViews.emplace_back(mesh->m_PositionStream);
-                if ((mesh->m_PSOFlags & kHasNormal) != 0) {
-                    vertexBufferViews.emplace_back(mesh->m_NormalStream);
-                }
                 if ((mesh->m_PSOFlags & kHasUV) != 0) {
                     vertexBufferViews.emplace_back(mesh->m_UVStream);
+                }
+                if ((mesh->m_PSOFlags & kHasNormal) != 0) {
+                    vertexBufferViews.emplace_back(mesh->m_NormalStream);
                 }
                 if ((mesh->m_PSOFlags & kHasTangent) != 0) {
                     vertexBufferViews.emplace_back(mesh->m_TangentStream);
@@ -455,11 +406,6 @@ namespace DSM {
                     cmdList.DrawIndexed(submesh.m_IndexCount, submesh.m_IndexOffset, submesh.m_VertexOffset);
                 }
             }
-        }
-
-        // 渲染玩ShadowMap切换状态
-        if (m_BatchType == kShadows) {
-            cmdList.TransitionResource(*m_DepthTex, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
         }
     }
 }

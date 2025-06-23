@@ -5,26 +5,26 @@
 #include <DirectXMath.h>
 
 namespace DSM {
-	struct ILight
+	struct Light
 	{
 		DirectX::XMFLOAT3 m_Color;
 	};
 
-	struct DirectionalLight : public ILight
+	struct DirectionalLight : public Light
 	{
 		float m_Pad0;
 		DirectX::XMFLOAT3 m_Dir;
 		float m_Pad1;
 	};
 
-	struct PointLight : ILight
+	struct PointLight : Light
 	{
 		float m_StartAtten;
 		DirectX::XMFLOAT3 m_Pos;
 		float m_EndAtten;
 	};
 
-	struct SpotLight : ILight
+	struct SpotLight : Light
 	{
 		float m_StartAtten;
 		DirectX::XMFLOAT3 m_Pos;

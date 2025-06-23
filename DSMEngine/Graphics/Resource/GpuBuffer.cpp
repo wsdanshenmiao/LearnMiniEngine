@@ -33,7 +33,12 @@ namespace DSM{
         }
 
         if (initData != nullptr) {
-            CommandList::InitBuffer(*this, initData, bufferDesc.m_Size);
+            if (m_BufferDesc.m_HeapType == D3D12_HEAP_TYPE_UPLOAD) {
+                memcpy(m_MappedData, initData, bufferDesc.m_Size);
+            }
+            else {
+                CommandList::InitBuffer(*this, initData, bufferDesc.m_Size);
+            }
         }
     }
 
@@ -72,7 +77,7 @@ namespace DSM{
         }
     }
 
-    void GpuBuffer::Update(void* data, std::uint64_t size, std::uint64_t offset)
+    void GpuBuffer::Update(const void* data, std::uint64_t size, std::uint64_t offset)
     {
         ASSERT(m_BufferDesc.m_HeapType == D3D12_HEAP_TYPE_UPLOAD);
         if (m_MappedData == nullptr) {
