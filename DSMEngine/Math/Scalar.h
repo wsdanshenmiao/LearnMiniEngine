@@ -3,6 +3,7 @@
 #define __SCALAR_H__
 
 #include <DirectXMath.h>
+#include <compare>
 
 
 namespace DSM::Math {

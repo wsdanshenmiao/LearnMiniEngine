@@ -39,6 +39,8 @@ namespace DSM {
         void RotateX(float angle) noexcept { m_Transform.Rotate(angle, 0, 0); }
         void RotateY(float angle) noexcept { m_Transform.Rotate(0, angle, 0); }
 
+        void Translate(Math::Vector3 translation) noexcept { m_Transform.Translate(translation); }
+
         // 设置视口
         void SetViewPort(const D3D12_VIEWPORT& viewPort) noexcept { m_ViewPort = viewPort; }
         void SetViewPort(

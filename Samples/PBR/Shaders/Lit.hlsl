@@ -13,8 +13,6 @@ Texture2D<float> _OcclusionTex : register(t3);
 Texture2D<float3> _EmissiveTex : register(t4);
 Texture2D<float3> _NormalTex : register(t5);
 
-// 从第十个纹理开始
-Texture2D<float> _ShadowTex : register(t10);
 
 struct Attributes
 {
@@ -75,7 +73,6 @@ float4 LitPassPS(Varyings i) : SV_TARGET0
     baseCol.rgb *= occlusion;
     baseCol.rgb *= metalness;
     baseCol.rgb *= diffuseRoughness.rgb;
-    normal *= i.normal;
 
     return float4(dot(float3(0,1,0), normalize(normal)) * baseCol.rgb, baseCol.a);
 }

@@ -21,14 +21,14 @@ namespace DSM {
 		using BaseType = Singleton<Driver>;
 		virtual bool InitImGui(ID3D12Device* device, HWND hMainWnd, int bufferCount, DXGI_FORMAT bufferFormat);
 		void ImGuiNewFrame();
-		void Update(const CpuTimer& timer);
+		void Update(float time);
 		virtual void RenderImGui(ID3D12GraphicsCommandList* cmdList);
 
 	protected:
 		BaseImGuiManager() = default;
 		virtual ~BaseImGuiManager() override;
 
-		virtual void UpdateImGui(const CpuTimer& timer) = 0;
+		virtual void UpdateImGui(float time) = 0;
 
 	protected:
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_ImGuiSrvHeap;		// 提供给ImGui的着色器资源描述符堆
@@ -77,10 +77,10 @@ namespace DSM {
 	}
 
 	template<typename Driver>
-	void BaseImGuiManager<Driver>::Update(const CpuTimer& timer)
+	void BaseImGuiManager<Driver>::Update(float time)
 	{
 		ImGuiNewFrame();
-		UpdateImGui(timer);
+		UpdateImGui(time);
 	}
 
 	template<typename Driver>

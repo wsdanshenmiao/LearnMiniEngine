@@ -32,6 +32,8 @@ namespace DSM {
 
         ASSERT_SUCCEEDED(swapChain1->QueryInterface(&m_SwapChain));
 
+        m_hWnd = swapChainDesc.m_hWnd;
+
         m_BackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
         m_BackBufferFormat = swapChainDesc.m_Format;
 

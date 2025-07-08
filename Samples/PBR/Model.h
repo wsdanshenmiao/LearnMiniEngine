@@ -7,12 +7,12 @@
 #include "Math/Transform.h"
 
 namespace DSM {
-    class MeshSorter;
+    class MeshRenderer;
 
     // 模型的数据
     struct Model
     {
-        void Render(MeshSorter& meshSorter, GpuBuffer& meshConstant, const Transform& meshTransforms);
+        void Render(MeshRenderer& meshRenderer, GpuBuffer& meshConstant, const Transform& meshTransforms);
         
         std::string m_Name{};
         DirectX::BoundingBox m_BoundingBox{};

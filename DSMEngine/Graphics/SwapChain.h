@@ -28,7 +28,8 @@ namespace DSM {
         Texture* GetBackBuffer() { return m_BackBuffers[m_BackBufferIndex].get(); }
         std::uint32_t GetWidth() const noexcept { return m_Width; }
         std::uint32_t GetHeight() const noexcept { return m_Height; }
-        
+        HWND GetWindowHandle() const noexcept { return m_hWnd; }
+
         void Present(std::uint32_t sync = 0);
         void OnResize(std::uint32_t width, std::uint32_t height);
 
@@ -49,6 +50,8 @@ namespace DSM {
         std::uint32_t m_Height;
         std::uint64_t m_BackBufferIndex;
         DXGI_FORMAT m_BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+        HWND m_hWnd{};
     };
 }
 

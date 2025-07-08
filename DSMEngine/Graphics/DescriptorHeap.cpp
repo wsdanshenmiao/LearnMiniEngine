@@ -27,7 +27,7 @@ namespace DSM {
 
 	bool DescriptorHandle::IsValid() const noexcept
 	{
-		return m_GPUHandle.ptr != D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN;
+		return m_CPUHandle.ptr != D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN;
 	}
 
 	bool DescriptorHandle::IsShaderVisible() const noexcept
@@ -86,7 +86,7 @@ namespace DSM {
 
 	bool DescriptorHeap::HasValidSpace(std::uint32_t numDesciptors) const noexcept
 	{
-		return m_Allocator.UsedSize() + numDesciptors <= m_Allocator.MaxSize();;
+		return (m_Allocator.UsedSize() + numDesciptors) <= m_Allocator.MaxSize();
 	}
 
 	bool DescriptorHeap::IsValidHandle(const DescriptorHandle& handle) const noexcept
@@ -108,10 +108,7 @@ namespace DSM {
 	{
 		ASSERT(HasValidSpace(count));
 		auto offset = m_Allocator.Allocate(count);
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_DescriptorHeap->GetDesc().Flags == D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE ? 
-			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() :
-			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_NULL };
-		auto handle = DescriptorHandle{m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(), gpuHandle} + offset * m_DescriptorSize;
+		auto handle = m_FirstHandle + offset * m_DescriptorSize;
 		return handle;
 	}
 
@@ -157,7 +154,7 @@ namespace DSM {
 		m_DescriptorSize = pDevice->GetDescriptorHandleIncrementSize(heapDesc.Type);
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = heapDesc.Flags == D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE ?
 			m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() :
-			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_NULL };
+			D3D12_GPU_DESCRIPTOR_HANDLE{ D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN };
 		m_FirstHandle = { m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 			gpuHandle };
 	}

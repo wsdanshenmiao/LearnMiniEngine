@@ -11,6 +11,8 @@ namespace DSM {
 	{
 		m_IsValid = CreateTextureFromFile(*this, filename, filename, forceSRGB);
 
+		m_Name = filename + (forceSRGB ? "_SRGB" : "");
+
 		if (m_IsValid) {
 			m_Descriptor = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			CreateShaderResourceView(m_Descriptor);
@@ -85,7 +87,7 @@ namespace DSM {
 		}
 
 		tex->Create(fileName, forceSRGB);
-		return tex;
+		return TextureRef{ tex };
 	}
 	
 	TextureRef TextureManager::LoadTextureFromMemory(const std::string& name, const TextureDesc& texDesc, const void* data)

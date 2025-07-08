@@ -19,7 +19,7 @@ namespace DSM {
 
     protected:
         Singleton() = default;
-        ~Singleton() = default;
+        virtual ~Singleton() = default;
     };
 }
 

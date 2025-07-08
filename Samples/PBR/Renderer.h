@@ -2,163 +2,80 @@
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
 
-#include "Mesh.h"
-#include "Core/Camera.h"
+#include "Utilities/Singleton.h"
+#include "Graphics/Resource/Texture.h"
 #include "Graphics/DescriptorHeap.h"
 #include "Graphics/RootSignature.h"
 #include "Graphics/PipelineState.h"
-#include "Graphics/Resource/Texture.h"
-#include "Utilities/Singleton.h"
 #include "Graphics/ShaderCompiler.h"
+#include "ConstantData.h"
+#include "Core/Camera.h"
 
-namespace DSM {
-    struct PassConstants;
-}
 
 namespace DSM {
     class GraphicsCommandList;
-}
-
-namespace DSM {
-    class Camera;
-    class Texture;
     struct Mesh;
     
     class Renderer : public Singleton<Renderer>
     {
     public:
+        // 跟参数的绑定槽
         enum RootBindings
         {
-            kMeshConstants,
+            kMeshConstants = 0,
             kMaterialConstants,
             kPassConstants,
             kMaterialSRVs,
-            kCommonSRVs,
-
             kNumRootBindings
         };
-        
+
     public:
         void Create();
         void Shutdown();
 
-        std::uint16_t GetPSO(std::uint16_t psoFlags);
-        void OnResize(std::uint32_t width, std::uint32_t height);
-        void ResizeShadowMap(std::uint32_t width, std::uint32_t height);
+        void OnResize(uint32_t width, uint32_t height);
+
+        uint16_t GetPSO(uint16_t psoFlags);
+
+    private:
+        void CreateResource(uint32_t width, uint32_t height);
 
     private:
         friend class Singleton<Renderer>;
         Renderer();
-        ~Renderer() { Shutdown(); }
+        virtual ~Renderer() { Shutdown(); }
 
     public:
-        // 是否使用PreZPass
-        bool m_SeparateZPass = true;
         bool m_Initialized = false;
 
-        Texture m_SceneColorTexture{};
-        DescriptorHandle m_SceneColorSRV{};
-        DescriptorHandle m_SceneColorRTV{};
-        
-        Texture m_SceneDepthTexture{};
-        DescriptorHandle m_SceneDepthSRV{};
-        DescriptorHandle m_SceneDepthDSV{};
-        DescriptorHandle m_SceneDepthDSVReadOnly{};
-        
-        Texture m_ShadowMap{};
-        DescriptorHandle m_ShadowMapSRV{};
-        DescriptorHandle m_ShadowMapDSV{};
-        DescriptorHandle m_ShadowMapDSVReadOnly{};
-        
-        DescriptorHandle m_CommonTexture{};
-        
-        DescriptorHeap m_TextureHeap;
-        RootSignature m_RootSignature;
+        Texture m_DepthTex;
+        DescriptorHandle m_DepthTexDSV;
+        DescriptorHandle m_DepthTexSRV;
 
-        std::unique_ptr<ShaderByteCode> m_LitVS;
-        std::unique_ptr<ShaderByteCode> m_LitPS;
-        std::unique_ptr<ShaderByteCode>m_LitNoTangentVS;
-		std::unique_ptr<ShaderByteCode> m_LitNoTangentPS;
+        Texture m_ColorTex;
+        DescriptorHandle m_ColorTexRTV;
+        DescriptorHandle m_ColorTexSRV;
 
-        
-        std::vector<GraphicsPSO> m_PSOs;
-        
-    private:
-        static constexpr std::uint32_t sm_MaxTextureSize = 4096;
-        static constexpr std::uint32_t sm_MaxSamplerSize = 2048;
-
+        RootSignature m_CommonRootSig;
         GraphicsPSO m_DefaultPSO;
-        GraphicsPSO m_SkyboxPSO;
+        std::vector<GraphicsPSO> m_PSOs;
+
+        DescriptorHeap m_TextureHeap;
+        // 测试封装的描述符堆
+        //TODO:测试后删除
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_TestTextureHeap;
+        uint64_t m_HeapOffset = 0;
+
+        std::unique_ptr<ShaderByteCode> m_VS;
+        std::unique_ptr<ShaderByteCode> m_VSUseTangent;
+        std::unique_ptr<ShaderByteCode> m_PS;
+        std::unique_ptr<ShaderByteCode> m_PSUseTangent;   
     };
 #define g_Renderer (Renderer::GetInstance())
 
-
-    // 根据网格的属性来排序并渲染
-    class MeshSorter
+    class MeshRenderer
     {
-    public:
-        enum BatchType{ kDefault, kShadows, kNumBatchTypes };
-        enum DrawPass{ kZPass, kOpaque, kTransparent, kNumDrawPasses };
-
-    public:
-        MeshSorter(BatchType batchType) : m_BatchType(batchType) {}
-        
-        Math::Matrix4 GetViewMatrix() const noexcept { return m_Camera->GetViewMatrix(); }
-        const DirectX::BoundingFrustum& GetViewFrustum() const noexcept { return m_Frustum; }
-        const DirectX::BoundingFrustum GetWorldFrustum() const noexcept
-        {
-            auto ret = m_Frustum;
-            m_Frustum.Transform(ret, m_Camera->GetTransform().GetLocalToWorld());
-            return ret;
-        }
-        
-        void SetCamera(const Camera& camera) noexcept
-        {
-            m_Camera = &camera;
-            DirectX::BoundingFrustum::CreateFromMatrix(m_Frustum, m_Camera->GetProjMatrix());
-        }
-        void SetScissor(const D3D12_RECT& rect) noexcept { m_Scissor = rect; }
-        void SetDepthStencilTarget(Texture& depthTarget, DescriptorHandle dsv, DescriptorHandle dsvReadOnly) noexcept
-        {
-            m_DepthTex = &depthTarget;
-            m_DSV = dsv;
-            m_DSVReadOnly = dsvReadOnly;
-        }
-
-        void AddRenderTarget(Texture& renderTarget, DescriptorHandle rtv, DescriptorHandle srv)
-        {
-            ASSERT(m_NumRTVs <= 8);
-            auto& renderTex = m_RenderTexs[m_NumRTVs++];
-            renderTex.m_RenderTex = &renderTarget;
-            renderTex.m_RTV = rtv;
-            renderTex.m_SRV = srv;
-        }
-
-        void AddMesh(const Mesh& mesh,
-            float distance,
-            D3D12_GPU_VIRTUAL_ADDRESS meshCBV,
-            D3D12_GPU_VIRTUAL_ADDRESS matCBV);
-        void Sort();
-        void Render(DrawPass pass, GraphicsCommandList& cmdList, PassConstants& passConstants);
-
     private:
-        // 用于排序的键值
-        struct SortKey
-        {
-            union
-            {
-                std::uint64_t m_Value;
-                // 优先将同一趟 Pass 的放在一起，然后是距离，再是同一个 PSO
-                struct
-                {
-                    std::uint64_t m_ObjIndex : 16;
-                    std::uint64_t m_PSOIndex : 12;
-                    std::uint64_t m_Key : 32;
-                    std::uint64_t m_PassId : 4;
-                };
-            };
-        };
-        
         struct SortObject
         {
             const Mesh* m_Mesh;
@@ -166,31 +83,54 @@ namespace DSM {
             D3D12_GPU_VIRTUAL_ADDRESS m_MaterialCBV;
         };
 
-        struct RenderResource
+        struct SortKey
         {
-            Texture* m_RenderTex;
-            DescriptorHandle m_RTV;
-            DescriptorHandle m_SRV;
+            union
+            {
+                uint64_t m_Value;
+                struct
+                {
+                    uint64_t m_ObjIndex : 16;
+                    uint64_t m_PSOIndex : 12;
+                    uint64_t m_Key : 36;
+                };
+            }; 
+            std::strong_ordering operator<=>(const SortKey& other) const
+            {
+                return m_Value <=> other.m_Value;
+            }
         };
 
-        std::vector<SortObject> m_SortObjects{};
-        std::vector<std::uint64_t> m_SortKey{};
-        BatchType m_BatchType{};
-        std::array<std::uint32_t, kNumDrawPasses> m_PassCounts{};
+    public:
+        void Render(GraphicsCommandList& cmdList, PassConstants& passConstants);
 
-        const Camera* m_Camera = nullptr;
+        Math::Matrix4 GetViewMatrix() const { return m_RenderCamera->GetViewMatrix(); }
+        DirectX::BoundingFrustum GetViewFrustum() const;
+
+        void AddRenderTarget(Texture& renderTarget, DescriptorHandle rtv);
+        void SetDepthTexture(Texture& depthTex, DescriptorHandle dsv);
+
+        void AddMesh(const Mesh& mesh, float distance, 
+            D3D12_GPU_VIRTUAL_ADDRESS meshCBV, 
+            D3D12_GPU_VIRTUAL_ADDRESS materialCBV);
+
+        void SetCamera(const Camera& camera) { m_RenderCamera = &camera; }
+        void SetScissor(const D3D12_RECT& scissor) { m_Scissor = scissor; }
+
+    private:
+        uint32_t m_NumRenderTargets = 0;
+        std::array<Texture*, 8> m_RenderTarget;
+        std::array<DescriptorHandle, 8> m_RenderTargetRTV;
+
+        Texture* m_DepthTex;
+        DescriptorHandle m_DepthTexDSV;
+        
+        std::map<SortKey, SortObject> m_SortObjects;
+
+        const Camera* m_RenderCamera;
         D3D12_RECT m_Scissor{};
-        
-        std::uint32_t m_NumRTVs = 0;
-        std::array<RenderResource, 8> m_RenderTexs{};
-
-        Texture* m_DepthTex = nullptr;
-        DescriptorHandle m_DSV{};
-        DescriptorHandle m_DSVReadOnly{};
-        
-        DirectX::BoundingFrustum m_Frustum{};
     };
 
-}
+} // namespace DSM 
 
 #endif
