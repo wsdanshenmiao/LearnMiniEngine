@@ -362,22 +362,13 @@ namespace DSM {
 
 			// 将纹理描述符拷贝到纹理堆中
 			DescriptorHandle texHandle = g_Renderer.m_TextureHeap.Allocate(kNumTextures);
-			//TODO:测试后删除
-			auto cpuHandle = g_Renderer.m_TestTextureHeap->GetCPUDescriptorHandleForHeapStart();
-			auto gpuHandle = g_Renderer.m_TestTextureHeap->GetGPUDescriptorHandleForHeapStart();
-			texHandle = DescriptorHandle{ cpuHandle, gpuHandle };
-			auto offset = g_Renderer.m_HeapOffset * g_RenderContext.GetDevice()->
-				GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			texHandle += offset;
-			g_Renderer.m_HeapOffset += kNumTextures;
 
 			std::uint32_t destCount = kNumTextures;
 			std::uint32_t srcCount[kNumTextures] = {1,1,1,1,1,1};
 			g_RenderContext.GetDevice()->CopyDescriptors(
 				1, &texHandle, &destCount, destCount, srcHandle, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-			//srvOffsets[i] = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
-			srvOffsets[i] = g_Renderer.m_HeapOffset - kNumTextures;
+			srvOffsets[i] = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
 		}
 
 		for (auto& mesh : model.m_Meshes) {

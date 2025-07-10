@@ -63,6 +63,7 @@ namespace DSM{
         range->RangeType = type;
         range->RegisterSpace = space;
         range->BaseShaderRegister = shaderRegister;
+        range->OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
     }
 
 

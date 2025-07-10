@@ -61,10 +61,6 @@ namespace DSM {
         std::vector<GraphicsPSO> m_PSOs;
 
         DescriptorHeap m_TextureHeap;
-        // 测试封装的描述符堆
-        //TODO:测试后删除
-        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_TestTextureHeap;
-        uint64_t m_HeapOffset = 0;
 
         std::unique_ptr<ShaderByteCode> m_VS;
         std::unique_ptr<ShaderByteCode> m_VSUseTangent;
