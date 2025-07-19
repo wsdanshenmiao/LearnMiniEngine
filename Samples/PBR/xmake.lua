@@ -3,7 +3,7 @@ target(targetName)
     set_kind("binary")
     set_targetdir(path.join(binDir, targetName))
 
-    add_deps("DSMEngine")
+    add_deps("LearnMiniEngine")
     add_rules("Imguiini")
     add_rules("ShaderCopy")
     add_rules("EngineShderCopy")

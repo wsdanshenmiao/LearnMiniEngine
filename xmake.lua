@@ -1,4 +1,4 @@
-set_project("DSMEngine")
+set_project("LearnMiniEngine")
 
 if is_os("windows") then 
     add_defines("UNICODE")
@@ -43,6 +43,6 @@ add_requires("assimp", {system = false})
 add_packages("assimp")
 
 includes("rules.lua")
-includes("DSMEngine")
+includes("LearnMiniEngine")
 
 includes("Samples/**")

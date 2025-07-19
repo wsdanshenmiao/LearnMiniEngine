@@ -74,5 +74,5 @@ float4 LitPassPS(Varyings i) : SV_TARGET0
     baseCol.rgb *= metalness;
     baseCol.rgb *= diffuseRoughness.rgb;
 
-    return float4(dot(float3(0,1,0), normalize(i.normal)) * baseCol.rgb, baseCol.a);
+    return float4(dot(normalize(float3(1,1,1)), normalize(i.normal)) * baseCol.rgb, baseCol.a);
 }

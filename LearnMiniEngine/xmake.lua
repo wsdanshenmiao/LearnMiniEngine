@@ -1,4 +1,4 @@
-targetName = "DSMEngine"
+targetName = "LearnMiniEngine"
 target(targetName)
     set_kind("static")
     set_targetdir(path.join(binDir, targetName))
