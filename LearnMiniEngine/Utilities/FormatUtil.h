@@ -118,13 +118,13 @@ namespace DSM::Utility {
 
 	inline std::uint64_t GetRowPitch(DXGI_FORMAT format, std::uint32_t width, std::uint32_t mipIndex = 0)
     {
-    	std::uint64_t numBlocks = std::max(1u, Math::DivideByMultiple(width >> mipIndex, GetFormatBlockSize(format)));
+    	std::uint64_t numBlocks = (std::max)(1u, Math::DivideByMultiple(width >> mipIndex, GetFormatBlockSize(format)));
     	return numBlocks * GetFormatStride(format);
     }
 	inline std::uint64_t GetSlicePitch(DXGI_FORMAT format, std::uint32_t width, std::uint32_t height, std::uint32_t mipIndex = 0)
     {
-    	std::uint64_t numBlocksX = std::max(1u, Math::DivideByMultiple(width >> mipIndex, GetFormatBlockSize(format)));
-    	std::uint64_t numBlocksY = std::max(1u, Math::DivideByMultiple(height >> mipIndex, GetFormatBlockSize(format)));
+    	std::uint64_t numBlocksX = (std::max)(1u, Math::DivideByMultiple(width >> mipIndex, GetFormatBlockSize(format)));
+    	std::uint64_t numBlocksY = (std::max)(1u, Math::DivideByMultiple(height >> mipIndex, GetFormatBlockSize(format)));
     	return numBlocksX * numBlocksY * GetFormatStride(format);
     }
 }

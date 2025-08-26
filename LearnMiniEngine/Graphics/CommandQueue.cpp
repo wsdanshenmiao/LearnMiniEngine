@@ -60,7 +60,7 @@ namespace DSM {
         std::lock_guard<std::mutex> guard{m_FenceMutex};
 
         if (m_LastCompletedFenceValue < fenceValue) {
-            m_LastCompletedFenceValue = std::max(m_LastCompletedFenceValue, m_pFence->GetCompletedValue());
+            m_LastCompletedFenceValue = (std::max)(m_LastCompletedFenceValue, m_pFence->GetCompletedValue());
         }
 
         return fenceValue <= m_LastCompletedFenceValue;

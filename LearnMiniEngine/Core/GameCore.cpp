@@ -41,8 +41,8 @@ namespace DSM::GameCore{
 
     void OnResize(std::uint32_t width, std::uint32_t height)
     {
-		width = std::max(width, 1u);
-		height = std::max(height, 1u);
+		width = (std::max)(width, 1u);
+		height = (std::max)(height, 1u);
         g_RenderContext.OnResize(width, height);
         if (g_CurrGameApp != nullptr) {
             g_CurrGameApp->OnResize(width, height);

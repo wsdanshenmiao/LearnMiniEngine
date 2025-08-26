@@ -219,8 +219,8 @@ namespace DSM {
 			std::uint32_t stackCount) noexcept
 		{
 			GeometryMesh mesh{};
-			sliceCount = std::max(2u, sliceCount);
-			stackCount = std::max(2u, stackCount);
+			sliceCount = (std::max)(2u, sliceCount);
+			stackCount = (std::max)(2u, stackCount);
 
 			Vertex topVertex{ {0,radius,0},{0,1,0},{1,0,0,1},{},{0,0} };
 			Vertex buttonVertex{ {0,-radius,0},{0,-1,0},{1,0,0,1},{},{0,1} };

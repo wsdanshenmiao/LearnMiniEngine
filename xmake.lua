@@ -21,20 +21,13 @@ end
 add_syslinks("d3d12", "dxgi", "d3dcompiler", "dxguid", "user32")
 
 -- 添加DXC
-add_includedirs("ThridParty/dxc/inc")
+add_includedirs("ThridParty/dxc/include")
 if is_arch("x64") then
-    add_linkdirs("ThridParty/dxc/lib/x64")
+    add_linkdirs("ThridParty/dxc/lib")
 elseif is_arch("x86") then
-    add_linkdirs("ThridParty/dxc/lib/x86")
+    add_linkdirs("ThridParty/dxc/lib")
 end
 add_links("dxcompiler")
-after_build(function (target)
-        if is_plat("windows") then
-            local path = is_arch("x64") and "ThridParty/dxc/bin/x64/dxcompiler.dll" or 
-            "ThridParty/dxc/bin/x86/dxcompiler.dll"
-            os.cp(path, target:targetdir())
-        end
-    end)
 
 includes("ThridParty/Imgui")
 
