@@ -77,8 +77,8 @@ namespace DSM::Math {
     template <XMVectorType T> __forceinline constexpr T Select(T l, T r, BoolVector mask) noexcept { return T(DirectX::XMVectorSelect(l, r, mask)); }
 
     __forceinline float Sqrt( float s ) { return Sqrt(Scalar(s)); }
-    __forceinline float Recip( float s ) { return Recip(Scalar(s)); }
-    __forceinline float RecipSqrt( float s ) { return RecipSqrt(Scalar(s)); }
+    __forceinline float Recip( float s ) { return Reciprocal(Scalar(s)); }
+    __forceinline float RecipSqrt( float s ) { return ReciprocalSqrt(Scalar(s)); }
     __forceinline float Floor( float s ) { return Floor(Scalar(s)); }
     __forceinline float Ceiling( float s ) { return Ceiling(Scalar(s)); }
     __forceinline float Round( float s ) { return Round(Scalar(s)); }
