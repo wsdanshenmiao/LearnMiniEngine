@@ -44,8 +44,10 @@ namespace DSM {
         }
         // 根据 俯仰角、偏航角、滚动角 进行旋转
         void Rotate(float pitch, float yaw, float roll) noexcept
-        {
-            m_Rotation *= Math::Quaternion{pitch, yaw, roll};
+        {            
+            Math::Vector3 angles = m_Rotation.ToEulerAngles();
+            angles += Math::Vector3{pitch, yaw, roll};
+            m_Rotation = Math::Quaternion{angles};
         }
         // 根据 俯仰角、偏航角、滚动角 进行旋转
         void Rotate(Math::Vector3 pyr)

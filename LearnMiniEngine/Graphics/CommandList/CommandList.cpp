@@ -9,6 +9,7 @@ namespace DSM {
         auto listName = id + L" CommandList";
         g_RenderContext.CreateCommandList(m_CmdListType, &m_CmdList, &m_CurrAllocator);
         m_CmdList->SetName(listName.c_str());
+        m_CmdList->QueryInterface(IID_PPV_ARGS(m_CmdList4.GetAddressOf()));
         m_ResourceBarriers.reserve(16);
         
         m_ViewDescriptorHeap = DynamicDescriptorHeap::AllocateDynamicDescriptorHeap(this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -209,7 +210,7 @@ namespace DSM {
         }
     }
 
-    GpuResourceLocatioin CommandList::GetUploadBuffer(std::uint64_t bufferSize, std::uint32_t alignment)
+    GpuResourceLocation CommandList::GetUploadBuffer(std::uint64_t bufferSize, std::uint32_t alignment)
     {
         return g_RenderContext.GetCpuBufferAllocator().Allocate(bufferSize, alignment);
     }

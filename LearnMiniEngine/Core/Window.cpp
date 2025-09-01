@@ -1,7 +1,9 @@
 #include "Window.h"
-
 #include "GameCore.h"
 #include "../Graphics/RenderContext.h"
+#include "Utilities/BaseImGuiManager.h"
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
 namespace DSM {
@@ -60,8 +62,10 @@ namespace DSM {
 
     LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     {
-        switch( message )
-        {
+		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+			return true;
+
+        switch( message ) {
         case WM_SIZE: {
             GameCore::OnResize((UINT)(UINT64)lParam & 0xFFFF, (UINT)(UINT64)lParam >> 16); break;
         }

@@ -10,10 +10,8 @@
 #include "Math/Random.h"
 #include "Math/Transform.h"
 #include "Utilities/Utility.h"
-#include "ModelLoader.h"
 #include "ConstantData.h"
 #include "Geometry.h"
-#include "Material.h"
 #include "CameraController.h"
 #include "ImguiManager.h"
 #include "Renderer.h"
@@ -22,7 +20,7 @@ using namespace DSM;
 using namespace DirectX;
 
 
-class Sample : public GameCore::IGameApp
+class RayTracing : public GameCore::IGameApp
 {
 public:
 
@@ -46,24 +44,13 @@ public:
 		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 0.1f, 1000.0f);
-        m_Camera->SetPosition({ 100, 100, -100 });
+        // m_Camera->SetPosition({ 100, 100, -100 });
         //m_Camera->SetPosition({ 0, 0, -10 });
-        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
+        // m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
-
-        m_SceneTrans.SetScale({ 0.05f, 0.05f, 0.05f });
-        MeshConstants meshConstants{};
-		meshConstants.m_World = Math::Matrix4::Transpose(m_SceneTrans.GetLocalToWorld());
-        meshConstants.m_WorldIT = Math::Matrix4::InverseTranspose(m_SceneTrans.GetLocalToWorld());
-		GpuBufferDesc meshConstantsDesc{};
-        meshConstantsDesc.m_Size = sizeof(MeshConstants);
-		meshConstantsDesc.m_Stride = sizeof(MeshConstants);
-		meshConstantsDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
-		m_MeshConstants.Create(L"MeshConstants", meshConstantsDesc, &meshConstants);
-
-        m_Model = LoadModel("Models//Sponza//sponza.gltf");
+        m_CameraController->SetMoveSpeed(15);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {
@@ -81,10 +68,6 @@ public:
 
         ImguiManager::GetInstance().Update(deltaTime);
 
-        m_PassConstants.m_ShadowTrans = Math::Matrix4::Identity;
-		m_PassConstants.m_TotalTime = 0;
-		m_PassConstants.m_DeltaTime = deltaTime;
-
         m_CameraController->Update(deltaTime);
 	}
     virtual void RenderScene(RenderContext& renderContext) override
@@ -94,18 +77,16 @@ public:
 
         GraphicsCommandList cmdList{ L"Render Scene" };
 
-        MeshRenderer meshRenderer{};
-        meshRenderer.AddRenderTarget(*swapChain.GetBackBuffer(), swapChain.GetBackBufferRTV());
-        meshRenderer.SetDepthTexture(g_Renderer.m_DepthTex, g_Renderer.m_DepthTexDSV);
-		meshRenderer.SetCamera(*m_Camera);
-        meshRenderer.SetScissor(m_Scissor);
-        m_Model->Render(meshRenderer, m_MeshConstants, m_SceneTrans);
-        meshRenderer.Render(cmdList, m_PassConstants);
+        auto rect = RECT{0, 0, static_cast<long>(swapChain.GetWidth()), static_cast<long>(swapChain.GetHeight())};
+        cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
+        cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+        cmdList.TransitionResource(g_Renderer.m_RayTracingOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        cmdList.FlushResourceBarriers();
 
+        cmdList.SetRenderTarget(swapChain.GetBackBufferRTV());
         ImguiManager::GetInstance().RenderImGui(cmdList.GetCommandList());
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
-
         cmdList.ExecuteCommandList();
 
         swapChain.Present();
@@ -115,19 +96,12 @@ public:
         g_Renderer.Shutdown();
     };
 
+    virtual bool RequiresRaytracingSupport() const override {return true;}
+
 private:
     std::unique_ptr<Camera> m_Camera{};
     std::unique_ptr<CameraController> m_CameraController{};
-
     D3D12_RECT m_Scissor{};
-
-    Transform m_SceneTrans{};
-    GpuBuffer m_MeshConstants{};
-
-    PassConstants m_PassConstants{};
-
-    std::shared_ptr<Model> m_Model{};
-
 };
 
 int WinMain(
@@ -136,6 +110,6 @@ int WinMain(
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    Sample sandbox{};
+    RayTracing sandbox{};
     return GameCore::RunApplication(sandbox, 1024, 768, L"DSMEngine", hInstance, nShowCmd);
 }

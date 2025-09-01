@@ -20,7 +20,7 @@ using namespace DSM;
 using namespace DirectX;
 
 
-class Sandbox : public GameCore::IGameApp
+class Sample : public GameCore::IGameApp
 {
 public:
     struct VertexPosColor
@@ -233,6 +233,6 @@ int WinMain(
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    Sandbox sandbox{};
+    Sample sandbox{};
     return GameCore::RunApplication(sandbox, 1024, 768, L"DSMEngine", hInstance, nShowCmd);
 }

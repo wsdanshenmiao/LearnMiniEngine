@@ -7,7 +7,7 @@
 
 namespace DSM {
     // 用于定位子资源在缓冲区中的位置
-    struct GpuResourceLocatioin
+    struct GpuResourceLocation
     {
         GpuResource* m_Resource{};
         D3D12_GPU_VIRTUAL_ADDRESS m_GpuAddress{};
@@ -29,7 +29,7 @@ namespace DSM {
         }
         ~DynamicBufferPage() = default;
 
-        bool Allocate(std::uint64_t size, std::uint32_t alignment, GpuResourceLocatioin& outResource)
+        bool Allocate(std::uint64_t size, std::uint32_t alignment, GpuResourceLocation& outResource)
         {
             auto offset = m_LiearAllocator.Allocate(size, alignment);
             if (offset == Utility::INVALID_ALLOC_OFFSET) {
@@ -73,7 +73,7 @@ namespace DSM {
         void Create(AllocateMode mode, std::uint64_t pageSize = DEFAULT_BUFFER_PAGE_SIZE);
         void Shutdown();
 
-        GpuResourceLocatioin Allocate(std::uint64_t bufferSize, std::uint32_t alignment = 0);
+        GpuResourceLocation Allocate(std::uint64_t bufferSize, std::uint32_t alignment = 0);
         // 清理所有的缓冲区
         void Cleanup(std::uint64_t fenceValue);
 

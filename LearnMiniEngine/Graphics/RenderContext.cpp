@@ -55,6 +55,7 @@ namespace DSM {
 
         // 枚举适配器并创建设备
         ComPtr<IDXGIAdapter1> dxgiAdapter;
+        ComPtr<ID3D12Device5> device;
         SIZE_T maxSize{};
         for (std::uint32_t i = 0; DXGI_ERROR_NOT_FOUND != m_pFactory->EnumAdapters1(i, &dxgiAdapter); ++i) {
             DXGI_ADAPTER_DESC1 dxgiDesc{};
@@ -66,12 +67,12 @@ namespace DSM {
             }
 
             // 不能创建设备则跳过
-            if (FAILED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(m_pDevice.GetAddressOf())))) {
+            if (FAILED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(device.GetAddressOf())))) {
                 continue;
             }
 
             // 是否支持光追
-            if (requireDXRSupport && !Graphics::IsDirectXRaytracingSupported(m_pDevice.Get())) {
+            if (requireDXRSupport && !Graphics::IsDirectXRaytracingSupported(device.Get())) {
                 continue;
             }
 
@@ -80,6 +81,7 @@ namespace DSM {
                 continue;
             }
             maxSize = dxgiDesc.DedicatedVideoMemory;
+            m_pDevice = device;
 
             Utility::Print(L"Selected GPU:  {} ({} MB)\n", dxgiDesc.Description, dxgiDesc.DedicatedVideoMemory >> 20);
         }

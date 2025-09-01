@@ -86,6 +86,7 @@ namespace DSM {
             case ShaderType::Compute: target += L"cs_"; break;
             case ShaderType::Mesh: target += L"ms_"; break;
             case ShaderType::Amplification: target += L"as_"; break;
+            case ShaderType::Lib: target += L"lib_"; break;
             default: ASSERT("Invalid ShaderType"); break;
         }
         switch (mode) {

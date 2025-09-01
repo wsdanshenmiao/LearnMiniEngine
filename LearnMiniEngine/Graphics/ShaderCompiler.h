@@ -60,7 +60,10 @@ namespace DSM {
         Pixel,
         Compute,
         Mesh,
-        Amplification,
+        Amplification,        
+        
+        Lib,
+        
         NumTypes
     };
 
@@ -80,10 +83,10 @@ namespace DSM {
     struct ShaderDesc
     {
         ShaderType m_Type;
-        ShaderMode m_Mode;
-        std::string m_FileName;
-        std::string m_EnterPoint;
-        ShaderDefines m_Defines;
+        ShaderMode m_Mode = ShaderMode::SM_6_3;
+        std::string m_FileName{};
+        std::string m_EnterPoint{};
+        ShaderDefines m_Defines{};
     };
     
     class ShaderByteCode

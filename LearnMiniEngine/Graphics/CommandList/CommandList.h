@@ -18,7 +18,7 @@ namespace DSM {
     class PSO;
     class DynamicDescriptorHeap;
     class GpuResource;
-    struct GpuResourceLocatioin;
+    struct GpuResourceLocation;
 
     struct DWParam
     {
@@ -59,6 +59,7 @@ namespace DSM {
         }
 
         ID3D12GraphicsCommandList* GetCommandList() { return m_CmdList.Get(); }
+        ID3D12GraphicsCommandList4* GetDXRCommandList() { return m_CmdList4.Get(); }
 
         void Reset();
         void FlushResourceBarriers();
@@ -85,7 +86,7 @@ namespace DSM {
         void InsertUAVBarrier(GpuResource& resource, bool flush = false);
         void TransitionResource(GpuResource& resource, D3D12_RESOURCE_STATES newState, bool flush = false);
 
-        GpuResourceLocatioin GetUploadBuffer(std::uint64_t bufferSize, std::uint32_t alignment = 0);
+        GpuResourceLocation GetUploadBuffer(std::uint64_t bufferSize, std::uint32_t alignment = 0);
 
         void SetDescriptorHeap(ID3D12DescriptorHeap* descriptorHeap);
         void SetDescriptorHeaps(std::uint32_t count , ID3D12DescriptorHeap** descriptorHeaps);
@@ -104,6 +105,7 @@ namespace DSM {
     protected:
         D3D12_COMMAND_LIST_TYPE m_CmdListType{};
         Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CmdList{};
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> m_CmdList4{};
         ID3D12CommandAllocator* m_CurrAllocator{};
 
         ID3D12RootSignature* m_CurrGraphicsRootSignature{};

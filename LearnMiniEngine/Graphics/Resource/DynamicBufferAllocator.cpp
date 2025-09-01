@@ -43,9 +43,9 @@ namespace DSM {
         m_PagePool.clear();
     }
 
-    GpuResourceLocatioin DynamicBufferAllocator::Allocate(std::uint64_t bufferSize, std::uint32_t alignment)
+    GpuResourceLocation DynamicBufferAllocator::Allocate(std::uint64_t bufferSize, std::uint32_t alignment)
     {
-        GpuResourceLocatioin ret{};
+        GpuResourceLocation ret{};
 
         std::lock_guard lock(m_Mutex);
 
