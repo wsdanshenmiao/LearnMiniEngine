@@ -43,14 +43,14 @@ namespace DSM {
 
     void ComputeCommandList::SetShaderResource(std::uint32_t rootIndex, const GpuResource& resource, std::uint64_t offset)
     {
-        auto state = (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        ASSERT(resource.GetUsageState() & state != 0);
+        // auto state = (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        // ASSERT((resource.GetUsageState() & state) != 0);
         m_CmdList->SetComputeRootShaderResourceView(rootIndex, resource.GetGpuVirtualAddress() + offset);
     }
 
     void ComputeCommandList::SetUnorderedAccess(std::uint32_t rootIndex, const GpuResource& resource,std::uint64_t offset)
     {
-        ASSERT(resource.GetUsageState() & D3D12_RESOURCE_STATE_UNORDERED_ACCESS != 0);
+        ASSERT((resource.GetUsageState() & D3D12_RESOURCE_STATE_UNORDERED_ACCESS) != 0);
         m_CmdList->SetComputeRootUnorderedAccessView(rootIndex, resource.GetGpuVirtualAddress() + offset);
     }
 

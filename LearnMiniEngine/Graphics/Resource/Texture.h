@@ -33,13 +33,11 @@ namespace DSM {
         void Create(const std::wstring& name,
             const TextureDesc& texDesc,
             std::span<D3D12_SUBRESOURCE_DATA> subResources = {},
+            D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON,
+            const D3D12_CLEAR_VALUE* clearValue = nullptr,
             bool isCubeMap = false);
         void Create(const std::wstring& name, ID3D12Resource* resource, bool isCubeMap = false);
-        void Create(const std::wstring& name,
-            const TextureDesc& texDesc,
-            const D3D12_CLEAR_VALUE& clearValue,
-            bool isCubeMap = false);
-        
+
         const TextureDesc& GetDesc() const { return m_Desc; }
         D3D12_RESOURCE_DIMENSION GetDimension() const { return m_Desc.m_Dimension; }
         std::uint64_t GetWidth() const { return m_Desc.m_Width; }
@@ -50,6 +48,7 @@ namespace DSM {
         void CreateShaderResourceView(D3D12_CPU_DESCRIPTOR_HANDLE handle);
         void CreateDepthStencilView(D3D12_CPU_DESCRIPTOR_HANDLE handle, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
         void CreateRenderTargetView(D3D12_CPU_DESCRIPTOR_HANDLE handle);
+        void CreateUnorderedAccessView(D3D12_CPU_DESCRIPTOR_HANDLE handle);
 
 
         static bool CreateTextureFromFile(

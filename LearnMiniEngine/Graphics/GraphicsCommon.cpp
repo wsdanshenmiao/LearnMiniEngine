@@ -267,7 +267,7 @@ namespace DSM::Graphics {
         uint32_t BlackCubeTexels[6] = {};
         subresourceData.pData = BlackCubeTexels;
         texDesc.m_DepthOrArraySize = 6;
-        DefaultTextures[kBlackCubeTex].Create(L"BlackCube Tex", texDesc, {&subresourceData, 1}, true);
+        DefaultTextures[kBlackCubeTex].Create(L"BlackCube Tex", texDesc, {&subresourceData, 1}, D3D12_RESOURCE_STATE_COMMON, nullptr, true);
 
         // 创建默认纹理的描述符
         for (int i = 0; i < kNumDefaultTexture; ++i) {

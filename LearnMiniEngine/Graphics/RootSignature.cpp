@@ -20,6 +20,8 @@ namespace DSM{
         m_RootParameter.ShaderVisibility = visibility;
         m_RootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         m_RootParameter.Constants.Num32BitValues = numDwords;
+        m_RootParameter.Constants.ShaderRegister = shaderRegister;
+        m_RootParameter.Constants.RegisterSpace = space;
     }
 
     void RootParameter::InitAsConstantBuffer(std::uint32_t shaderRegister, D3D12_SHADER_VISIBILITY visibility, std::uint32_t space) noexcept

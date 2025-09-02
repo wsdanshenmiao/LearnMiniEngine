@@ -94,7 +94,7 @@ public:
         clearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         clearValue.DepthStencil.Depth = 1.f;
         clearValue.DepthStencil.Stencil = 0;
-        m_DepthStencilTexture.Create(L"DepthStencil", dsTexDesc, clearValue);
+        m_DepthStencilTexture.Create(L"DepthStencil", dsTexDesc, {}, D3D12_RESOURCE_STATE_COMMON, &clearValue);
         D3D12_DEPTH_STENCIL_VIEW_DESC dsViewDesc{};
         dsViewDesc.Flags = D3D12_DSV_FLAG_NONE;
         dsViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;

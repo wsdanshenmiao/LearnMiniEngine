@@ -14,6 +14,8 @@ namespace DSM{
     void Texture::Create(const std::wstring& name,
         const TextureDesc& texDesc,
         std::span<D3D12_SUBRESOURCE_DATA> subResources,
+        D3D12_RESOURCE_STATES initialState,
+        const D3D12_CLEAR_VALUE* clearValue,
         bool isCubeMap)
     {
         m_Desc = texDesc;
@@ -32,7 +34,7 @@ namespace DSM{
         GpuResourceDesc gpuResourceDesc{};
         gpuResourceDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
         gpuResourceDesc.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
-        gpuResourceDesc.m_State = D3D12_RESOURCE_STATE_COPY_DEST;
+        gpuResourceDesc.m_State = initialState;
         gpuResourceDesc.m_Desc = resourceDesc;
         
         GpuResource::Create(name, gpuResourceDesc);
@@ -58,33 +60,6 @@ namespace DSM{
         m_Desc.m_Format = resourceDesc.Format;
     }
 
-    void Texture::Create(
-        const std::wstring& name,
-        const TextureDesc& texDesc,
-        const D3D12_CLEAR_VALUE& clearValue,
-        bool isCubeMap)
-    {
-        m_Desc = texDesc;
-        m_IsCubeMap = isCubeMap;
-        
-        D3D12_RESOURCE_DESC resourceDesc{};
-        resourceDesc.Dimension = texDesc.m_Dimension;
-        resourceDesc.Flags = texDesc.m_Flags;
-        resourceDesc.Format = texDesc.m_Format;
-        resourceDesc.Width = texDesc.m_Width;
-        resourceDesc.Height = texDesc.m_Height;
-        resourceDesc.DepthOrArraySize = texDesc.m_DepthOrArraySize;
-        resourceDesc.MipLevels = texDesc.m_MipLevels;
-        resourceDesc.SampleDesc = texDesc.m_SampleDesc;
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        GpuResourceDesc gpuResourceDesc{};
-        gpuResourceDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
-        gpuResourceDesc.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
-        gpuResourceDesc.m_State = D3D12_RESOURCE_STATE_COMMON;
-        gpuResourceDesc.m_Desc = resourceDesc;
-        
-        GpuResource::Create(name, gpuResourceDesc, clearValue);
-    }
 
     void Texture::CreateShaderResourceView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
     {
@@ -230,6 +205,50 @@ namespace DSM{
             }
         }
         g_RenderContext.GetDevice()->CreateRenderTargetView(GetResource(), &rtvDesc, handle);
+    }
+
+    void Texture::CreateUnorderedAccessView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+    {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = m_Desc.m_Format;
+        switch (m_Desc.m_Dimension) {
+            case D3D12_RESOURCE_DIMENSION_TEXTURE1D: {
+                if (m_Desc.m_DepthOrArraySize > 1) {
+                    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
+                    uavDesc.Texture1DArray.ArraySize = m_Desc.m_DepthOrArraySize;
+                }
+                else {
+                    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+                }
+                break;
+            }
+            case D3D12_RESOURCE_DIMENSION_TEXTURE2D: {
+                if (m_Desc.m_DepthOrArraySize > 1) {
+                    if (m_Desc.m_SampleDesc.Count > 1) {
+                        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DMSARRAY;
+                        uavDesc.Texture2DMSArray.ArraySize = m_Desc.m_DepthOrArraySize;
+                    }
+                    else {
+                        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+                        uavDesc.Texture2DArray.ArraySize = m_Desc.m_DepthOrArraySize;
+                    }
+                }
+                else {
+                    if (m_Desc.m_SampleDesc.Count > 1) {
+                        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DMS;
+                    }
+                    else {
+                        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                    }
+                }
+                break;
+            }
+            case D3D12_RESOURCE_DIMENSION_TEXTURE3D: {
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+                uavDesc.Texture3D.WSize = m_Desc.m_DepthOrArraySize;
+            }
+        }
+        g_RenderContext.GetDevice()->CreateUnorderedAccessView(GetResource(), nullptr, &uavDesc, handle);
     }
 
     bool Texture::CreateTextureFromFile(

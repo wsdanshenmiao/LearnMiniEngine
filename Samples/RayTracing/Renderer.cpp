@@ -2,7 +2,6 @@
 #include "Graphics/RenderContext.h"
 #include "Graphics/CommandList/GraphicsCommandList.h"
 
-
 namespace DSM {
 
     // Renderer implementation
@@ -40,26 +39,27 @@ namespace DSM {
 
         auto width = g_RenderContext.GetSwapChain().GetWidth();
         auto height = g_RenderContext.GetSwapChain().GetHeight();
+        m_OutputUAV = m_TextureHeap.Allocate(1);
         CreateResource(width, height);
                 
         // 创建根签名
-        m_LocalRootSig[0].InitAsConstantBuffer(0);
+        m_LocalRootSig[0].InitAsConstants(0, sizeof(m_RayGenCB) / sizeof(uint32_t) + 1);
         m_LocalRootSig.Finalize(L"RayTracingLocalRootSignature", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-        m_GlobalRootSig[0].InitAsBufferUAV(0);  // RayTracingOutput
-        m_GlobalRootSig[1].InitAsBufferSRV(0);  // 加速结构
+        m_GlobalRootSig[RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
+        m_GlobalRootSig[AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
         m_GlobalRootSig.Finalize(L"RayTracingGlobalRootSignature");
 
         CreateStateObject();
 
         CreateAccelerationStructure();
 
+        CreateShaderTable();
+
         m_Initialized = true;
     }
 
     void Renderer::Shutdown()
     {
-        // 释放描述符
-        g_RenderContext.FreeDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_OutputUAV);
     }
 
     void Renderer::OnResize(uint32_t width, uint32_t height)
@@ -76,14 +76,8 @@ namespace DSM {
         texDesc.m_Height = height;
         texDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-        m_RayTracingOutput.Create(L"RayTracingOutput", texDesc);
-
-        m_OutputUAV = g_RenderContext.AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-        uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        g_RenderContext.GetDevice()->CreateUnorderedAccessView(m_RayTracingOutput.GetResource(), nullptr, &uavDesc, m_OutputUAV);
-     
+        m_RayTracingOutput.Create(L"RayTracingOutput", texDesc, {}, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        m_RayTracingOutput.CreateUnorderedAccessView(m_OutputUAV);
     }
 
     void DSM::Renderer::CreateStateObject()
@@ -271,10 +265,41 @@ namespace DSM {
         GraphicsCommandList cmdList{L"BuildAccelerationStructure"};
         cmdList.GetDXRCommandList()->BuildRaytracingAccelerationStructure(&buildBottomLevelASDesc, 0, nullptr);
         // 等待底层加速结构构建完毕
-        cmdList.TransitionResource(m_BottomLevelAS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        cmdList.FlushResourceBarriers();
+        cmdList.InsertUAVBarrier(m_BottomLevelAS, true);
         cmdList.GetDXRCommandList()->BuildRaytracingAccelerationStructure(&buildTopLevelASDesc, 0, nullptr);
         cmdList.ExecuteCommandList(true);
+    }
+
+    void Renderer::CreateShaderTable()
+    {
+        // 创建着色器表
+        // 获取 Shader 的标识符
+        Microsoft::WRL::ComPtr<ID3D12StateObjectProperties> stateObjectProps{};
+        ASSERT_SUCCEEDED(m_RayTracingStateObject.As(&stateObjectProps));
+        void* rayGenShaderIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_RayGenShaderName);
+        void* missShaderIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_MissShaderName);
+        void* hitGroupIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName);
+
+        // RayGeneration 着色器表
+        m_RayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
+        m_RayGenCB.stencil = { -1.0f, -1.0f, 1.0f, 1.0f };
+        GpuBufferDesc rayGenShaderTableDesc{};
+        rayGenShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + sizeof(m_RayGenCB);
+        rayGenShaderTableDesc.m_Stride = rayGenShaderTableDesc.m_Size;
+        rayGenShaderTableDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        std::vector<uint8_t> rayGenShaderTableData(rayGenShaderTableDesc.m_Size);
+        memcpy(rayGenShaderTableData.data(), rayGenShaderIdentifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        memcpy(rayGenShaderTableData.data() + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, &m_RayGenCB, sizeof(m_RayGenCB));
+        m_RayGenShaderTable.Create(L"RayGenShaderTable", rayGenShaderTableDesc, rayGenShaderTableData.data());
+        // Miss 着色器表
+        GpuBufferDesc missShaderTableDesc = rayGenShaderTableDesc;
+        missShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        missShaderTableDesc.m_Stride = missShaderTableDesc.m_Size;
+        m_MissShaderTable.Create(L"MissShaderTable", missShaderTableDesc, missShaderIdentifier);
+        // Hit 着色器表
+        GpuBufferDesc hitShaderTableDesc = missShaderTableDesc;
+        hitShaderTableDesc.m_Stride = hitShaderTableDesc.m_Size;
+        m_HitShaderTable.Create(L"HitShaderTable", hitShaderTableDesc, hitGroupIdentifier);
     }
 
     Renderer::Renderer()

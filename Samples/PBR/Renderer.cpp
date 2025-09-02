@@ -120,7 +120,7 @@ namespace DSM {
         auto depthTexDesc = colTexDesc;
         depthTexDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
         depthTexDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-        m_DepthTex.Create(L"Renderer::DepthTexture", depthTexDesc, clearValue);
+        m_DepthTex.Create(L"Renderer::DepthTexture", depthTexDesc, {}, D3D12_RESOURCE_STATE_COMMON, &clearValue);
 
         // 创建资源视图
         m_ColorTex.CreateRenderTargetView(m_ColorTexRTV);

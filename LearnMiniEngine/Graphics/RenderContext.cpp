@@ -18,7 +18,7 @@ namespace DSM {
     void RenderContext::Create(bool requireDXRSupport, const Window& window)
     {
         DWORD factoryFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG) || 1
+#if defined(DEBUG) || defined(_DEBUG)
         // 开启调试层
         ComPtr<ID3D12Debug> pDebug{};
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(pDebug.GetAddressOf())))) {

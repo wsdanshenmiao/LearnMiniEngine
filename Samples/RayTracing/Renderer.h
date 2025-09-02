@@ -11,6 +11,7 @@
 #include "Graphics/ShaderCompiler.h"
 #include "ConstantData.h"
 #include "Core/Camera.h"
+#include "Shaders/RayTracingHLSLCompat.h"
 
 
 namespace DSM {
@@ -20,6 +21,13 @@ namespace DSM {
     class Renderer : public Singleton<Renderer>
     {
     public:
+        enum RootBindings
+        {
+            RayTracingOutput,
+            AccelerationStructure,
+            Count
+        };
+
         void Create();
         void Shutdown();
 
@@ -29,6 +37,7 @@ namespace DSM {
         void CreateResource(uint32_t width, uint32_t height);
         void CreateStateObject();
         void CreateAccelerationStructure();
+        void CreateShaderTable();
 
     private:
         friend class Singleton<Renderer>;
@@ -65,20 +74,11 @@ namespace DSM {
         GpuBuffer m_MissShaderTable{};
         GpuBuffer m_HitShaderTable{};
 
+        RayGenConstantBuffer m_RayGenCB{};
+
         DescriptorHeap m_TextureHeap;
     };
 #define g_Renderer (Renderer::GetInstance())
-
-    class MeshRenderer
-    {
-    public:
-        void Render(GraphicsCommandList& cmdList);
-
-        void SetScissor(const D3D12_RECT& scissor) { m_Scissor = scissor; }
-
-    private:
-        D3D12_RECT m_Scissor{};
-    };
 
 } // namespace DSM 
 

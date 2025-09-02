@@ -5,6 +5,7 @@
 #include "Graphics/RenderContext.h"
 #include "Graphics/ShaderCompiler.h"
 #include "Graphics/CommandList/GraphicsCommandList.h"
+#include "Graphics/CommandList/ComputeCommandList.h"
 #include "Graphics/Resource/GpuBuffer.h"
 #include "Math/Matrix.h"
 #include "Math/Random.h"
@@ -76,6 +77,27 @@ public:
 
 
         GraphicsCommandList cmdList{ L"Render Scene" };
+
+        auto& computeCmdList = cmdList.GetComputeCommandList();
+        computeCmdList.SetRootSignature(g_Renderer.m_GlobalRootSig);
+        computeCmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
+        computeCmdList.SetDescriptorTable(Renderer::RayTracingOutput, g_Renderer.m_OutputUAV);
+        computeCmdList.SetShaderResource(Renderer::AccelerationStructure, g_Renderer.m_TopLevelAS);
+            
+        D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+        dispatchDesc.HitGroupTable.StartAddress = g_Renderer.m_HitShaderTable->GetGPUVirtualAddress();
+        dispatchDesc.HitGroupTable.SizeInBytes = g_Renderer.m_HitShaderTable.GetSize();
+        dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
+        dispatchDesc.MissShaderTable.StartAddress = g_Renderer.m_MissShaderTable->GetGPUVirtualAddress();
+        dispatchDesc.MissShaderTable.SizeInBytes = g_Renderer.m_MissShaderTable.GetSize();
+        dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
+        dispatchDesc.RayGenerationShaderRecord.StartAddress = g_Renderer.m_RayGenShaderTable->GetGPUVirtualAddress();
+        dispatchDesc.RayGenerationShaderRecord.SizeInBytes = g_Renderer.m_RayGenShaderTable.GetSize();
+        dispatchDesc.Width = swapChain.GetWidth();
+        dispatchDesc.Height = swapChain.GetHeight();
+        dispatchDesc.Depth = 1;
+        computeCmdList.GetDXRCommandList()->SetPipelineState1(g_Renderer.m_RayTracingStateObject.Get());
+        computeCmdList.GetDXRCommandList()->DispatchRays(&dispatchDesc);
 
         auto rect = RECT{0, 0, static_cast<long>(swapChain.GetWidth()), static_cast<long>(swapChain.GetHeight())};
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
