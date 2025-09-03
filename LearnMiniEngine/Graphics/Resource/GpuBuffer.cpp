@@ -71,7 +71,7 @@ namespace DSM{
 
     void GpuBuffer::Unmap()
     {
-        if (m_MappedData != nullptr) {
+        if (m_Resource != nullptr && m_MappedData != nullptr) {
             m_Resource->Unmap(0, nullptr);
             m_MappedData = nullptr;
         }

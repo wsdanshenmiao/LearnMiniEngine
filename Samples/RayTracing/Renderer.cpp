@@ -39,10 +39,9 @@ namespace DSM {
 
         auto width = g_RenderContext.GetSwapChain().GetWidth();
         auto height = g_RenderContext.GetSwapChain().GetHeight();
-        m_OutputUAV = m_TextureHeap.Allocate(1);
-        CreateResource(width, height);
                 
         // 创建根签名
+        // 注意是根常量
         m_LocalRootSig[0].InitAsConstants(0, sizeof(m_RayGenCB) / sizeof(uint32_t) + 1);
         m_LocalRootSig.Finalize(L"RayTracingLocalRootSignature", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
         m_GlobalRootSig[RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
@@ -53,7 +52,8 @@ namespace DSM {
 
         CreateAccelerationStructure();
 
-        CreateShaderTable();
+        m_OutputUAV = m_TextureHeap.Allocate(1);
+        OnResize(width, height);
 
         m_Initialized = true;
     }
@@ -63,7 +63,21 @@ namespace DSM {
     }
 
     void Renderer::OnResize(uint32_t width, uint32_t height)
-    {
+    {    
+        float border = 0.1f;
+        float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+        if (width <= height) {
+            m_RayGenCB.stencil = {
+                -1 + border, -1 + border * aspectRatio,
+                1.0f - border, 1 - border * aspectRatio
+            };
+        }
+        else {
+            m_RayGenCB.stencil = {
+                -1 + border / aspectRatio, -1 + border,
+                1 - border / aspectRatio, 1.0f - border
+            };
+        }
         CreateResource(width, height);
     }
 
@@ -78,6 +92,8 @@ namespace DSM {
         texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         m_RayTracingOutput.Create(L"RayTracingOutput", texDesc, {}, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         m_RayTracingOutput.CreateUnorderedAccessView(m_OutputUAV);
+
+        CreateShaderTable();
     }
 
     void DSM::Renderer::CreateStateObject()
@@ -282,7 +298,6 @@ namespace DSM {
 
         // RayGeneration 着色器表
         m_RayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
-        m_RayGenCB.stencil = { -1.0f, -1.0f, 1.0f, 1.0f };
         GpuBufferDesc rayGenShaderTableDesc{};
         rayGenShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + sizeof(m_RayGenCB);
         rayGenShaderTableDesc.m_Stride = rayGenShaderTableDesc.m_Size;
