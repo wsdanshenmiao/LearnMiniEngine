@@ -16,14 +16,7 @@ namespace DSM {
 		void UpdateImGui(float time) override;
 
 	public:
-		DirectX::XMFLOAT3 m_LightDir;
-		DirectX::XMFLOAT3 m_LightColor;
-
-		float m_FogStart = 10;
-		float m_FogRange = 100;
-		DirectX::XMFLOAT3 m_FogColor = DirectX::XMFLOAT3(1, 1, 1);
-
-		int m_BlurCount = 1;
+		Math::Vector3 outSideColor;
 	};
 }
 

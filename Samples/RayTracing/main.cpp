@@ -68,6 +68,8 @@ public:
         deltaTime = 1.f / 60;
 
         ImguiManager::GetInstance().Update(deltaTime);
+        g_Renderer.m_RayGenCB.outSideColor = ImguiManager::GetInstance().outSideColor;
+        g_Renderer.CreateShaderTable();
 
         m_CameraController->Update(deltaTime);
 	}

@@ -40,7 +40,7 @@ void RaygenShader()
         gOutput[rayIndex] = payload.color;
     }
     else{
-        gOutput[rayIndex] = float4(lerpVal.xy, 0, 1);
+        gOutput[rayIndex] = float4(gRayGenCB.outSideColor, 1);
     }
 }
 

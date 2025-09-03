@@ -57,8 +57,8 @@ namespace DSM{
 
     void GpuBuffer::Destroy()
     {
-        GpuResource::Destroy();
         Unmap();
+        GpuResource::Destroy();
     }
 
     void* GpuBuffer::Map()

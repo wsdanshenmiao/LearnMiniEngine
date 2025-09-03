@@ -33,11 +33,12 @@ namespace DSM {
 
         void OnResize(uint32_t width, uint32_t height);
 
+        void CreateShaderTable();
+
     private:
         void CreateResource(uint32_t width, uint32_t height);
         void CreateStateObject();
         void CreateAccelerationStructure();
-        void CreateShaderTable();
 
     private:
         friend class Singleton<Renderer>;
