@@ -18,14 +18,14 @@ namespace DSM {
         heapDesc.m_HeapFlags = resourceDesc.m_HeapFlags;
         ID3D12Resource* resource = nullptr;
         if (auto it = s_GpuResourceAllocators.find(heapDesc); it != s_GpuResourceAllocators.end()) {
-            resource =it->second.CreateResource(resourceDesc.m_Desc, resourceDesc.m_State, clearValue);
-            m_Allocator = &it->second;
+           resource =it->second.CreateResource(resourceDesc.m_Desc, resourceDesc.m_State, clearValue);
+           m_Allocator = &it->second;
         }
         else {
-            auto& allocator = s_GpuResourceAllocators[heapDesc];
-            allocator.Create(heapDesc);
-            resource = allocator.CreateResource(resourceDesc.m_Desc, resourceDesc.m_State, clearValue);
-            m_Allocator = &allocator;
+           auto& allocator = s_GpuResourceAllocators[heapDesc];
+           allocator.Create(heapDesc);
+           resource = allocator.CreateResource(resourceDesc.m_Desc, resourceDesc.m_State, clearValue);
+           m_Allocator = &allocator;
         }
         m_Resource = resource;
         m_UsageState = resourceDesc.m_State;
@@ -48,7 +48,7 @@ namespace DSM {
 
     void GpuResource::Destroy()
     {
-        if (m_Allocator != nullptr) {
+        if (m_Resource != nullptr && m_Allocator != nullptr) {
             m_Allocator->ReleaseResource(m_Resource.Get());
         }
         m_Resource = nullptr;

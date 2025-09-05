@@ -1,4 +1,4 @@
-targetName = "RayTracing"
+targetName = "RayTracingTriangle"
 target(targetName)
     set_kind("binary")
     set_targetdir(path.join(binDir, targetName))
@@ -6,7 +6,7 @@ target(targetName)
     add_deps("LearnMiniEngine")
     add_rules("Imguiini")
     add_rules("ShaderCopy")
-    add_rules("EngineShderCopy")
+    add_rules("EngineShaderCopy")
     add_rules("ModelCopy")
     add_rules("TextureCopy")
 

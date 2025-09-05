@@ -1,4 +1,4 @@
-targetName = "PBR"
+targetName = "RayTracingSimpleLight"
 target(targetName)
     set_kind("binary")
     set_targetdir(path.join(binDir, targetName))

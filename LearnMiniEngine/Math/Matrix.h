@@ -85,18 +85,7 @@ namespace DSM::Math {
 
     __forceinline bool operator==(const Matrix3& m0, const Matrix3& m1) noexcept
     {
-        BoolVector equalX = DirectX::XMVectorSetW(m0.GetX() == m1.GetX(), 0);
-        BoolVector equalY = DirectX::XMVectorSetW(m0.GetY() == m1.GetY(), 0);
-        BoolVector equalZ = DirectX::XMVectorSetW(m0.GetZ() == m1.GetZ(), 0);
-        bool equal = (equalX == equalY) && (equalX == equalZ);
-        if (equal) {
-            return DirectX::XMVectorGetX(equalX) == 1 &&
-                DirectX::XMVectorGetY(equalX) == 1 &&
-                DirectX::XMVectorGetZ(equalX) == 1;
-        }
-        else {
-            return false;
-        }
+        return m0.GetX() == m1.GetX() && m0.GetY() == m1.GetY() && m0.GetZ() == m1.GetZ();
     }
 
 
@@ -182,6 +171,11 @@ namespace DSM::Math {
     }
     __forceinline Matrix4 operator*(const Matrix4& m, Scalar s) noexcept { return Matrix4{m} *= s; }
     __forceinline Matrix4 operator*(Scalar s, const Matrix4& rhs) noexcept { return rhs * s; }
+
+    __forceinline bool operator==(const Matrix4& m0, const Matrix4& m1) noexcept
+    {
+        return m0.GetX() == m1.GetX() && m0.GetY() == m1.GetY() && m0.GetZ() == m1.GetZ() && m0.GetW() == m1.GetW();
+    }
 
     /*bool operator==(const Matrix4& m0, const Matrix4& m1) noexcept
     {

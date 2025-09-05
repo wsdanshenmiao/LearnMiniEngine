@@ -18,38 +18,38 @@ namespace DSM {
     void RenderContext::Create(bool requireDXRSupport, const Window& window)
     {
         DWORD factoryFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)
-        // 开启调试层
-        ComPtr<ID3D12Debug> pDebug{};
-        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(pDebug.GetAddressOf())))) {
-            pDebug->EnableDebugLayer();
-            ComPtr<ID3D12Debug1> pDebug1{};
-            if (SUCCEEDED(pDebug->QueryInterface(IID_PPV_ARGS(pDebug1.GetAddressOf())))) {
-                pDebug1->SetEnableGPUBasedValidation(true);
-            }
-        }
-        else {
-            Utility::Print("Warnint:    Failed to get D3D12 debug interface");
-        }
+// #if defined(DEBUG) || defined(_DEBUG)
+//         // 开启调试层
+//         ComPtr<ID3D12Debug> pDebug{};
+//         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(pDebug.GetAddressOf())))) {
+//             pDebug->EnableDebugLayer();
+//             ComPtr<ID3D12Debug1> pDebug1{};
+//             if (SUCCEEDED(pDebug->QueryInterface(IID_PPV_ARGS(pDebug1.GetAddressOf())))) {
+//                 pDebug1->SetEnableGPUBasedValidation(true);
+//             }
+//         }
+//         else {
+//             Utility::Print("Warnint:    Failed to get D3D12 debug interface");
+//         }
 
-        ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
-        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiInfoQueue.GetAddressOf()))))
-        {
-            factoryFlags = DXGI_CREATE_FACTORY_DEBUG;
+//         ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+//         if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiInfoQueue.GetAddressOf()))))
+//         {
+//             factoryFlags = DXGI_CREATE_FACTORY_DEBUG;
 
-            dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-            dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+//             dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+//             dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
 
-            DXGI_INFO_QUEUE_MESSAGE_ID hide[] =
-            {
-                80 /* IDXGISwapChain::GetContainingOutput: The swapchain's adapter does not control the output on which the swapchain's window resides. */,
-            };
-            DXGI_INFO_QUEUE_FILTER filter = {};
-            filter.DenyList.NumIDs = _countof(hide);
-            filter.DenyList.pIDList = hide;
-            dxgiInfoQueue->AddStorageFilterEntries(DXGI_DEBUG_DXGI, &filter);
-        }
-#endif
+//             DXGI_INFO_QUEUE_MESSAGE_ID hide[] =
+//             {
+//                 80 /* IDXGISwapChain::GetContainingOutput: The swapchain's adapter does not control the output on which the swapchain's window resides. */,
+//             };
+//             DXGI_INFO_QUEUE_FILTER filter = {};
+//             filter.DenyList.NumIDs = _countof(hide);
+//             filter.DenyList.pIDList = hide;
+//             dxgiInfoQueue->AddStorageFilterEntries(DXGI_DEBUG_DXGI, &filter);
+//         }
+// #endif
         // 创建工厂
         ASSERT_SUCCEEDED(CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(m_pFactory.GetAddressOf())));
 

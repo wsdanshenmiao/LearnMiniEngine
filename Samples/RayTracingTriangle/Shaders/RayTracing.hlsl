@@ -41,6 +41,7 @@ void RaygenShader()
     }
     else{
         gOutput[rayIndex] = float4(gRayGenCB.outSideColor, 1);
+        //gOutput[rayIndex] = float4(lerpVal, 1);
     }
 }
 

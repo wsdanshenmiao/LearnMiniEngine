@@ -31,6 +31,8 @@ namespace DSM::Math {
         __forceinline void SetY(Scalar y) noexcept { m_Vector = DirectX::XMVectorPermute<0,5,2,3>(m_Vector, y); }
         __forceinline void SetZ(Scalar z) noexcept { m_Vector = DirectX::XMVectorPermute<0,1,6,3>(m_Vector, z); }
 
+        __forceinline Vector3 Normalized() noexcept { return Vector3{ DirectX::XMVector3Normalize(m_Vector) }; }
+
         __forceinline Vector3& operator+=(Vector3 other) noexcept
         {
             m_Vector = DirectX::XMVectorAdd(m_Vector, other);
@@ -55,6 +57,8 @@ namespace DSM::Math {
         }
         __forceinline Vector3& operator/=(Scalar scalar) noexcept { return operator/=(Vector3{scalar}); }
         __forceinline Vector3& operator/=(float v) noexcept { return operator/=(Scalar{v}); }
+        
+        __forceinline bool operator==(const Vector3& other) const noexcept { return DirectX::XMVector3Equal(m_Vector, other); }
         
         __forceinline operator DirectX::XMVECTOR() const noexcept { return m_Vector; }
 
@@ -109,6 +113,8 @@ namespace DSM::Math {
         __forceinline void SetW(Scalar w) noexcept { m_Vector = DirectX::XMVectorPermute<0,1,2,7>(m_Vector, w); }
         __forceinline void SetXYZ(Vector3 xyz) noexcept { m_Vector = DirectX::XMVectorPermute<4,5,6,3>(m_Vector, xyz); }
 
+        __forceinline Vector4 Normalized() noexcept { return Vector4{ DirectX::XMVector4Normalize(m_Vector) }; }
+
         
         __forceinline Vector4& operator+=(Vector4 other) noexcept
         {
@@ -134,6 +140,8 @@ namespace DSM::Math {
         }
         __forceinline Vector4& operator/=(Scalar scalar) noexcept { return operator/=(Vector4{scalar}); }
         __forceinline Vector4& operator/=(float v) noexcept { return operator/=(Scalar{v}); }
+                
+        __forceinline bool operator==(const Vector4& other) const noexcept { return DirectX::XMVector4Equal(m_Vector, other); }
         
         __forceinline operator DirectX::XMVECTOR() const noexcept { return m_Vector; }
 

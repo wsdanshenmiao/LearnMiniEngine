@@ -73,7 +73,6 @@ namespace DSM::Math {
     template <XMVectorType T> __forceinline constexpr BoolVector operator<=(T l, T r) noexcept { return BoolVector(DirectX::XMVectorLessOrEqual(l, r)); }
     template <XMVectorType T> __forceinline constexpr BoolVector operator>(T l, T r) noexcept { return BoolVector(DirectX::XMVectorGreater(l, r)); }
     template <XMVectorType T> __forceinline constexpr BoolVector operator>=(T l, T r) noexcept { return BoolVector(DirectX::XMVectorGreaterOrEqual(l, r)); }
-    template <XMVectorType T> __forceinline constexpr BoolVector operator==(T l, T r) noexcept { return BoolVector(DirectX::XMVectorEqual(l, r)); }
     template <XMVectorType T> __forceinline constexpr T Select(T l, T r, BoolVector mask) noexcept { return T(DirectX::XMVectorSelect(l, r, mask)); }
 
     __forceinline float Sqrt( float s ) { return Sqrt(Scalar(s)); }

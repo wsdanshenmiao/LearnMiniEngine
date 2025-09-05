@@ -44,10 +44,10 @@ public:
         m_Camera = std::make_unique<Camera>();
 		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
         float aspect = float(width) / height;
-        m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 0.1f, 1000.0f);
+        m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
         // m_Camera->SetPosition({ 100, 100, -100 });
-        //m_Camera->SetPosition({ 0, 0, -10 });
-        // m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
+        m_Camera->SetPosition({ 0, 0, -5 });
+        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
@@ -68,8 +68,6 @@ public:
         deltaTime = 1.f / 60;
 
         ImguiManager::GetInstance().Update(deltaTime);
-        g_Renderer.m_RayGenCB.outSideColor = ImguiManager::GetInstance().outSideColor;
-        g_Renderer.CreateShaderTable();
 
         m_CameraController->Update(deltaTime);
 	}
@@ -80,26 +78,9 @@ public:
 
         GraphicsCommandList cmdList{ L"Render Scene" };
 
-        auto& computeCmdList = cmdList.GetComputeCommandList();
-        computeCmdList.SetRootSignature(g_Renderer.m_GlobalRootSig);
-        computeCmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
-        computeCmdList.SetDescriptorTable(Renderer::RayTracingOutput, g_Renderer.m_OutputUAV);
-        computeCmdList.SetShaderResource(Renderer::AccelerationStructure, g_Renderer.m_TopLevelAS);
-            
-        D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
-        dispatchDesc.HitGroupTable.StartAddress = g_Renderer.m_HitShaderTable->GetGPUVirtualAddress();
-        dispatchDesc.HitGroupTable.SizeInBytes = g_Renderer.m_HitShaderTable.GetSize();
-        dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
-        dispatchDesc.MissShaderTable.StartAddress = g_Renderer.m_MissShaderTable->GetGPUVirtualAddress();
-        dispatchDesc.MissShaderTable.SizeInBytes = g_Renderer.m_MissShaderTable.GetSize();
-        dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
-        dispatchDesc.RayGenerationShaderRecord.StartAddress = g_Renderer.m_RayGenShaderTable->GetGPUVirtualAddress();
-        dispatchDesc.RayGenerationShaderRecord.SizeInBytes = g_Renderer.m_RayGenShaderTable.GetSize();
-        dispatchDesc.Width = swapChain.GetWidth();
-        dispatchDesc.Height = swapChain.GetHeight();
-        dispatchDesc.Depth = 1;
-        computeCmdList.GetDXRCommandList()->SetPipelineState1(g_Renderer.m_RayTracingStateObject.Get());
-        computeCmdList.GetDXRCommandList()->DispatchRays(&dispatchDesc);
+        RayTracer rayTracer{};
+        rayTracer.SetCamera(m_Camera.get());
+        rayTracer.TraceRays(cmdList.GetComputeCommandList());
 
         auto rect = RECT{0, 0, static_cast<long>(swapChain.GetWidth()), static_cast<long>(swapChain.GetHeight())};
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);

@@ -1,6 +1,8 @@
 #include "Renderer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/CommandList/GraphicsCommandList.h"
+#include "Geometry.h"
+#include "Graphics/CommandList/ComputeCommandList.h"
 
 namespace DSM {
 
@@ -9,51 +11,41 @@ namespace DSM {
     {
         if(m_Initialized) return;
 
-        struct Vertex
-        {
-            Math::Vector3 position;
-            Math::Vector4 color;
-        };
+        auto mesh = Geometry::GeometryGenerator::CreateBox(2, 2, 2, 0);
 
-        uint32_t indices[] = {
-            0, 1, 2
-        };
-
-        float depthValue = 1.0;
-        float offset = 0.7f;
-        Vertex vertices[] = {
-            {{ 0, -offset, depthValue }, { 1, 0, 0, 1 }},
-            {{ -offset, offset, depthValue }, { 0, 1, 0, 1 }},
-            {{ offset, offset, depthValue }, { 0, 0, 1, 1 }}
-        };
         GpuBufferDesc vertexBufferDesc{};
-        vertexBufferDesc.m_Size = sizeof(vertices);
-        vertexBufferDesc.m_Stride = sizeof(Vertex);
+        vertexBufferDesc.m_Size = sizeof(Geometry::Vertex) * mesh.m_Vertices.size();
+        vertexBufferDesc.m_Stride = sizeof(Geometry::Vertex);
         vertexBufferDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
-        m_VertexBuffer.Create(L"VertexBuffer", vertexBufferDesc, vertices);
+        m_VertexBuffer.Create(L"VertexBuffer", vertexBufferDesc, mesh.m_Vertices.data());
 
         GpuBufferDesc indexBufferDesc = vertexBufferDesc;
-        indexBufferDesc.m_Size = sizeof(indices);
+        indexBufferDesc.m_Size = sizeof(uint32_t) * mesh.m_Indices32.size();
         indexBufferDesc.m_Stride = sizeof(uint32_t);
-        m_IndexBuffer.Create(L"IndexBuffer", indexBufferDesc, indices);
+        m_IndexBuffer.Create(L"IndexBuffer", indexBufferDesc, mesh.m_Indices32.data());
 
         auto width = g_RenderContext.GetSwapChain().GetWidth();
         auto height = g_RenderContext.GetSwapChain().GetHeight();
-                
+
+        m_OutputUAV = m_TextureHeap.Allocate(1);
+        CreateResource(width, height);
+        
         // 创建根签名
-        // 注意是根常量
-        m_LocalRootSig[0].InitAsConstants(0, sizeof(m_RayGenCB) / sizeof(uint32_t) + 1);
+        // 给 HitGroup 设置的资源
+        m_LocalRootSig[0].InitAsConstants(1, sizeof(CubeConstantBuffer) / sizeof(uint32_t) + 1);
         m_LocalRootSig.Finalize(L"RayTracingLocalRootSignature", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
         m_GlobalRootSig[RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
         m_GlobalRootSig[AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
+        m_GlobalRootSig[VertexData].InitAsBufferSRV(1);  // 顶点数据
+        m_GlobalRootSig[IndexData].InitAsBufferSRV(2);  // 索引数据
+        m_GlobalRootSig[SceneConstantBuffer].InitAsConstantBuffer(0);
         m_GlobalRootSig.Finalize(L"RayTracingGlobalRootSignature");
 
         CreateStateObject();
 
         CreateAccelerationStructure();
 
-        m_OutputUAV = m_TextureHeap.Allocate(1);
-        OnResize(width, height);
+        CreateShaderTable();
 
         m_Initialized = true;
     }
@@ -63,21 +55,7 @@ namespace DSM {
     }
 
     void Renderer::OnResize(uint32_t width, uint32_t height)
-    {    
-        float border = 0.1f;
-        float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-        if (width <= height) {
-            m_RayGenCB.stencil = {
-                -1 + border, -1 + border * aspectRatio,
-                1.0f - border, 1 - border * aspectRatio
-            };
-        }
-        else {
-            m_RayGenCB.stencil = {
-                -1 + border / aspectRatio, -1 + border,
-                1 - border / aspectRatio, 1.0f - border
-            };
-        }
+    {
         CreateResource(width, height);
     }
 
@@ -92,8 +70,6 @@ namespace DSM {
         texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         m_RayTracingOutput.Create(L"RayTracingOutput", texDesc, {}, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         m_RayTracingOutput.CreateUnorderedAccessView(m_OutputUAV);
-
-        CreateShaderTable();
     }
 
     void DSM::Renderer::CreateStateObject()
@@ -169,7 +145,7 @@ namespace DSM {
         D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociation{};
         localRootSigAssociation.pSubobjectToAssociate = &localSubobject;
         localRootSigAssociation.NumExports = 1;
-        localRootSigAssociation.pExports = &s_RayGenShaderName;
+        localRootSigAssociation.pExports = &s_HitGroupName;
         D3D12_STATE_SUBOBJECT localRootSigAssociationSubobject{};
         localRootSigAssociationSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
         localRootSigAssociationSubobject.pDesc = &localRootSigAssociation;
@@ -297,35 +273,74 @@ namespace DSM {
         void* hitGroupIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName);
 
         // RayGeneration 着色器表
-        m_RayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
         GpuBufferDesc rayGenShaderTableDesc{};
-        rayGenShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + sizeof(m_RayGenCB);
+        rayGenShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
         rayGenShaderTableDesc.m_Stride = rayGenShaderTableDesc.m_Size;
         rayGenShaderTableDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
-        std::vector<uint8_t> rayGenShaderTableData(rayGenShaderTableDesc.m_Size);
-        memcpy(rayGenShaderTableData.data(), rayGenShaderIdentifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-        memcpy(rayGenShaderTableData.data() + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, &m_RayGenCB, sizeof(m_RayGenCB));
-        m_RayGenShaderTable.Create(L"RayGenShaderTable", rayGenShaderTableDesc, rayGenShaderTableData.data());
+        m_RayGenShaderTable.Create(L"RayGenShaderTable", rayGenShaderTableDesc, rayGenShaderIdentifier);
         // Miss 着色器表
         GpuBufferDesc missShaderTableDesc = rayGenShaderTableDesc;
         missShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
         missShaderTableDesc.m_Stride = missShaderTableDesc.m_Size;
         m_MissShaderTable.Create(L"MissShaderTable", missShaderTableDesc, missShaderIdentifier);
         // Hit 着色器表
-        GpuBufferDesc hitShaderTableDesc = missShaderTableDesc;
+        GpuBufferDesc hitShaderTableDesc = rayGenShaderTableDesc;
+        auto size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + sizeof(CubeConstantBuffer);
+        hitShaderTableDesc.m_Size = Math::AlignUp(size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
         hitShaderTableDesc.m_Stride = hitShaderTableDesc.m_Size;
-        m_HitShaderTable.Create(L"HitShaderTable", hitShaderTableDesc, hitGroupIdentifier);
+        std::vector<uint8_t> hitShaderTableData(hitShaderTableDesc.m_Size);
+        memcpy(hitShaderTableData.data(), hitGroupIdentifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        m_HitShaderTable.Create(L"HitShaderTable", hitShaderTableDesc, hitShaderTableData.data());
     }
 
     Renderer::Renderer()
         :m_TextureHeap(L"Renderer::TextureHeap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096),
         m_LocalRootSig(1, 0),
-        m_GlobalRootSig(2, 0) {}
+        m_GlobalRootSig(Count, 0) {}
 
 
 
 
+    
+    void RayTracer::TraceRays(ComputeCommandList &cmdList)
+    {
+        ASSERT(m_Camera != nullptr);
 
+        uint32_t width = m_Camera->GetViewPort().Width;
+        uint32_t height = m_Camera->GetViewPort().Height;
+
+        cmdList.SetRootSignature(g_Renderer.m_GlobalRootSig);
+        cmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
+
+        SceneConstantBuffer sceneCB{};
+        sceneCB.viewProjInv = Math::Matrix4::Inverse(m_Camera->GetViewProjMatrix());
+        sceneCB.cameraPos = Math::Vector4{m_Camera->GetPosition()};
+        
+
+        CubeConstantBuffer cubeCB{};
+        g_Renderer.m_HitShaderTable.Update(&cubeCB, sizeof(CubeConstantBuffer), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+        cmdList.SetDescriptorTable(Renderer::RayTracingOutput, g_Renderer.m_OutputUAV);
+        cmdList.SetShaderResource(Renderer::AccelerationStructure, g_Renderer.m_TopLevelAS);
+        cmdList.SetShaderResource(Renderer::VertexData, g_Renderer.m_VertexBuffer);
+        cmdList.SetShaderResource(Renderer::IndexData, g_Renderer.m_IndexBuffer);
+        cmdList.SetDynamicConstantBuffer(Renderer::SceneConstantBuffer, sizeof(SceneConstantBuffer), &sceneCB);
+
+        D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+        dispatchDesc.HitGroupTable.StartAddress = g_Renderer.m_HitShaderTable->GetGPUVirtualAddress();
+        dispatchDesc.HitGroupTable.SizeInBytes = g_Renderer.m_HitShaderTable.GetSize();
+        dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
+        dispatchDesc.MissShaderTable.StartAddress = g_Renderer.m_MissShaderTable->GetGPUVirtualAddress();
+        dispatchDesc.MissShaderTable.SizeInBytes = g_Renderer.m_MissShaderTable.GetSize();
+        dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
+        dispatchDesc.RayGenerationShaderRecord.StartAddress = g_Renderer.m_RayGenShaderTable->GetGPUVirtualAddress();
+        dispatchDesc.RayGenerationShaderRecord.SizeInBytes = g_Renderer.m_RayGenShaderTable.GetSize();
+        dispatchDesc.Width = width;
+        dispatchDesc.Height = height;
+        dispatchDesc.Depth = 1;
+        cmdList.GetDXRCommandList()->SetPipelineState1(g_Renderer.m_RayTracingStateObject.Get());
+        cmdList.GetDXRCommandList()->DispatchRays(&dispatchDesc);
+    }
 
 
 }

@@ -71,6 +71,24 @@ namespace DSM {
         D3D12_RESOURCE_STATES resourceState,
             const D3D12_CLEAR_VALUE* clearValue)
     {
+        // TODO:检测到有资源重叠，暂未找到原因，因此使用直接创建资源
+        {
+            ID3D12Resource* resource = nullptr;
+            D3D12_HEAP_PROPERTIES prop = {};
+            prop.Type = m_HeapDesc.m_HeapType;
+            prop.CreationNodeMask = 1;
+            prop.VisibleNodeMask = 1;
+            ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->CreateCommittedResource(
+                &prop,
+                m_HeapDesc.m_HeapFlags,
+                &resourceDesc,
+                resourceState,
+                clearValue,
+                IID_PPV_ARGS(&resource)));
+            return resource;
+        }
+
+
         auto allocInfo = g_RenderContext.GetDevice()->GetResourceAllocationInfo(0, 1, &resourceDesc);
         
         std::lock_guard lock{m_Mutex};

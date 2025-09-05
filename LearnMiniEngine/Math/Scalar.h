@@ -44,7 +44,9 @@ namespace DSM::Math {
             return *this;
         }
         __forceinline Scalar& operator/=(float v) noexcept { return operator/=(Scalar{v}); }
-        
+
+        __forceinline bool operator==(const Scalar& other) const noexcept { return DirectX::XMVector4Equal(m_Vector, other); }
+
         __forceinline operator DirectX::XMVECTOR() const noexcept { return m_Vector; }
         __forceinline operator float() const noexcept { return DirectX::XMVectorGetX(m_Vector); }
 
