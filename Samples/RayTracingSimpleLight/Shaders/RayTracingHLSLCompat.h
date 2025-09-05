@@ -16,8 +16,11 @@ struct CubeConstantBuffer
 struct SceneConstantBuffer
 {
     // 生成光线使用的数据
-    float4x4 viewProjInv;  // 投影矩阵的逆矩阵
-    float4 cameraPos;
+    float4 cameraPosAndFocusDist;
+    float4 viewportU;
+    float4 viewportV;
+    float4 lightDir;
+    float4 lightColor;
 };
 
 #endif

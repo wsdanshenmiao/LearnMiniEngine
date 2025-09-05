@@ -3,6 +3,7 @@
 #include "Graphics/CommandList/GraphicsCommandList.h"
 #include "Geometry.h"
 #include "Graphics/CommandList/ComputeCommandList.h"
+#include "ImguiManager.h"
 
 namespace DSM {
 
@@ -11,7 +12,7 @@ namespace DSM {
     {
         if(m_Initialized) return;
 
-        auto mesh = Geometry::GeometryGenerator::CreateBox(2, 2, 2, 0);
+        auto mesh = Geometry::GeometryGenerator::CreateBox(3, 3, 3, 0);
 
         GpuBufferDesc vertexBufferDesc{};
         vertexBufferDesc.m_Size = sizeof(Geometry::Vertex) * mesh.m_Vertices.size();
@@ -312,12 +313,19 @@ namespace DSM {
         cmdList.SetRootSignature(g_Renderer.m_GlobalRootSig);
         cmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
 
+        float focusDist = 10;
+        auto h = std::tan(m_Camera->GetFovY() * .5f);
+        auto viewportHeight = 2 * h * focusDist;
+        float viewportWidth = viewportHeight * (float(width) / height);
         SceneConstantBuffer sceneCB{};
-        sceneCB.viewProjInv = Math::Matrix4::Inverse(m_Camera->GetViewProjMatrix());
-        sceneCB.cameraPos = Math::Vector4{m_Camera->GetPosition()};
-        
+        sceneCB.cameraPosAndFocusDist = Math::Vector4{m_Camera->GetPosition(), focusDist};
+        sceneCB.viewportU = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth};
+        sceneCB.viewportV = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight};
+        sceneCB.lightDir = Math::Vector4{ImguiManager::GetInstance().lightDir.Normalized(), 0};
+        sceneCB.lightColor = Math::Vector4{ImguiManager::GetInstance().lightColor, 0};
 
         CubeConstantBuffer cubeCB{};
+        cubeCB.albedo = Math::Vector4{ImguiManager::GetInstance().cubeAlbedo};
         g_Renderer.m_HitShaderTable.Update(&cubeCB, sizeof(CubeConstantBuffer), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
         cmdList.SetDescriptorTable(Renderer::RayTracingOutput, g_Renderer.m_OutputUAV);

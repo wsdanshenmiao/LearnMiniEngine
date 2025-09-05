@@ -91,9 +91,6 @@ namespace DSM {
 
     private:
         const Camera* m_Camera;
-
-        // 常量缓冲区的数据
-        CubeConstantBuffer m_CubeCB{};
     };
 
 } // namespace DSM 

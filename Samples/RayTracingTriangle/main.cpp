@@ -68,8 +68,8 @@ public:
         deltaTime = 1.f / 60;
 
         ImguiManager::GetInstance().Update(deltaTime);
-        if(g_Renderer.m_RayGenCB.outSideColor != ImguiManager::GetInstance().outSideColor){
-            g_Renderer.m_RayGenCB.outSideColor = ImguiManager::GetInstance().outSideColor;
+        if(g_Renderer.m_RayGenCB.outSideColor != ImguiManager::GetInstance().cubeAlbedo){
+            g_Renderer.m_RayGenCB.outSideColor = ImguiManager::GetInstance().cubeAlbedo;
             g_Renderer.m_RayGenShaderTable.Update(&g_Renderer.m_RayGenCB, sizeof(g_Renderer.m_RayGenCB), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
         }
 

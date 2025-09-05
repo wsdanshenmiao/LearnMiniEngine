@@ -46,12 +46,11 @@ public:
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
         // m_Camera->SetPosition({ 100, 100, -100 });
-        m_Camera->SetPosition({ 0, 0, -5 });
+        m_Camera->SetPosition({ 5, 5, -5 });
         m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
-        m_CameraController->SetMoveSpeed(15);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {

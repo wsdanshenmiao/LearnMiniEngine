@@ -16,6 +16,6 @@ namespace DSM {
 		}
 		ImGui::End();
 
-		outSideColor = {outSideCol[0], outSideCol[1], outSideCol[2]};
+		cubeAlbedo = {outSideCol[0], outSideCol[1], outSideCol[2]};
 	}
 }

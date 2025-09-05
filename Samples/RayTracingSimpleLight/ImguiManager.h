@@ -16,7 +16,9 @@ namespace DSM {
 		void UpdateImGui(float time) override;
 
 	public:
-		Math::Vector3 outSideColor;
+		Math::Vector3 cubeAlbedo;
+		Math::Vector3 lightDir;
+		Math::Vector3 lightColor;
 	};
 }
 
