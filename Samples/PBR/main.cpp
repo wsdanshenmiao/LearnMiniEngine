@@ -137,5 +137,5 @@ int WinMain(
     _In_ int nShowCmd)
 {
     Sample sandbox{};
-    return GameCore::RunApplication(sandbox, 1024, 768, L"DSMEngine", hInstance, nShowCmd);
+    return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
 }

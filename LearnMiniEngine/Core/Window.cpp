@@ -1,7 +1,8 @@
 #include "Window.h"
 #include "GameCore.h"
-#include "../Graphics/RenderContext.h"
+#include "Graphics/RenderContext.h"
 #include "Utilities/BaseImGuiManager.h"
+#include "Utilities/Utility.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -12,10 +13,13 @@ namespace DSM {
 
     Window::Window(const WindowDesc& desc)
     {
+        m_Desc = desc;
+        
+        auto name = Utility::UTF8ToWString(desc.m_Title);
         // 注册类
         WNDCLASSEX wcex{};
         wcex.hInstance = desc.m_HInstance;
-        wcex.lpszClassName = desc.m_Title.c_str();
+        wcex.lpszClassName = name.c_str();
         wcex.style= CS_HREDRAW | CS_VREDRAW;
         wcex.hIcon = LoadIcon(desc.m_HInstance, IDI_APPLICATION);
         wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
@@ -33,8 +37,8 @@ namespace DSM {
         AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
 
         m_WindowHandle = CreateWindow(
-            desc.m_Title.c_str(),
-            desc.m_Title.c_str(),
+            name.c_str(),
+            name.c_str(),
             WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
             rect.right - rect.left,
             rect.bottom - rect.top,
@@ -58,6 +62,13 @@ namespace DSM {
             if (msg.message == WM_QUIT) return false;
         }
         return true;
+    }
+
+    void Window::SetTitle(const std::string &title)
+    {
+        m_Desc.m_Title = title;
+        auto name = Utility::UTF8ToWString(title);
+        SetWindowText(m_WindowHandle, name.c_str());
     }
 
     LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )

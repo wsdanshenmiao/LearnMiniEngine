@@ -307,8 +307,6 @@ namespace DSM {
     {
         ASSERT(m_Camera != nullptr);
 
-        auto& imgui = ImguiManager::GetInstance();
-
         uint32_t width = m_Camera->GetViewPort().Width;
         uint32_t height = m_Camera->GetViewPort().Height;
 
@@ -323,11 +321,11 @@ namespace DSM {
         sceneCB.cameraPosAndFocusDist = Math::Vector4{m_Camera->GetPosition(), focusDist};
         sceneCB.viewportU = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth};
         sceneCB.viewportV = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight};
-        sceneCB.lightColor = Math::Vector4{imgui.lightColor, 0};
-        sceneCB.lightDirAndGloss = Math::Vector4{imgui.lightDir.Normalized(), float(imgui.cubeGloss)};
+        sceneCB.lightDir = Math::Vector4{ImguiManager::GetInstance().lightDir.Normalized(), 0};
+        sceneCB.lightColor = Math::Vector4{ImguiManager::GetInstance().lightColor, 0};
 
         CubeConstantBuffer cubeCB{};
-        cubeCB.albedo = Math::Vector4{imgui.cubeAlbedo};
+        cubeCB.albedo = Math::Vector4{ImguiManager::GetInstance().cubeAlbedo};
         g_Renderer.m_HitShaderTable.Update(&cubeCB, sizeof(CubeConstantBuffer), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
         cmdList.SetDescriptorTable(Renderer::RayTracingOutput, g_Renderer.m_OutputUAV);

@@ -85,19 +85,13 @@ void ClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     };
 
     Vertex attributes = GetHitAttributes(vertices, attrs.barycentrics);
-    float3 lightDir = -normalize(gSceneCB.lightDirAndGloss.xyz);
-    float3 lightColor = gSceneCB.lightColor.rgb;
-    float3 halfDir = normalize(lightDir - normalize(WorldRayDirection()));
-    float gloss = gSceneCB.lightDirAndGloss.w;
-
+    float3 lightDir = -normalize(gSceneCB.lightDir.xyz);
+    
     float4 albedo = gCubeCB.albedo;
-    float3 diffuse = lightColor * max(0, dot(lightDir, attributes.normal));
-    float3 specular = lightColor * pow(max(0, dot(halfDir, attributes.normal)), gloss);
-    float3 col = saturate(diffuse + specular + 0.1);
-    col *= albedo.rgb;
+    float3 diffuse = gSceneCB.lightColor.rgb * albedo.rgb * max(0, dot(lightDir, attributes.normal));
 
     // 获取重心坐标
-    payload.color = float4(col, albedo.a);
+    payload.color = float4(diffuse + albedo.rgb * 0.1, albedo.a);
 }
 
 [shader("miss")]

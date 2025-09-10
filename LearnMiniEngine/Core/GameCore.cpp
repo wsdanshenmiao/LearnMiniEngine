@@ -1,13 +1,37 @@
 #include "GameCore.h"
 
 #include "Window.h"
-#include "../Utilities/Macros.h"
-#include "../Graphics/RenderContext.h"
+#include "Utilities/Macros.h"
+#include "CpuTimer.h"
+#include "Graphics/RenderContext.h"
 #include <iostream>
 
 namespace DSM::GameCore{
     IGameApp* g_CurrGameApp = nullptr;
+    CpuTimer g_Timer{};
     
+
+    void CalculateFrameStates(Window& window)
+    {
+        static int frameCnt = 0;
+        static float timeElapsed = 0.0f;
+        static std::string originTitle = window.GetTitle();
+
+        frameCnt++;
+
+        if ((g_Timer.TotalTime() - timeElapsed) >= 1.0f) {
+            float fps = (float)frameCnt; // fps = frameCnt / 1
+            float mspf = 1000.0f / fps;
+
+            auto title = std::format("{}    FPS: {}    Frame Time: {} (ms)", originTitle, fps, mspf);
+            window.SetTitle(title);
+
+            // Reset for next average.
+            frameCnt = 0;
+            timeElapsed += 1.0f;
+        }
+    }
+
     bool IGameApp::IsDown()
     {
         return false;
@@ -53,7 +77,7 @@ namespace DSM::GameCore{
         IGameApp& app,
         std::uint32_t width,
         std::uint32_t height,
-        const wchar_t* className,
+        const char* className,
         HINSTANCE hInstance,
         int nShowCmd)
     {
@@ -74,7 +98,10 @@ namespace DSM::GameCore{
         
         InitializeApplication(app, win);
 
+        g_Timer.Reset();
         while (win.Loop()) {
+            g_Timer.Tick();
+            CalculateFrameStates(win);
             UpdateApplication(app);
         }
 

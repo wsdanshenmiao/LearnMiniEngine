@@ -65,6 +65,8 @@ public:
     }
     virtual void Update(float deltaTime) override
     {
+        deltaTime = 1.f / 60;
+
         ImguiManager::GetInstance().Update(deltaTime);
 
         m_CameraController->Update(deltaTime);

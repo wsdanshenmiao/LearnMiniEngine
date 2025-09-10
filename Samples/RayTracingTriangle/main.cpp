@@ -79,7 +79,6 @@ public:
     {
         auto& swapChain = renderContext.GetSwapChain();
 
-
         GraphicsCommandList cmdList{ L"Render Scene" };
 
         auto& computeCmdList = cmdList.GetComputeCommandList();
@@ -137,5 +136,5 @@ int WinMain(
     _In_ int nShowCmd)
 {
     RayTracing sandbox{};
-    return GameCore::RunApplication(sandbox, 1024, 768, L"DSMEngine", hInstance, nShowCmd);
+    return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
 }

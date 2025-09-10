@@ -19,7 +19,6 @@ namespace DSM {
 		Math::Vector3 cubeAlbedo;
 		Math::Vector3 lightDir;
 		Math::Vector3 lightColor;
-		int cubeGloss = 90;
 	};
 }
 

@@ -13,7 +13,7 @@ namespace DSM {
         std::uint32_t m_Height{};
         bool m_Maximized = false;
         HINSTANCE m_HInstance;
-        std::wstring m_Title{};
+        std::string m_Title{};
     };
 
     
@@ -44,8 +44,11 @@ namespace DSM {
             return static_cast<std::uint32_t>(rect.bottom - rect.top);
         }
         HWND GetHandle() const noexcept { return m_WindowHandle; }
+        const std::string& GetTitle() const noexcept { return m_Desc.m_Title; }
+        void SetTitle(const std::string& title);
 
     private:
+        WindowDesc m_Desc{};
         HWND m_WindowHandle = nullptr;
     };
 

@@ -33,7 +33,7 @@ namespace DSM::GameCore {
         IGameApp& app,
         std::uint32_t width,
         std::uint32_t height,
-        const wchar_t* className,
+        const char* className,
         HINSTANCE hInstance,
         int nShowCmd);
 }

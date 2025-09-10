@@ -19,8 +19,8 @@ struct SceneConstantBuffer
     float4 cameraPosAndFocusDist;
     float4 viewportU;
     float4 viewportV;
+    float4 lightDir;
     float4 lightColor;
-    float4 lightDirAndGloss;
 };
 
 #endif
