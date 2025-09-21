@@ -7,9 +7,8 @@
 #include "Renderer.h"
 #include "Graphics/CommandList/CommandList.h"
 #include "Graphics/GraphicsCommon.h"
+#include "Math/Vector.h"
 #include <filesystem>
-
-#include "ConstantData.h"
 
 using namespace DirectX;
 
@@ -43,9 +42,9 @@ namespace DSM {
 		}
 
 		auto model = std::make_shared<Model>();
-		model->m_Name = name;
-		model->m_Materials.emplace_back(std::make_shared<Material>());
-		auto& mesh = model->m_Meshes.emplace_back(std::make_shared<Mesh>());
+		model->name = name;
+		model->materials.emplace_back(std::make_shared<Material>());
+		auto& mesh = model->meshes.emplace_back(std::make_shared<Mesh>());
 		mesh->m_Name = name;
 
 		MeshData meshData{};
@@ -63,8 +62,29 @@ namespace DSM {
 		}
 
 		CreateMesh(*mesh, {&meshData, 1});
+		GpuBufferDesc meshDataDesc{};
+		meshDataDesc.m_Size = Math::AlignUp(sizeof(Material), size_t(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+		meshDataDesc.m_Stride = meshDataDesc.m_Size;
+		model->materialData.Create(L"MaterialData", meshDataDesc, model->materials[0].get());
 
-		model->m_BoundingBox = mesh->m_BoundingBox;
+		D3D12_CPU_DESCRIPTOR_HANDLE defaultTexture[kNumTextures] = {
+			Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+			Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+			Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+			Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
+			Graphics::GetDefaultTexture(Graphics::kBlackTransparent2D),
+			Graphics::GetDefaultTexture(Graphics::kDefaultNormalTex)
+		};
+		DescriptorHandle texHandle = g_Renderer.m_TextureHeap.Allocate(kNumTextures);
+
+		std::uint32_t destCount = kNumTextures;
+		std::uint32_t srcCount[kNumTextures] = {1,1,1,1,1,1};
+		g_RenderContext.GetDevice()->CopyDescriptors(
+			1, &texHandle, &destCount, destCount, defaultTexture, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		model->meshes[0]->m_SubMeshes[name].m_SRVTableOffset = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
+
+		model->boundingBox = mesh->m_BoundingBox;
 		
 		return model;
 	}
@@ -93,10 +113,10 @@ namespace DSM {
 		ProcessNode(*model, pScene->mRootNode, pScene);
 		ProcessMaterial(*model, filename, pScene);
 
-		model->m_BoundingBox = BoundingBox{{0,0,0}, {0,0,0}};
-		model->m_Name = pScene->mRootNode->mName.C_Str();
-		for (const auto& mesh : model->m_Meshes) {
-			BoundingBox::CreateMerged(model->m_BoundingBox, model->m_BoundingBox, mesh->m_BoundingBox);
+		model->boundingBox = BoundingBox{{0,0,0}, {0,0,0}};
+		model->name = pScene->mRootNode->mName.C_Str();
+		for (const auto& mesh : model->meshes) {
+			BoundingBox::CreateMerged(model->boundingBox, model->boundingBox, mesh->m_BoundingBox);
 		}
 
 		return model;
@@ -115,7 +135,7 @@ namespace DSM {
 
 		if (!meshDatas.empty()) {
 			CreateMesh(*mesh, meshDatas);
-			model.m_Meshes.push_back(std::move(mesh));
+			model.meshes.push_back(std::move(mesh));
 		}
 
 		// 导入子节点的网格
@@ -196,7 +216,9 @@ namespace DSM {
 			auto indexCount = meshData.m_Indices.size();
 			Mesh::SubMesh submesh;
 			submesh.m_MaterialIndex = meshData.m_MaterialIndex;
+			submesh.m_IndexCount = indexCount;
 			submesh.m_IndexOffset = preIndexCount;
+			submesh.m_VertexCount = meshData.m_Positions.size();
 			submesh.m_VertexOffset = preVertexCount;
 			mesh.m_SubMeshes.insert(std::make_pair(meshData.m_Name, std::move(submesh)));
 			
@@ -263,9 +285,9 @@ namespace DSM {
 	{
 		std::vector<std::uint32_t> srvOffsets(scene->mNumMaterials);
 		
-		model.m_Materials.resize(scene->mNumMaterials);
+		model.materials.resize(scene->mNumMaterials);
 		for (UINT i = 0; i < scene->mNumMaterials; ++i) {
-			auto& modelMaterial = model.m_Materials[i];
+			auto& modelMaterial = model.materials[i];
 			auto& material = scene->mMaterials[i];
 
 			modelMaterial = std::make_shared<Material>();
@@ -275,21 +297,16 @@ namespace DSM {
 			float value{};
 
 			if (aiReturn_SUCCESS == material->Get(AI_MATKEY_BASE_COLOR, (float*)&vector, &num)) {
-				modelMaterial->m_BaseColor[0] = vector.x;
-				modelMaterial->m_BaseColor[1] = vector.y;
-				modelMaterial->m_BaseColor[2] = vector.z;
-				modelMaterial->m_BaseColor[3] = 1.0f;
+				modelMaterial->baseColor = Math::Vector4{Math::Vector3{vector}, 1.0f};
 			}
 			if (aiReturn_SUCCESS == material->Get(AI_MATKEY_COLOR_EMISSIVE, (float*)&vector, &num)) {
-				modelMaterial->m_EmissiveColor[0] = vector.x;
-				modelMaterial->m_EmissiveColor[1] = vector.y;
-				modelMaterial->m_EmissiveColor[2] = vector.z;
+				modelMaterial->emissiveColor = Math::Vector4{vector};
 			}
 			if (aiReturn_SUCCESS == material->Get(AI_MATKEY_METALLIC_FACTOR, value)) {
-				modelMaterial->m_MetallicFactor = value;
+				modelMaterial->metallicFactor = value;
 			}
 			if (aiReturn_SUCCESS == material->Get(AI_MATKEY_ROUGHNESS_FACTOR, value)) {
-				modelMaterial->m_RoughnessFactor = value;
+				modelMaterial->roughnessFactor = value;
 			}
 
 			aiString aiPath;
@@ -339,7 +356,7 @@ namespace DSM {
 					texDesc.m_MipLevels = 1;
 					texDesc.m_SampleDesc = {1,0};
 					texDesc.m_DepthOrArraySize = 1;
-					TextureRef& texRef = model.m_Textures.emplace_back(
+					TextureRef& texRef = model.textures.emplace_back(
 						g_TexManager.LoadTextureFromMemory(texName, texDesc, pTex->pcData));
 					srcHandle[materialTex] = texRef.GetSRV();
 				}
@@ -347,7 +364,7 @@ namespace DSM {
 					texFilename = filename;
 					texFilename = texFilename.parent_path() / aiPath.C_Str();
 					auto texRef = g_TexManager.LoadTextureFromFile(texFilename.string());
-					model.m_Textures.push_back(texRef);
+					model.textures.push_back(texRef);
 					srcHandle[materialTex] = texRef.GetSRV();
 				}
 			};
@@ -370,7 +387,7 @@ namespace DSM {
 			srvOffsets[i] = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
 		}
 
-		for (auto& mesh : model.m_Meshes) {
+		for (auto& mesh : model.meshes) {
 			int psoFlags = 0;
 			std::uint32_t num = 1;
 			for (auto& [name, submesh] : mesh->m_SubMeshes) {
@@ -380,19 +397,18 @@ namespace DSM {
 					mesh->m_PSOFlags |= (psoFlags == 0) ? mesh->m_PSOFlags : kBothSide;
 				}
 			}
-			mesh->m_PSOIndex = g_Renderer.GetPSO(mesh->m_PSOFlags);
 		}
 
-		std::vector<MaterialConstants> materialConstants(model.m_Materials.size());
-		for (std::size_t i = 0; i < model.m_Materials.size(); i++) {
-			memcpy(&materialConstants[i], model.m_Materials[i].get(), sizeof(MaterialConstants));
+		std::vector<Material> materialConstants(model.materials.size());
+		for (std::size_t i = 0; i < model.materials.size(); i++) {
+			memcpy(&materialConstants[i], model.materials[i].get(), sizeof(Material));
 		}
 		GpuBufferDesc bufferDesc = {};
-		bufferDesc.m_Size = sizeof(MaterialConstants) * materialConstants.size();
-		bufferDesc.m_Stride = sizeof(MaterialConstants);
+		bufferDesc.m_Size = sizeof(Material) * materialConstants.size();
+		bufferDesc.m_Stride = sizeof(Material);
 		bufferDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
-		auto matBufferName = L"Model MaterialData" + Utility::UTF8ToWString(model.m_Name);
-		model.m_MaterialData.Create(matBufferName, bufferDesc, materialConstants.data());
+		auto matBufferName = L"Model MaterialData" + Utility::UTF8ToWString(model.name);
+		model.materialData.Create(matBufferName, bufferDesc, materialConstants.data());
 	}
 	
 }

@@ -22,7 +22,9 @@ StructuredBuffer<uint3> gIndexBuffer : register(t2);
 // 输出图像
 RWTexture2D<float4> gOutput : register(u0);
 
+// 全局常量缓冲区
 ConstantBuffer<SceneConstantBuffer> gSceneCB : register(b0);
+// 局部常量缓冲区
 ConstantBuffer<CubeConstantBuffer> gCubeCB : register(b1);
 
 

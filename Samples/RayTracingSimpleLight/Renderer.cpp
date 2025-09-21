@@ -12,6 +12,7 @@ namespace DSM {
     {
         if(m_Initialized) return;
         
+        //auto mesh = Geometry::GeometryGenerator::CreateSphere(3, 30, 30);
         auto mesh = Geometry::GeometryGenerator::CreateBox(3, 3, 3, 0);
 
         GpuBufferDesc vertexBufferDesc{};
@@ -146,7 +147,7 @@ namespace DSM {
         D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociation{};
         localRootSigAssociation.pSubobjectToAssociate = &localSubobject;
         localRootSigAssociation.NumExports = 1;
-        localRootSigAssociation.pExports = &s_HitGroupName;
+        localRootSigAssociation.pExports = &s_HitGroupName; // Hit Group 的导出名
         D3D12_STATE_SUBOBJECT localRootSigAssociationSubobject{};
         localRootSigAssociationSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
         localRootSigAssociationSubobject.pDesc = &localRootSigAssociation;
@@ -286,7 +287,7 @@ namespace DSM {
         m_MissShaderTable.Create(L"MissShaderTable", missShaderTableDesc, missShaderIdentifier);
         // Hit 着色器表
         GpuBufferDesc hitShaderTableDesc = rayGenShaderTableDesc;
-        auto size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + sizeof(CubeConstantBuffer);
+        auto size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + Math::AlignUp(sizeof(CubeConstantBuffer), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
         hitShaderTableDesc.m_Size = Math::AlignUp(size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
         hitShaderTableDesc.m_Stride = hitShaderTableDesc.m_Size;
         std::vector<uint8_t> hitShaderTableData(hitShaderTableDesc.m_Size);

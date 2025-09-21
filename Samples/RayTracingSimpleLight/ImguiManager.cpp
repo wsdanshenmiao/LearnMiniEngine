@@ -19,7 +19,7 @@ namespace DSM {
 			ImGui::ColorEdit3("Light Color", lightCol);
 			ImGui::Text("Light Direction: %.2f, %.2f, %.2f", _lightDir[0], _lightDir[1], _lightDir[2]);
 			ImGui::SliderFloat3("##0", _lightDir, -1, 1, "");
-			ImGui::Text("Roughness: %d", gloss);
+			ImGui::Text("Gloss: %d", gloss);
 			ImGui::SliderInt("##1", &gloss, 0, 255, "");
 		}
 		ImGui::End();

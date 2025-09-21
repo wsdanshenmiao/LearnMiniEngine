@@ -6,7 +6,7 @@ if is_os("windows") then
 end
 
 add_rules("mode.debug", "mode.release")
-set_languages("c99", "cxx20")
+set_languages("c99", "cxx23")
 set_toolchains("msvc")
 set_encodings("utf-8")
 set_defaultmode("debug")

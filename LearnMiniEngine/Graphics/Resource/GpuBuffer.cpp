@@ -21,7 +21,7 @@ namespace DSM{
         resourceDesc.SampleDesc = {1,0};
         GpuResourceDesc gpuResourceDesc{};
         gpuResourceDesc.m_Desc = resourceDesc;
-        gpuResourceDesc.m_State = D3D12_RESOURCE_STATE_COMMON;
+        gpuResourceDesc.m_State = bufferDesc.m_ResourceState;
         gpuResourceDesc.m_HeapType = bufferDesc.m_HeapType;
         gpuResourceDesc.m_HeapFlags = D3D12_HEAP_FLAG_NONE;
 

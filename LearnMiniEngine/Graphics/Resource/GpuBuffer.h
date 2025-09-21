@@ -13,6 +13,7 @@ namespace DSM {
         std::uint64_t m_Size = 0;
         std::uint32_t m_Stride = 0;
         D3D12_HEAP_TYPE m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        D3D12_RESOURCE_STATES m_ResourceState = D3D12_RESOURCE_STATE_COMMON;
         D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
     };
 
@@ -28,6 +29,8 @@ namespace DSM {
             Create(name, bufferDesc, initData);
         }
         ~GpuBuffer() = default;
+        GpuBuffer(GpuBuffer&& buffer) noexcept = default;
+        GpuBuffer& operator=(GpuBuffer&& buffer) noexcept = default;
         DSM_NONCOPYABLE(GpuBuffer);
 
         void Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData = nullptr);

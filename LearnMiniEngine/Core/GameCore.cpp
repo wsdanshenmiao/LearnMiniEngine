@@ -49,7 +49,7 @@ namespace DSM::GameCore{
     // 更新引擎
     bool UpdateApplication(IGameApp& app)
     {
-        app.Update(0);
+        app.Update(g_Timer.DeltaTime());
         app.RenderScene(g_RenderContext);
         
         return !app.IsDown();

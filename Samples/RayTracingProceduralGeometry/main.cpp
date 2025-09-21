@@ -11,17 +11,17 @@
 #include "Math/Random.h"
 #include "Math/Transform.h"
 #include "Utilities/Utility.h"
-#include "ConstantData.h"
 #include "Geometry.h"
 #include "CameraController.h"
 #include "ImguiManager.h"
 #include "Renderer.h"
+#include "ModelLoader.h"
 
 using namespace DSM;
 using namespace DirectX;
 
 
-class RayTracing : public GameCore::IGameApp
+class RayTracingApp : public GameCore::IGameApp
 {
 public:
 
@@ -49,9 +49,16 @@ public:
         m_Camera->SetPosition({ 5, 5, -5 });
         m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
+        m_RayTracer.SetCamera(m_Camera.get());
+
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
         m_CameraController->SetMoveSpeed(2);
+
+        auto sponza = LoadModel("Models/Sponza/sponza.gltf");
+        auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
+        //m_RayTracer.AddModel(sponza);
+        m_RayTracer.AddModel(box);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {
@@ -78,9 +85,7 @@ public:
 
         GraphicsCommandList cmdList{ L"Render Scene" };
 
-        RayTracer rayTracer{};
-        rayTracer.SetCamera(m_Camera.get());
-        rayTracer.TraceRays(cmdList.GetComputeCommandList());
+        m_RayTracer.TraceRays(cmdList.GetComputeCommandList());
 
         auto rect = RECT{0, 0, static_cast<long>(swapChain.GetWidth()), static_cast<long>(swapChain.GetHeight())};
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
@@ -93,7 +98,7 @@ public:
 
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
         cmdList.ExecuteCommandList();
-
+        ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->GetDeviceRemovedReason());
         swapChain.Present();
     }
     virtual void Cleanup() override
@@ -107,6 +112,8 @@ private:
     std::unique_ptr<Camera> m_Camera{};
     std::unique_ptr<CameraController> m_CameraController{};
     D3D12_RECT m_Scissor{};
+
+    RayTracer m_RayTracer{};
 };
 
 int WinMain(
@@ -115,6 +122,6 @@ int WinMain(
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    RayTracing sandbox{};
+    RayTracingApp sandbox{};
     return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
 }
