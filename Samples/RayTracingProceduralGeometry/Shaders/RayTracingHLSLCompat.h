@@ -8,7 +8,20 @@ using float3x3 = DSM::Math::Matrix3;
 using float4x4 = DSM::Math::Matrix4;
 using uint = uint32_t;
 #endif
+struct CubeConstantBuffer
+{
+    float4 albedo;
+};
 
+struct SceneConstantBuffer
+{
+    // 生成光线使用的数据
+    float4 cameraPosAndFocusDist;
+    float4 viewportU;
+    float4 viewportV;
+    float4 lightColor;
+    float4 lightDirAndGloss;
+};
 namespace RayTracing {
     struct RayPayload
     {

@@ -56,9 +56,9 @@ public:
         m_CameraController->SetMoveSpeed(2);
 
         auto sponza = LoadModel("Models/Sponza/sponza.gltf");
-        auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
-        //m_RayTracer.AddModel(sponza);
-        m_RayTracer.AddModel(box);
+        // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
+        m_RayTracer.AddModel(sponza);
+        // m_RayTracer.AddModel(box);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {

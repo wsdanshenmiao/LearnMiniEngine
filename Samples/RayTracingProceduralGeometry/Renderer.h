@@ -9,62 +9,17 @@
 #include "Graphics/RootSignature.h"
 #include "Graphics/PipelineState.h"
 #include "Graphics/ShaderCompiler.h"
-#include "Graphics/CommandList/ComputeCommandList.h"
 #include "Core/Camera.h"
 #include "Shaders/RayTracingHLSLCompat.h"
 
 
 namespace DSM {
+    class GraphicsCommandList;
+    class ComputeCommandList;
+    struct Mesh;
     struct Model;
 
-    namespace GeometryType {
-        enum Enum {
-            Triangle = 0,
-            Count
-        };
-    }
 
-    // 根签名的布局
-    namespace GlobalRootSignature {
-        enum Slot {
-            RayTracingOutput = 0,
-            AccelerationStructure,
-            SceneConstantBuffer,
-            Count
-        };
-    }
-
-    namespace LocalRootSignature {
-        namespace Type {
-            enum Enum {
-                Triangle = 0,
-                Count
-            };
-        }
-
-        namespace Triangle {
-            enum Slot {
-                Material = 0,
-                IndexBuffer,
-                NormalBuffer,
-                UVBuffer,
-                Textures,
-                Count
-            };
-            struct RootArguments {
-                RayTracing::Material material;
-                D3D12_GPU_VIRTUAL_ADDRESS indexBuffer;
-                D3D12_GPU_VIRTUAL_ADDRESS normalBuffer;
-                D3D12_GPU_VIRTUAL_ADDRESS uvBuffer;
-                D3D12_GPU_DESCRIPTOR_HANDLE textures;   // 6 个 PBR 纹理
-            };
-        };
-
-        inline uint32_t MaxRootArgumentsSize()
-        {
-            return sizeof(Triangle::RootArguments);
-        }
-    }
 
     struct AccelerationStructureBuffers
     {
@@ -74,10 +29,18 @@ namespace DSM {
         uint64_t resultDataMaxSizeInBytes;
     };
 
-
+    
     class Renderer : public Singleton<Renderer>
     {
     public:
+        enum RootBindings
+        {
+            RayTracingOutput,
+            AccelerationStructure,
+            SceneConstantBuffer,
+            Count
+        };
+
         void Create();
         void Shutdown();
 
@@ -94,17 +57,9 @@ namespace DSM {
 
     public:
         inline static const wchar_t* s_RayGenShaderName = L"RaygenShader";
-        inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_MissShaderName = { 
-            L"MissShader" 
-        };
-        inline static std::array<const wchar_t*, GeometryType::Count> s_ClosestHitShaderName_Triangle = { 
-            L"ClosestHitShader_Triangle" 
-        };
-        inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_Triangle = { 
-            L"HitGroup_Triangle"
-        };
-
-        static constexpr uint32_t s_MaxRecursionDepth = 5;
+        inline static const wchar_t* s_MissShaderName = L"MissShader";
+        inline static const wchar_t* s_ClosestHitShaderName = L"ClosestHitShader";
+        inline static const wchar_t* s_HitGroupName = L"HitGroup";
 
         bool m_Initialized = false;
 
@@ -139,17 +94,16 @@ namespace DSM {
 
         std::vector<std::shared_ptr<Model>> m_Models;
 
-        std::vector<AccelerationStructureBuffers> m_BottomLevelASs;
-        AccelerationStructureBuffers m_TopLevelAS;
+        // 加速结构
+        std::vector<AccelerationStructureBuffers> m_BottomLevelASs{};
+        AccelerationStructureBuffers m_TopLevelAS{};
 
-        // 所有的 Shader Table
-        GpuBuffer m_RayGenShaderTable;
-        GpuBuffer m_HitGroupShaderTable;
-        GpuBuffer m_MissShaderTable;
-
-        GpuBuffer m_IndexBuffer{};
-        GpuBuffer m_VertexBuffer{};
+        // 着色器表
+        GpuBuffer m_RayGenShaderTable{};
+        GpuBuffer m_MissShaderTable{};
+        GpuBuffer m_HitShaderTable{};
     };
+
 
 } // namespace DSM 
 
