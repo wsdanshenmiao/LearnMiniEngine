@@ -46,17 +46,20 @@ public:
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
         // m_Camera->SetPosition({ 100, 100, -100 });
-        m_Camera->SetPosition({ 5, 5, -5 });
-        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
+        // m_Camera->SetPosition({ 10, 10, -10 });
+        // m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
         m_RayTracer.SetCamera(m_Camera.get());
 
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
-        m_CameraController->SetMoveSpeed(2);
+        m_CameraController->SetMoveSpeed(1);
 
-        auto sponza = LoadModel("Models/Sponza/sponza.gltf");
+        auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
+        auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
+
+        m_RayTracer.AddModel(lihuazou);
         m_RayTracer.AddModel(sponza);
         // m_RayTracer.AddModel(box);
     }
@@ -81,13 +84,15 @@ public:
     virtual void RenderScene(RenderContext& renderContext) override
     {
         auto& swapChain = renderContext.GetSwapChain();
-
+        uint32_t width = swapChain.GetWidth();
+        uint32_t height = swapChain.GetHeight();
 
         GraphicsCommandList cmdList{ L"Render Scene" };
 
         m_RayTracer.TraceRays(cmdList.GetComputeCommandList());
 
-        auto rect = RECT{0, 0, static_cast<long>(swapChain.GetWidth()), static_cast<long>(swapChain.GetHeight())};
+        assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
+        auto rect = RECT{0, 0, static_cast<long>(width), static_cast<long>(height)};
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET);
         cmdList.TransitionResource(g_Renderer.m_RayTracingOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -122,6 +127,13 @@ int WinMain(
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    RayTracingApp sandbox{};
-    return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
+    try {
+        RayTracingApp sandbox{};
+        return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
+    }
+    catch(const std::exception& e) {
+        std::cerr << e.what() << '\n';
+        return -1;
+    }
+    return 0;
 }

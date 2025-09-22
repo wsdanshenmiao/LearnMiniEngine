@@ -20,6 +20,61 @@ namespace DSM {
     struct Model;
 
 
+    namespace GeometryType {
+        enum Enum {
+            Triangle = 0,
+            Count
+        };
+    }
+
+    // 根签名的布局
+    namespace GlobalRootSignature {
+        enum Slot {
+            RayTracingOutput = 0,
+            AccelerationStructure,
+            SceneConstantBuffer,
+            Count
+        };
+
+        namespace StaticSampler {
+            enum Slot {
+                AnisoWrap = 0,
+                Count
+            };
+        }
+    }
+
+    namespace LocalRootSignature {
+        namespace Type {
+            enum Enum {
+                Triangle = 0,
+                Count
+            };
+        }
+
+        namespace Triangle {
+            enum Slot {
+                // Material = 0,
+                IndexBuffer,
+                NormalBuffer,
+                UVBuffer,
+                Textures,
+                Count
+            };
+            struct RootArguments {
+                // RayTracing::Material material;
+                D3D12_GPU_VIRTUAL_ADDRESS indexBuffer;
+                D3D12_GPU_VIRTUAL_ADDRESS normalBuffer;
+                D3D12_GPU_VIRTUAL_ADDRESS uvBuffer;
+                D3D12_GPU_DESCRIPTOR_HANDLE textures;   // 6 个 PBR 纹理
+            };
+        };
+
+        inline uint32_t MaxRootArgumentsSize()
+        {
+            return sizeof(Triangle::RootArguments);
+        }
+    }
 
     struct AccelerationStructureBuffers
     {
@@ -33,14 +88,6 @@ namespace DSM {
     class Renderer : public Singleton<Renderer>
     {
     public:
-        enum RootBindings
-        {
-            RayTracingOutput,
-            AccelerationStructure,
-            SceneConstantBuffer,
-            Count
-        };
-
         void Create();
         void Shutdown();
 

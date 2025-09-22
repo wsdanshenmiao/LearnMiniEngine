@@ -107,7 +107,7 @@ namespace DSM::Graphics {
         SamplerPointBorder.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 
         SamplerAnisoWrap = samplerDesc;
-        SamplerAnisoWrap.MaxAnisotropy = 4;
+        SamplerAnisoWrap.MaxAnisotropy = 16;
 
         SamplerShadow = samplerDesc;
         SamplerShadow.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;

@@ -231,7 +231,7 @@ namespace DSM {
 			mesh.m_PSOFlags &= meshData.m_PSOFlags;
 			positions.insert(positions.end(), meshData.m_Positions.begin(), meshData.m_Positions.end());
 			normals.insert(normals.end(), meshData.m_Normals.begin(), meshData.m_Normals.end());
-			uvs.insert(uvs.begin(), meshData.m_Texcoords.begin(), meshData.m_Texcoords.end());
+			uvs.insert(uvs.end(), meshData.m_Texcoords.begin(), meshData.m_Texcoords.end());
 			tangents.insert(tangents.end(), meshData.m_Tangents.begin(), meshData.m_Tangents.end());
 			indices.insert(indices.end(), meshData.m_Indices.begin(), meshData.m_Indices.end());
 
@@ -327,6 +327,7 @@ namespace DSM {
 			auto tryCreateTexture = [&](aiTextureType type) {
 				MaterialTex materialTex;
 				switch (type) {
+					case aiTextureType_DIFFUSE:
 					case aiTextureType_BASE_COLOR: materialTex = kBaseColor; break;
 					case aiTextureType_DIFFUSE_ROUGHNESS: materialTex = kDiffuseRoughness; break;
 					case aiTextureType_METALNESS: materialTex = kMetalness; break;
@@ -337,7 +338,7 @@ namespace DSM {
 				}
 				if (material->GetTextureCount(type) == 0) {
 					srcHandle[materialTex] = defaultTexture[materialTex];
-					return;
+					return false;
 				}
 				
 				material->GetTexture(type, 0, &aiPath);
@@ -367,9 +368,12 @@ namespace DSM {
 					model.textures.push_back(texRef);
 					srcHandle[materialTex] = texRef.GetSRV();
 				}
+				return true;
 			};
 			// 加载纹理
-			tryCreateTexture(aiTextureType_BASE_COLOR);
+			if (!tryCreateTexture(aiTextureType_BASE_COLOR)) {
+				tryCreateTexture(aiTextureType_DIFFUSE);
+			}
 			tryCreateTexture(aiTextureType_DIFFUSE_ROUGHNESS);
 			tryCreateTexture(aiTextureType_METALNESS);
 			tryCreateTexture(aiTextureType_AMBIENT_OCCLUSION);
