@@ -1,5 +1,6 @@
 #include "RayTracingHLSLCompat.h"
-
+#include "Common.hlsli"
+#include "Light.hlsli"
 
 // Global
 // 输出图像
@@ -7,11 +8,10 @@ RWTexture2D<float4> gOutput : register(u0);
 // 场景中的几何数据
 RaytracingAccelerationStructure gScene : register(t0);
 ConstantBuffer<RayTracing::SceneConstantBuffer> gSceneCB : register(b0);
-SamplerState gAnisoWrapSampler : register(s0);
 
 
 // Local
-ConstantBuffer<RayTracing::Material> lMaterialCB : register(b1);
+ConstantBuffer<MaterialConstantBuffer> lMaterialCB : register(b1);
 
 StructuredBuffer<uint3> lIndexBuffer : register(t1);
 StructuredBuffer<float3> lNormalBuffer : register(t2);
@@ -19,7 +19,7 @@ StructuredBuffer<float2> lUVBuffer : register(t3);
 
 Texture2D<float4> lBaseColorTex : register(t4);
 Texture2D<float4> lDiffuseRoughnessTex : register(t5);
-Texture2D<float> lMetalnessTex : register(t6);
+Texture2D<float4> lMetalnessTex : register(t6);
 Texture2D<float> lOcclusionTex : register(t7);
 Texture2D<float3> lEmissiveTex : register(t8);
 Texture2D<float3> lNormalTex : register(t9);
@@ -82,22 +82,36 @@ void ClosestHitShader(inout RayTracing::RayPayload payload, in BuiltInTriangleIn
             lUVBuffer[indices[2]].xyy};
     float3 normal = normalize(GetHitAttributes(normals, attrs.barycentrics));
     float2 uv = GetHitAttributes(uvs, attrs.barycentrics).xy;
-    uv -= int2(uv);
-    uv *= sign(uv);
-    
-    float4 baseColor = lBaseColorTex.SampleLevel(gAnisoWrapSampler, uv, 0);
 
-    float3 lightDir = -normalize(gSceneCB.lightDir.xyz);
-    float3 lightColor = gSceneCB.lightColor.rgb;
-    float3 halfDir = normalize(lightDir - normalize(WorldRayDirection()));
+    float4 baseCol = lBaseColorTex.SampleLevel(gAnisoWrapSampler, uv, 0);
+    baseCol *= lMaterialCB.baseColor;
+    float roughness = lDiffuseRoughnessTex.SampleLevel(gAnisoWrapSampler, uv, 0).g;
+    float metallic = lMetalnessTex.SampleLevel(gAnisoWrapSampler, uv, 0).b;
+    float occlusion = lOcclusionTex.SampleLevel(gAnisoWrapSampler, uv, 0).r;
+    float3 emissive = lEmissiveTex.SampleLevel(gAnisoWrapSampler, uv, 0).rgb;
 
-    float3 diffuse = lightColor * max(0, dot(lightDir, normal));
-    float3 specular = lightColor * pow(max(0, dot(halfDir, normal)), 90);
-    float3 col = saturate(diffuse + specular + 0.1);
-    col *= baseColor.rgb;
+    // 感知上的粗糙度
+    float perceptualRoughness = roughness * lMaterialCB.roughnessFactor;
 
+    Surface surface;
+    surface.position = GetWorldPosition();
+    surface.depth = RayTCurrent();
+    surface.normal = normal;
+    surface.roughness = perceptualRoughness * perceptualRoughness;
+    surface.roughness = max(0.05, surface.roughness);
+    surface.color = baseCol.rgb;
+    surface.alpha = baseCol.a;
+    surface.viewDir = normalize(gSceneCB.cameraPosAndFocusDist.xyz - surface.position);
+    surface.metallic = metallic * lMaterialCB.metallicFactor;
+
+    float3 color = ShadeLighting(surface);
+    color *= occlusion;
+    color += emissive * lMaterialCB.emissiveColor.rgb;
+    //color += 0.05 * surface.color;
+
+    color = LinearToSRGB(color);
     // 获取重心坐标
-    payload.color = float4(col, baseColor.a);
+    payload.color = float4(color, surface.alpha);
 }
 
 [shader("miss")]

@@ -28,14 +28,14 @@ public:
     virtual void Startup()override
     {
         g_Renderer.Create();
+        
+		auto& swapChain = g_RenderContext.GetSwapChain();
 
 		ASSERT(ImguiManager::GetInstance().InitImGui(
 			g_RenderContext.GetDevice(),
 			g_RenderContext.GetSwapChain().GetWindowHandle(),
 			2,
-			g_RenderContext.GetSwapChain().GetBackBuffer()->GetFormat()));
-        
-		auto& swapChain = g_RenderContext.GetSwapChain();
+			swapChain.GetBackBufferFormat()));
 
         uint64_t width = swapChain.GetWidth();
         uint32_t height = swapChain.GetHeight();
@@ -46,10 +46,11 @@ public:
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
         // m_Camera->SetPosition({ 100, 100, -100 });
-        // m_Camera->SetPosition({ 10, 10, -10 });
-        // m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
+        m_Camera->SetPosition({ -2, 10, 1 });
+        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
-        m_RayTracer.SetCamera(m_Camera.get());
+        m_RayTracer = std::make_unique<RayTracer>();
+        m_RayTracer->SetCamera(m_Camera.get());
 
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
@@ -59,8 +60,8 @@ public:
         auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
 
-        m_RayTracer.AddModel(lihuazou);
-        m_RayTracer.AddModel(sponza);
+        m_RayTracer->AddModel(lihuazou);
+        m_RayTracer->AddModel(sponza);
         // m_RayTracer.AddModel(box);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
@@ -89,7 +90,7 @@ public:
 
         GraphicsCommandList cmdList{ L"Render Scene" };
 
-        m_RayTracer.TraceRays(cmdList.GetComputeCommandList());
+        m_RayTracer->TraceRays(cmdList.GetComputeCommandList());
 
         assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
         auto rect = RECT{0, 0, static_cast<long>(width), static_cast<long>(height)};
@@ -118,7 +119,7 @@ private:
     std::unique_ptr<CameraController> m_CameraController{};
     D3D12_RECT m_Scissor{};
 
-    RayTracer m_RayTracer{};
+    std::unique_ptr<RayTracer> m_RayTracer{};
 };
 
 int WinMain(

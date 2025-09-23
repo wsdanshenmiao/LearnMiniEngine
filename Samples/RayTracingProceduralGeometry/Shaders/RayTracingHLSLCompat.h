@@ -9,6 +9,29 @@ using float4x4 = DSM::Math::Matrix4;
 using uint = uint32_t;
 #endif
 
+
+
+struct MaterialConstantBuffer
+{
+    float4 baseColor;
+    float4 emissiveColor;
+    float normalTexScale;
+    float metallicFactor;
+    float roughnessFactor;
+    float pad;
+};
+
+struct DirectionalLightData
+{
+    float4 color;
+    float4 direction;
+};
+
+struct LightData
+{
+    uint dirLightCount;
+};
+
 namespace RayTracing {
     struct RayPayload
     {
@@ -28,18 +51,6 @@ namespace RayTracing {
         float4 cameraPosAndFocusDist;
         float4 viewportU;
         float4 viewportV;
-        float4 lightDir;
-        float4 lightColor;
-    };
-
-    struct Material
-    {
-        float4 baseColor;
-        float4 emissiveColor;
-        float normalTexScale;
-        float metallicFactor;
-        float roughnessFactor;
-        float pad;
     };
 
     struct InstanceConstantBuffer
@@ -70,6 +81,7 @@ namespace RayTracing {
             };
         }
     }
+
 }
 
 

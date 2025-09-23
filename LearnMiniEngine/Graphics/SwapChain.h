@@ -30,6 +30,8 @@ namespace DSM {
         std::uint32_t GetHeight() const noexcept { return m_Height; }
         HWND GetWindowHandle() const noexcept { return m_hWnd; }
 
+        DXGI_FORMAT GetBackBufferFormat() const noexcept { return m_BackBufferFormat; }
+
         void Present(std::uint32_t sync = 0);
         void OnResize(std::uint32_t width, std::uint32_t height);
 

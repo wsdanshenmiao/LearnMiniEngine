@@ -22,15 +22,17 @@ namespace DSM {
         
         // 创建根签名
         // 给 HitGroup 设置的资源
-        // m_LocalRootSig[LocalRootSignature::Triangle::Slot::Material].InitAsConstants(1, sizeof(RayTracing::Material) / sizeof(uint32_t) + 1);
+        m_LocalRootSig[LocalRootSignature::Triangle::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
         m_LocalRootSig[LocalRootSignature::Triangle::Slot::IndexBuffer].InitAsBufferSRV(1);
         m_LocalRootSig[LocalRootSignature::Triangle::Slot::NormalBuffer].InitAsBufferSRV(2);
         m_LocalRootSig[LocalRootSignature::Triangle::Slot::UVBuffer].InitAsBufferSRV(3);
         m_LocalRootSig[LocalRootSignature::Triangle::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
         m_LocalRootSig.Finalize(L"RayTracingLocalRootSignature", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-        m_GlobalRootSig[GlobalRootSignature::Slot::RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
-        m_GlobalRootSig[GlobalRootSignature::Slot::AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
-        m_GlobalRootSig[GlobalRootSignature::Slot::SceneConstantBuffer].InitAsConstantBuffer(0);
+        m_GlobalRootSig[GlobalRootSignature::RayTracing::RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
+        m_GlobalRootSig[GlobalRootSignature::RayTracing::AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
+        m_GlobalRootSig[GlobalRootSignature::RayTracing::SceneConstantBuffer].InitAsConstantBuffer(0);
+        m_GlobalRootSig[GlobalRootSignature::Light::LightData].InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_ALL, 1);
+        m_GlobalRootSig[GlobalRootSignature::Light::DirectionalLightDatas].InitAsBufferSRV(0, D3D12_SHADER_VISIBILITY_ALL, 1);
         m_GlobalRootSig.InitStaticSampler(GlobalRootSignature::StaticSampler::AnisoWrap, Graphics::SamplerAnisoWrap);
         m_GlobalRootSig.Finalize(L"RayTracingGlobalRootSignature");
 
@@ -173,11 +175,26 @@ namespace DSM {
     Renderer::Renderer()
         :m_TextureHeap(L"Renderer::TextureHeap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096),
         m_LocalRootSig(LocalRootSignature::Triangle::Slot::Count, 0),
-        m_GlobalRootSig(GlobalRootSignature::Slot::Count, GlobalRootSignature::StaticSampler::Count) {}
+        m_GlobalRootSig(GlobalRootSignature::GlobalRootSignatureCount, GlobalRootSignature::StaticSampler::Count) {}
 
 
 
 
+
+    RayTracer::RayTracer()
+    {
+        m_DirLights.emplace_back();
+
+        GpuBufferDesc lightDataBufferDesc{};
+        lightDataBufferDesc.m_Size = Math::AlignUp(sizeof(LightData), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+        lightDataBufferDesc.m_Stride = lightDataBufferDesc.m_Size;
+        m_LightDataBuffer.Create(L"RayTracer::LightDataBuffer", lightDataBufferDesc);
+
+        GpuBufferDesc dirLightDataBufferDesc{};
+        dirLightDataBufferDesc.m_Size = sizeof(DirectionalLightData) * sm_MaxDirLightCount;
+        dirLightDataBufferDesc.m_Stride = sizeof(DirectionalLightData);
+        m_DirLightDataBuffer.Create(L"RayTracer::DirLightDataBuffer", dirLightDataBufferDesc);
+    }
     
     void RayTracer::TraceRays(ComputeCommandList &cmdList)
     {
@@ -187,6 +204,17 @@ namespace DSM {
             return;
 
         auto& imgui = ImguiManager::GetInstance();
+        m_DirLights[0].color = Math::Vector4{imgui.lightColor, 0};
+        m_DirLights[0].direction = -Math::Vector4{imgui.lightDir.Normalized(), 0};
+
+        if(!m_DirLights.empty()){
+            static uint32_t dirLightCount = 0;
+            if(dirLightCount != m_DirLights.size()){
+                LightData lightData{m_DirLights.size()};
+                cmdList.WriteBuffer(m_LightDataBuffer, 0, &lightData, sizeof(LightData));
+                cmdList.WriteBuffer(m_DirLightDataBuffer, 0, m_DirLights.data(), m_DirLights.size() * sizeof(DirectionalLightData));
+            }
+        }
 
         uint32_t width = m_Camera->GetViewPort().Width;
         uint32_t height = m_Camera->GetViewPort().Height;
@@ -202,12 +230,12 @@ namespace DSM {
         sceneCB.cameraPosAndFocusDist = Math::Vector4{m_Camera->GetPosition(), focusDist};
         sceneCB.viewportU = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth};
         sceneCB.viewportV = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight};
-        sceneCB.lightColor = Math::Vector4{imgui.lightColor, 0};
-        sceneCB.lightDir = Math::Vector4{imgui.lightDir.Normalized()};
 
-        cmdList.SetDescriptorTable(GlobalRootSignature::Slot::RayTracingOutput, g_Renderer.m_OutputUAV);
-        cmdList.SetShaderResource(GlobalRootSignature::Slot::AccelerationStructure, m_TopLevelAS.accelerationStructure);
-        cmdList.SetDynamicConstantBuffer(GlobalRootSignature::Slot::SceneConstantBuffer, sizeof(RayTracing::SceneConstantBuffer), &sceneCB);
+        cmdList.SetDescriptorTable(GlobalRootSignature::RayTracing::RayTracingOutput, g_Renderer.m_OutputUAV);
+        cmdList.SetShaderResource(GlobalRootSignature::RayTracing::AccelerationStructure, m_TopLevelAS.accelerationStructure);
+        cmdList.SetDynamicConstantBuffer(GlobalRootSignature::RayTracing::SceneConstantBuffer, sizeof(RayTracing::SceneConstantBuffer), &sceneCB);
+        cmdList.SetConstantBuffer(GlobalRootSignature::Light::LightData, m_LightDataBuffer.GetGpuVirtualAddress());
+        cmdList.SetShaderResource(GlobalRootSignature::Light::DirectionalLightDatas, m_DirLightDataBuffer);
 
         D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
         dispatchDesc.HitGroupTable.StartAddress = m_HitShaderTable->GetGPUVirtualAddress();
@@ -230,6 +258,16 @@ namespace DSM {
         m_Models.push_back(model);
         CreateAccelerationStructure();
         CreateShaderTable();
+    }
+
+    void RayTracer::AddLight(const Light &light)
+    {
+        switch (light.lightType) {
+        case LightType::Directional:
+            m_DirLights.emplace_back(light.color, -Math::Vector4{light.transform.GetForwardAxis()}); break;
+        default:
+            break;
+        }
     }
 
     void RayTracer::CreateAccelerationStructure()
@@ -390,12 +428,12 @@ namespace DSM {
                         // Fill hitGroupRecordData with shader IDs and root arguments
                         memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifier, shaderIdSize);
                         LocalRootSignature::Triangle::RootArguments rootArgs{};
-                        // auto meshMat = model->materials[submesh.m_MaterialIndex];
-                        // rootArgs.material.baseColor = meshMat->baseColor;
-                        // rootArgs.material.emissiveColor = meshMat->emissiveColor;
-                        // rootArgs.material.metallicFactor = meshMat->metallicFactor;
-                        // rootArgs.material.roughnessFactor = meshMat->roughnessFactor;
-                        // rootArgs.material.normalTexScale = meshMat->normalTexScale;
+                         auto meshMat = model->materials[submesh.m_MaterialIndex];
+                         rootArgs.material.baseColor = meshMat->baseColor;
+                         rootArgs.material.emissiveColor = meshMat->emissiveColor;
+                         rootArgs.material.metallicFactor = meshMat->metallicFactor;
+                         rootArgs.material.roughnessFactor = meshMat->roughnessFactor;
+                         rootArgs.material.normalTexScale = meshMat->normalTexScale;
                         rootArgs.indexBuffer = mesh->m_IndexBufferViews.BufferLocation + submesh.m_IndexOffset * sizeof(uint32_t);
                         rootArgs.normalBuffer = mesh->m_NormalStream.BufferLocation + 
                             submesh.m_VertexOffset * mesh->m_NormalStream.StrideInBytes;

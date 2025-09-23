@@ -11,6 +11,7 @@
 #include "Graphics/ShaderCompiler.h"
 #include "Core/Camera.h"
 #include "Shaders/RayTracingHLSLCompat.h"
+#include "Light.h"
 
 
 namespace DSM {
@@ -29,12 +30,24 @@ namespace DSM {
 
     // 根签名的布局
     namespace GlobalRootSignature {
-        enum Slot {
-            RayTracingOutput = 0,
-            AccelerationStructure,
-            SceneConstantBuffer,
-            Count
-        };
+        namespace RayTracing{
+            enum Slot {
+                RayTracingOutput = 0,
+                AccelerationStructure,
+                SceneConstantBuffer,
+                Count
+            };
+        }
+
+        namespace Light{
+            enum Slot {
+                LightData = RayTracing::Slot::Count,
+                DirectionalLightDatas,
+                Count
+            };
+        }
+
+        static constexpr uint32_t GlobalRootSignatureCount = Light::Slot::Count;
 
         namespace StaticSampler {
             enum Slot {
@@ -54,7 +67,7 @@ namespace DSM {
 
         namespace Triangle {
             enum Slot {
-                // Material = 0,
+                Material = 0,
                 IndexBuffer,
                 NormalBuffer,
                 UVBuffer,
@@ -62,7 +75,7 @@ namespace DSM {
                 Count
             };
             struct RootArguments {
-                // RayTracing::Material material;
+                MaterialConstantBuffer material;
                 D3D12_GPU_VIRTUAL_ADDRESS indexBuffer;
                 D3D12_GPU_VIRTUAL_ADDRESS normalBuffer;
                 D3D12_GPU_VIRTUAL_ADDRESS uvBuffer;
@@ -127,14 +140,20 @@ namespace DSM {
     class RayTracer
     {
     public:
+        RayTracer();
+
         void SetCamera(const Camera* camera) { m_Camera = camera; }
         void TraceRays(ComputeCommandList& cmdList);
 
         void AddModel(std::shared_ptr<Model> model);
+        void AddLight(const Light& light);
 
     private:
         void CreateAccelerationStructure();
         void CreateShaderTable();
+
+    public:
+        static constexpr size_t sm_MaxDirLightCount = 4;
 
     private:
         const Camera* m_Camera;
@@ -149,6 +168,12 @@ namespace DSM {
         GpuBuffer m_RayGenShaderTable{};
         GpuBuffer m_MissShaderTable{};
         GpuBuffer m_HitShaderTable{};
+
+
+        // 光照信息
+        GpuBuffer m_LightDataBuffer;
+        GpuBuffer m_DirLightDataBuffer;
+        std::vector<DirectionalLightData> m_DirLights{};
     };
 
 

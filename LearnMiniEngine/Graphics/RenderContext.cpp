@@ -131,7 +131,7 @@ namespace DSM {
         SwapChainDesc swapChainDesc = {};
         swapChainDesc.m_Width = window.GetWidth();
         swapChainDesc.m_Height = window.GetHeight();
-        swapChainDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swapChainDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         swapChainDesc.m_FullScreen = false;
         swapChainDesc.m_hWnd = window.GetHandle();
         m_SwapChain = std::make_unique<SwapChain>(swapChainDesc);
