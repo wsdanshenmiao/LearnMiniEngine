@@ -115,8 +115,8 @@ namespace DSM {
     
         // Shader config
         D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
-        shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float); // 三角形的重心坐标
-        shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float); // 光线的颜色
+        shaderConfig.MaxPayloadSizeInBytes = (std::max)(sizeof(RayTracing::RayPayload), sizeof(RayTracing::ShadowRayPayload)); // 光线的颜色
+        shaderConfig.MaxAttributeSizeInBytes = sizeof(RayTracing::ProceduralPrimitiveAttributes); // 三角形的重心坐标
 
         D3D12_STATE_SUBOBJECT shaderConfigSubobject{};
         shaderConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
@@ -156,7 +156,7 @@ namespace DSM {
 
         // Pipeline config
         D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig{};
-        pipelineConfig.MaxTraceRecursionDepth = 1;  // 最大递归深度
+        pipelineConfig.MaxTraceRecursionDepth = s_MaxTraceRecursionDepth;  // 最大递归深度
 
         D3D12_STATE_SUBOBJECT pipelineConfigSubobject{};
         pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;

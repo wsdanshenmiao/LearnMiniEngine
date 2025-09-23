@@ -25,28 +25,22 @@ Texture2D<float3> lEmissiveTex : register(t8);
 Texture2D<float3> lNormalTex : register(t9);
 
 
-RayDesc GetRay(int2 index)
+RayTracing::Ray GenerateCameraRay(int2 index, float3 cameraPos, float3 viewportU, float3 viewportV, float focusDist)
 {
     uint2 dimension = DispatchRaysDimensions().xy;
-    float3 viewportU = gSceneCB.viewportU.xyz;
-    float3 viewportV = gSceneCB.viewportV.xyz;
     float3 front = normalize(cross(viewportV, viewportU));
 
     float3 pixelDeltaU = viewportU / dimension.x;
     float3 pixelDeltaV = viewportV / dimension.y;
     
-    float3 cameraPos = gSceneCB.cameraPosAndFocusDist.xyz;
-    float focusDist = gSceneCB.cameraPosAndFocusDist.w;
     float3 startPixelCenter = cameraPos + front * focusDist - (viewportU + viewportV) * 0.5f;
     startPixelCenter += (pixelDeltaU + pixelDeltaV) * 0.5f;
 
     float3 pixelSample = startPixelCenter + index.x * pixelDeltaU + index.y * pixelDeltaV;
 
-    RayDesc ray;
-    ray.Origin = cameraPos;
-    ray.Direction = normalize(pixelSample - ray.Origin);
-    ray.TMin = 0.001f;
-    ray.TMax = 10000.0f;
+    RayTracing::Ray ray;
+    ray.origin = cameraPos;
+    ray.direction = normalize(pixelSample - ray.origin);
     return ray;
 }
 
@@ -57,15 +51,51 @@ float3 GetHitAttributes(float3 attributes[3], float2 barycentrics)
     return attribute;
 }
 
-[shader("raygeneration")]
-void RaygenShader()
+
+float4 TraceRadianceRay(RayTracing::Ray ray, uint depth)
 {
-    RayDesc ray = GetRay(DispatchRaysIndex().xy);
+    [branch]
+    if(depth >= MAX_TRACE_RECURSION_DEPTH) {
+        return 0;
+    }
+
+    RayDesc rayDesc;
+    rayDesc.Origin = ray.origin;
+    rayDesc.Direction = ray.direction;
+    rayDesc.TMin = 0.001f;
+    rayDesc.TMax = 10000.0f;
 
     RayTracing::RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
-    TraceRay(gScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
-    gOutput[DispatchRaysIndex().xy] = payload.color;
+    payload.depth = depth + 1;
+    TraceRay(gScene, 
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 
+        RayTracing::TraceRayParameters::InstanceMark, 
+        RayTracing::TraceRayParameters::HitGroup::Offset[RayTracing::RayType::Radiance], 
+        RayTracing::TraceRayParameters::HitGroup::GeometryStride, 
+        RayTracing::TraceRayParameters::MissShader::Offset[RayTracing::RayType::Radiance], 
+        rayDesc, 
+        payload);
+    
+    return payload.color;
+}
+
+
+[shader("raygeneration")]
+void RaygenShader()
+{
+    RayTracing::Ray ray = GenerateCameraRay(
+        DispatchRaysIndex().xy,
+        gSceneCB.cameraPosAndFocusDist.xyz,
+        gSceneCB.viewportU.xyz,
+        gSceneCB.viewportV.xyz,
+        gSceneCB.cameraPosAndFocusDist.w);
+
+    float4 color = TraceRadianceRay(ray, 0);
+
+    // 手动进行伽马映射
+    color.rgb = LinearToSRGB(color.rgb);
+    gOutput[DispatchRaysIndex().xy] = color;
 }
 
 [shader("closesthit")]
@@ -101,17 +131,33 @@ void ClosestHitShader(inout RayTracing::RayPayload payload, in BuiltInTriangleIn
     surface.roughness = max(0.05, surface.roughness);
     surface.color = baseCol.rgb;
     surface.alpha = baseCol.a;
-    surface.viewDir = normalize(gSceneCB.cameraPosAndFocusDist.xyz - surface.position);
+    surface.viewDir = -WorldRayDirection();
     surface.metallic = metallic * lMaterialCB.metallicFactor;
 
-    float3 color = ShadeLighting(surface);
-    color *= occlusion;
-    color += emissive * lMaterialCB.emissiveColor.rgb;
-    //color += 0.05 * surface.color;
+    // 计算光照
+    float4 color = float4(ShadeLighting(surface), surface.alpha);
+    color.rgb *= occlusion;
+    color.rgb += emissive * lMaterialCB.emissiveColor.rgb;
 
-    color = LinearToSRGB(color);
-    // 获取重心坐标
-    payload.color = float4(color, surface.alpha);
+    // 若表面很粗糙则不追踪反射光线
+    [branch]
+    if(surface.roughness <= 0.9f) {
+        // 获得反射光线
+        RayTracing::Ray reflectRay;
+        reflectRay.origin = surface.position + 0.001 * surface.normal;
+        reflectRay.direction = reflect(WorldRayDirection(), surface.normal);
+        float4 refCol = TraceRadianceRay(reflectRay, payload.depth);
+
+        // 计算反射系数
+        float3 f0 = lerp(s_DielectricSpecular, surface.color, surface.metallic);
+        float cos = max(0, dot(surface.normal, surface.viewDir));
+        float3 F = F_Schlick(f0, 1.0, cos);
+
+        refCol.rgb *= F * (1 - surface.roughness);
+        color += refCol;
+    }
+
+    payload.color = color;
 }
 
 [shader("miss")]

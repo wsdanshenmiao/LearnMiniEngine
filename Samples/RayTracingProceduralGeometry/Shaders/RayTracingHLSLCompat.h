@@ -10,6 +10,8 @@ using uint = uint32_t;
 #endif
 
 
+#define MAX_TRACE_RECURSION_DEPTH 1
+
 
 struct MaterialConstantBuffer
 {
@@ -33,9 +35,21 @@ struct LightData
 };
 
 namespace RayTracing {
+    struct Ray
+    {
+        float3 origin;
+        float3 direction;
+    };
+
     struct RayPayload
     {
         float4 color;
+        uint depth;
+    };
+
+    struct ShadowRayPayload
+    {
+        bool visible;
     };
 
     // 自定义图元的属性

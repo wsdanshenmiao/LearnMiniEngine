@@ -8,6 +8,7 @@ struct Light
 {
     float3 color;
     float3 direction;
+    float attenuation;
 };
 
 ConstantBuffer<LightData> gLightData : register(b0, space1);
@@ -25,6 +26,7 @@ Light GetDirectionalLight(uint index, Surface surface)
     Light light;
     light.color = gDirLightData[index].color.rgb;
     light.direction = normalize(gDirLightData[index].direction.xyz);
+    light.attenuation = 1;
     return light;
 }
 
@@ -43,7 +45,7 @@ float3 ShadeLighting(Surface surface, Light light)
     diffuse *= diffuseCol;
 
     float3 radians = NoL * light.color * (diffuse + specular);
-    return radians;
+    return radians * light.attenuation;
 }
 
 float3 ShadeLighting(Surface surface)

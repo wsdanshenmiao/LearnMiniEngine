@@ -121,6 +121,8 @@ namespace DSM {
         inline static const wchar_t* s_ClosestHitShaderName = L"ClosestHitShader";
         inline static const wchar_t* s_HitGroupName = L"HitGroup";
 
+        static constexpr uint32_t s_MaxTraceRecursionDepth = 3;
+
         bool m_Initialized = false;
 
         Texture m_RayTracingOutput{};
