@@ -10,7 +10,7 @@ using uint = uint32_t;
 #endif
 
 
-#define MAX_TRACE_RECURSION_DEPTH 1
+#define MAX_TRACE_RECURSION_DEPTH 3
 
 
 struct MaterialConstantBuffer
@@ -75,6 +75,7 @@ namespace RayTracing {
     // 使用的光线种类
     enum RayType{
         Radiance = 0,
+        Shadow,
         Count
     };
 
@@ -83,7 +84,8 @@ namespace RayTracing {
         static const uint InstanceMark = ~0;
         namespace HitGroup {
             static const uint Offset[RayType::Count] = {
-                0   // 用于渲染的光线
+                0,   // 用于渲染的光线
+                1    // 用于阴影的光线
             };
             static const uint GeometryStride = RayType::Count;
         }
@@ -91,10 +93,12 @@ namespace RayTracing {
         namespace MissShader {
             // Miss Shader 只需要使用索引
             static const uint Offset[RayType::Count] = {
-                0   // 用于渲染的光线
+                0,   // 用于渲染的光线
+                1    // 用于阴影的光线
             };
         }
     }
+
 
 }
 

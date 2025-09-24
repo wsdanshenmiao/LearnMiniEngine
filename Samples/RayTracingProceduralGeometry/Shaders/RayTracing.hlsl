@@ -2,13 +2,6 @@
 #include "Common.hlsli"
 #include "Light.hlsli"
 
-// Global
-// 输出图像
-RWTexture2D<float4> gOutput : register(u0);
-// 场景中的几何数据
-RaytracingAccelerationStructure gScene : register(t0);
-ConstantBuffer<RayTracing::SceneConstantBuffer> gSceneCB : register(b0);
-
 
 // Local
 ConstantBuffer<MaterialConstantBuffer> lMaterialCB : register(b1);
@@ -99,7 +92,7 @@ void RaygenShader()
 }
 
 [shader("closesthit")]
-void ClosestHitShader(inout RayTracing::RayPayload payload, in BuiltInTriangleIntersectionAttributes attrs)
+void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInTriangleIntersectionAttributes attrs)
 {
     uint3 indices = lIndexBuffer[PrimitiveIndex()];
     float3 normals[3] = {
@@ -125,7 +118,7 @@ void ClosestHitShader(inout RayTracing::RayPayload payload, in BuiltInTriangleIn
 
     Surface surface;
     surface.position = GetWorldPosition();
-    surface.depth = RayTCurrent();
+    surface.recursionDepth = payload.depth;
     surface.normal = normal;
     surface.roughness = perceptualRoughness * perceptualRoughness;
     surface.roughness = max(0.05, surface.roughness);
@@ -135,33 +128,42 @@ void ClosestHitShader(inout RayTracing::RayPayload payload, in BuiltInTriangleIn
     surface.metallic = metallic * lMaterialCB.metallicFactor;
 
     // 计算光照
-    float4 color = float4(ShadeLighting(surface), surface.alpha);
-    color.rgb *= occlusion;
-    color.rgb += emissive * lMaterialCB.emissiveColor.rgb;
+    float3 color = ShadeLighting(surface);
+    color *= occlusion;
+    color += emissive * lMaterialCB.emissiveColor.rgb;
+    color += surface.color * 0.05;
 
+    float4 refColor = float4(0,0,0,1);
     // 若表面很粗糙则不追踪反射光线
     [branch]
-    if(surface.roughness <= 0.9f) {
+    if(surface.roughness <= 0.99f) {
         // 获得反射光线
         RayTracing::Ray reflectRay;
-        reflectRay.origin = surface.position + 0.001 * surface.normal;
+        reflectRay.origin = surface.position;
         reflectRay.direction = reflect(WorldRayDirection(), surface.normal);
-        float4 refCol = TraceRadianceRay(reflectRay, payload.depth);
+        refColor = TraceRadianceRay(reflectRay, surface.recursionDepth);
 
         // 计算反射系数
         float3 f0 = lerp(s_DielectricSpecular, surface.color, surface.metallic);
-        float cos = max(0, dot(surface.normal, surface.viewDir));
+        float cos = saturate(dot(surface.normal, surface.viewDir));
         float3 F = F_Schlick(f0, 1.0, cos);
 
-        refCol.rgb *= F * (1 - surface.roughness);
-        color += refCol;
+        refColor.rgb *= F * (1 - perceptualRoughness);
     }
 
-    payload.color = color;
+    color += refColor.rgb;
+    payload.color = float4(color, surface.alpha);
 }
 
 [shader("miss")]
 void MissShader(inout RayTracing::RayPayload payload)
 {
     payload.color = float4(0.529, 0.808, 0.922, 1);
+}
+
+// 若阴影光线不与物体相交则表示可见
+[shader("miss")]
+void MissShader_Shadow(inout RayTracing::ShadowRayPayload payload)
+{
+    payload.visible = true;
 }

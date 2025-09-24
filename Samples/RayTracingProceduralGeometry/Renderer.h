@@ -117,9 +117,17 @@ namespace DSM {
 
     public:
         inline static const wchar_t* s_RayGenShaderName = L"RaygenShader";
-        inline static const wchar_t* s_MissShaderName = L"MissShader";
-        inline static const wchar_t* s_ClosestHitShaderName = L"ClosestHitShader";
-        inline static const wchar_t* s_HitGroupName = L"HitGroup";
+        inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_MissShaderName = { 
+            L"MissShader",
+            L"MissShader_Shadow"
+        };
+        inline static std::array<const wchar_t*, GeometryType::Count> s_ClosestHitShaderName = { 
+            L"ClosestHitShader_Triangle"
+        };
+        inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_Triangle = { 
+            L"HitGroup_Triangle",
+            L"HitGroup_Triangle_Shadow" 
+        };
 
         static constexpr uint32_t s_MaxTraceRecursionDepth = 3;
 

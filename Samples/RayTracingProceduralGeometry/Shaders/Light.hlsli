@@ -3,6 +3,7 @@
 
 #include "Surface.hlsli"
 #include "BRDF.hlsli"
+#include "Common.hlsli"
 
 struct Light
 {
@@ -15,6 +16,32 @@ ConstantBuffer<LightData> gLightData : register(b0, space1);
 
 StructuredBuffer<DirectionalLightData> gDirLightData : register(t0, space1);
 
+
+// 追踪阴影光线
+bool TraceShadowRay(RayDesc ray, uint depth)
+{
+    [branch]
+    if(depth >= MAX_TRACE_RECURSION_DEPTH) {
+        return false;
+    }
+
+    RayTracing::ShadowRayPayload payload;
+    payload.visible = false;
+    TraceRay(gScene, 
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES
+        | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
+        | RAY_FLAG_FORCE_OPAQUE             // ~skip any hit shaders
+        | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,
+        RayTracing::TraceRayParameters::InstanceMark, 
+        RayTracing::TraceRayParameters::HitGroup::Offset[RayTracing::RayType::Shadow], 
+        RayTracing::TraceRayParameters::HitGroup::GeometryStride, 
+        RayTracing::TraceRayParameters::MissShader::Offset[RayTracing::RayType::Shadow], 
+        ray, 
+        payload);
+
+    return payload.visible;
+}
+
 uint GetDirectionalLightCount()
 {
     return gLightData.dirLightCount;
@@ -23,10 +50,19 @@ uint GetDirectionalLightCount()
 
 Light GetDirectionalLight(uint index, Surface surface)
 {
+    DirectionalLightData lightData = gDirLightData[index];
+    // 计算阴影
+    RayDesc ray;
+    ray.Origin = surface.position;
+    ray.Direction = lightData.direction.xyz;
+    ray.TMin = 0.001f;
+    ray.TMax = 10000.0f;
+    bool visible = TraceShadowRay(ray, surface.recursionDepth);
+    //bool visible = true;
     Light light;
-    light.color = gDirLightData[index].color.rgb;
-    light.direction = normalize(gDirLightData[index].direction.xyz);
-    light.attenuation = 1;
+    light.color = lightData.color.rgb;
+    light.direction = normalize(lightData.direction.xyz);
+    light.attenuation = visible ? 1.0f : 0.0f;
     return light;
 }
 

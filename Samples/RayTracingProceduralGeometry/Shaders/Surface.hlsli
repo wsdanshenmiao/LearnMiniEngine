@@ -7,7 +7,7 @@
 struct Surface
 {
     float3 position;
-    float depth;
+    uint recursionDepth;
     float3 normal;
     float roughness;
     float3 color;

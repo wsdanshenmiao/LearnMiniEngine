@@ -70,30 +70,23 @@ namespace DSM {
         // 创建一个光线追踪管线状态对象需要又七个子对象
         // 每个子对象都需要关联到着色器
         // 1 - DXIL library
-        // 1 - Triangle hit group
+        // 2 - Triangle hit group
         // 1 - Shader config
         // 2 - Local root signature and association
         // 1 - Global root signature
         // 1 - Pipeline config
         std::vector<D3D12_STATE_SUBOBJECT> subobjects;
-        subobjects.reserve(7);
+        subobjects.reserve(8);
 
         ShaderDesc raytracingShaderDesc{};
         raytracingShaderDesc.m_Type = ShaderType::Lib;
-        raytracingShaderDesc.m_Mode = ShaderMode::SM_6_3;
+        raytracingShaderDesc.m_Mode = ShaderMode::SM_6_6;
         raytracingShaderDesc.m_FileName = "Shaders//RayTracing.hlsl";
         ShaderByteCode shaderLib{raytracingShaderDesc};
 
         // DXIL library
-        std::vector<D3D12_EXPORT_DESC> exportDescs(3);
-        exportDescs[0].Name = s_RayGenShaderName;
-        exportDescs[1].Name = s_MissShaderName;
-        exportDescs[2].Name = s_ClosestHitShaderName;
-
-        D3D12_DXIL_LIBRARY_DESC dxilLibDesc{};
+        D3D12_DXIL_LIBRARY_DESC dxilLibDesc{};  // 使用默认导出名
         dxilLibDesc.DXILLibrary = shaderLib;
-        dxilLibDesc.NumExports = static_cast<UINT>(exportDescs.size());
-        dxilLibDesc.pExports = exportDescs.data();
 
         D3D12_STATE_SUBOBJECT libSubobject{};
         libSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
@@ -101,16 +94,20 @@ namespace DSM {
         subobjects.push_back(std::move(libSubobject));
 
 
-        // Triangle hit group
-        D3D12_HIT_GROUP_DESC hitGroupDesc{};
-        hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-        hitGroupDesc.HitGroupExport = s_HitGroupName;
-        hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName;
+        // Hit group
+        // 由于需要取地址，所以需要额外保存
+        std::array<D3D12_HIT_GROUP_DESC, RayTracing::RayType::Count> hitGroupDescsTriangle{};
+        for(int i = 0; i < RayTracing::RayType::Count; ++i){
+            auto& hitGroupDesc = hitGroupDescsTriangle[i];
+            hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+            hitGroupDesc.HitGroupExport = s_HitGroupName_Triangle[i];
+            hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::Triangle];
 
-        D3D12_STATE_SUBOBJECT hitGroupSubobject{};
-        hitGroupSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-        hitGroupSubobject.pDesc = &hitGroupDesc;
-        subobjects.push_back(std::move(hitGroupSubobject));
+            D3D12_STATE_SUBOBJECT hitGroupSubobject{};
+            hitGroupSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+            hitGroupSubobject.pDesc = &hitGroupDesc;
+            subobjects.push_back(std::move(hitGroupSubobject));
+        }
     
     
         // Shader config
@@ -133,11 +130,11 @@ namespace DSM {
         localRootSigSubobject.pDesc = &localRootSig;
         auto& localSubobject = subobjects.emplace_back(std::move(localRootSigSubobject));
 
-        // 将局部根签名与 shader 相关联
+        // 将局部根签名与进行渲染的 HitGroup 相关联
         D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociation{};
         localRootSigAssociation.pSubobjectToAssociate = &localSubobject;
         localRootSigAssociation.NumExports = 1;
-        localRootSigAssociation.pExports = &s_HitGroupName; // Hit Group 的导出名
+        localRootSigAssociation.pExports = &s_HitGroupName_Triangle[RayTracing::RayType::Radiance];
         D3D12_STATE_SUBOBJECT localRootSigAssociationSubobject{};
         localRootSigAssociationSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
         localRootSigAssociationSubobject.pDesc = &localRootSigAssociation;
@@ -345,7 +342,7 @@ namespace DSM {
                     instanceDesc.AccelerationStructure = bottomLevelBuffers.accelerationStructure.GetGpuVirtualAddress();
                     DirectX::XMStoreFloat3x4(&reinterpret_cast<DirectX::XMFLOAT3X4&>(instanceDesc.Transform), model->transform.GetLocalToWorld());
                     instanceDescs.push_back(std::move(instanceDesc));
-                    instanceContributionToHitGroupIndex += bottomLevelASInputs.NumDescs;
+                    instanceContributionToHitGroupIndex += bottomLevelASInputs.NumDescs * RayTracing::RayType::Count;
                 }
             }
         }
@@ -397,26 +394,38 @@ namespace DSM {
         Microsoft::WRL::ComPtr<ID3D12StateObjectProperties> stateObjectProps{};
         ASSERT_SUCCEEDED(g_Renderer.m_RayTracingStateObject.As(&stateObjectProps));
         void* rayGenShaderIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_RayGenShaderName);
-        void* missShaderIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_MissShaderName);
-        void* hitGroupIdentifier = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName);
+        std::array<void*, RayTracing::RayType::Count> missShaderIdentifiers{};
+        for (size_t i = 0; i < RayTracing::RayType::Count; i++) {
+            missShaderIdentifiers[i] = stateObjectProps->GetShaderIdentifier(Renderer::s_MissShaderName[i]);
+        }
+        std::array<void*, RayTracing::RayType::Count> hitGroupIdentifiersTriangle{};
+        for (size_t i = 0; i < RayTracing::RayType::Count; i++) {
+            hitGroupIdentifiersTriangle[i] = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName_Triangle[i]);
+        }
 
-        const uint32_t shaderIdSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        constexpr uint32_t shaderIdSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
         // RayGeneration 着色器表
         GpuBufferDesc rayGenShaderTableDesc{};
-        rayGenShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        rayGenShaderTableDesc.m_Size = shaderIdSize;
         rayGenShaderTableDesc.m_Stride = rayGenShaderTableDesc.m_Size;
-        rayGenShaderTableDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        rayGenShaderTableDesc.m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
         m_RayGenShaderTable.Create(L"RayGenShaderTable", rayGenShaderTableDesc, rayGenShaderIdentifier);
+
         // Miss 着色器表
+        constexpr uint32_t missShaderTableSize = shaderIdSize * RayTracing::RayType::Count;
+        std::array<uint8_t, missShaderTableSize> missShaderTableData{};
+        for(int i = 0; i < RayTracing::RayType::Count; ++i){
+            memcpy(missShaderTableData.data() + i * shaderIdSize, missShaderIdentifiers[i], shaderIdSize);
+        }
         GpuBufferDesc missShaderTableDesc = rayGenShaderTableDesc;
-        missShaderTableDesc.m_Size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-        missShaderTableDesc.m_Stride = missShaderTableDesc.m_Size;
-        m_MissShaderTable.Create(L"MissShaderTable", missShaderTableDesc, missShaderIdentifier);
+        missShaderTableDesc.m_Size = missShaderTableSize;
+        missShaderTableDesc.m_Stride = shaderIdSize;
+        m_MissShaderTable.Create(L"MissShaderTable", missShaderTableDesc, missShaderTableData.data());
 
         // Hit 着色器表
-        uint32_t shaderRecordSize = shaderIdSize + LocalRootSignature::MaxRootArgumentsSize();
-        shaderRecordSize = Math::AlignUp(shaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+        uint32_t hitGroupShaderRecordSize = shaderIdSize + LocalRootSignature::MaxRootArgumentsSize();
+        hitGroupShaderRecordSize = Math::AlignUp(hitGroupShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
         std::vector<uint8_t> hitGroupShaderTableData{};
         std::vector<uint8_t> hitGroupShaderRecordData{};
         for (const auto& model : m_Models){
@@ -424,23 +433,25 @@ namespace DSM {
                 for(const auto& [name, submesh] : mesh->m_SubMeshes) {
                     for(int i = 0; i < RayTracing::RayType::Count; i++) {
                         hitGroupShaderRecordData.clear();
-                        hitGroupShaderRecordData.resize(shaderRecordSize, 0);
-                        // Fill hitGroupRecordData with shader IDs and root arguments
-                        memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifier, shaderIdSize);
-                        LocalRootSignature::Triangle::RootArguments rootArgs{};
-                         auto meshMat = model->materials[submesh.m_MaterialIndex];
-                         rootArgs.material.baseColor = meshMat->baseColor;
-                         rootArgs.material.emissiveColor = meshMat->emissiveColor;
-                         rootArgs.material.metallicFactor = meshMat->metallicFactor;
-                         rootArgs.material.roughnessFactor = meshMat->roughnessFactor;
-                         rootArgs.material.normalTexScale = meshMat->normalTexScale;
-                        rootArgs.indexBuffer = mesh->m_IndexBufferViews.BufferLocation + submesh.m_IndexOffset * sizeof(uint32_t);
-                        rootArgs.normalBuffer = mesh->m_NormalStream.BufferLocation + 
-                            submesh.m_VertexOffset * mesh->m_NormalStream.StrideInBytes;
-                        rootArgs.uvBuffer = mesh->m_UVStream.BufferLocation + 
-                            submesh.m_VertexOffset * mesh->m_UVStream.StrideInBytes;
-                        rootArgs.textures = g_Renderer.m_TextureHeap[submesh.m_SRVTableOffset];
-                        memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, LocalRootSignature::MaxRootArgumentsSize());
+                        // 全部清零以免残余数据影响
+                        hitGroupShaderRecordData.resize(hitGroupShaderRecordSize, 0);
+                        memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifiersTriangle[i], shaderIdSize);
+                        if(i == RayTracing::RayType::Radiance){ // 只有渲染光线需要填入根参数
+                            LocalRootSignature::Triangle::RootArguments rootArgs{};
+                            auto meshMat = model->materials[submesh.m_MaterialIndex];
+                            rootArgs.material.baseColor = meshMat->baseColor;
+                            rootArgs.material.emissiveColor = meshMat->emissiveColor;
+                            rootArgs.material.metallicFactor = meshMat->metallicFactor;
+                            rootArgs.material.roughnessFactor = meshMat->roughnessFactor;
+                            rootArgs.material.normalTexScale = meshMat->normalTexScale;
+                            rootArgs.indexBuffer = mesh->m_IndexBufferViews.BufferLocation + submesh.m_IndexOffset * sizeof(uint32_t);
+                            rootArgs.normalBuffer = mesh->m_NormalStream.BufferLocation + 
+                                submesh.m_VertexOffset * mesh->m_NormalStream.StrideInBytes;
+                            rootArgs.uvBuffer = mesh->m_UVStream.BufferLocation + 
+                                submesh.m_VertexOffset * mesh->m_UVStream.StrideInBytes;
+                            rootArgs.textures = g_Renderer.m_TextureHeap[submesh.m_SRVTableOffset];
+                            memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, LocalRootSignature::MaxRootArgumentsSize());
+                        }
                         hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
                     }
                 }
@@ -448,7 +459,7 @@ namespace DSM {
         }
         GpuBufferDesc hitShaderTableDesc = rayGenShaderTableDesc;
         hitShaderTableDesc.m_Size = Math::AlignUp(hitGroupShaderTableData.size(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-        hitShaderTableDesc.m_Stride = shaderRecordSize;
+        hitShaderTableDesc.m_Stride = hitGroupShaderRecordSize;
         hitGroupShaderTableData.resize(hitShaderTableDesc.m_Size);
         m_HitShaderTable.Create(L"HitShaderTable", hitShaderTableDesc, hitGroupShaderTableData.data());
     }

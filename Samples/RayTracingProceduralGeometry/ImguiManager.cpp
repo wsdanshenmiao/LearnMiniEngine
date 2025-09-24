@@ -7,7 +7,7 @@ namespace DSM {
 	void ImguiManager::UpdateImGui(float time)
 	{
 		static float albedo[] = {1,0.8,0.8};
-		static float _lightDir[] = {-0.5,-1,0.7};
+		static float _lightDir[] = {-0.5,-1,0.05};
 		static float lightCol[] = {1,1,1};
 		static int gloss = 90;
 		float dt = time;

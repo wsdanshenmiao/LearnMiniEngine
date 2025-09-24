@@ -4,6 +4,13 @@
 // 默认采样器
 SamplerState gAnisoWrapSampler : register(s0);
 
+// Global
+// 输出图像
+RWTexture2D<float4> gOutput : register(u0);
+// 场景中的几何数据
+RaytracingAccelerationStructure gScene : register(t0);
+ConstantBuffer<RayTracing::SceneConstantBuffer> gSceneCB : register(b0);
+
 
 
 float3 GetWorldPosition()
