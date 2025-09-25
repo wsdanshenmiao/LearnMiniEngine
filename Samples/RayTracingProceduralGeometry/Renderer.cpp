@@ -22,12 +22,21 @@ namespace DSM {
         
         // 创建根签名
         // 给 HitGroup 设置的资源
-        m_LocalRootSig[LocalRootSignature::Triangle::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
-        m_LocalRootSig[LocalRootSignature::Triangle::Slot::IndexBuffer].InitAsBufferSRV(1);
-        m_LocalRootSig[LocalRootSignature::Triangle::Slot::NormalBuffer].InitAsBufferSRV(2);
-        m_LocalRootSig[LocalRootSignature::Triangle::Slot::UVBuffer].InitAsBufferSRV(3);
-        m_LocalRootSig[LocalRootSignature::Triangle::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
-        m_LocalRootSig.Finalize(L"RayTracingLocalRootSignature", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+        auto& triangleRootSig = m_LocalRootSigs[LocalRootSignature::Type::Triangle];
+        auto& aabbRootSig = m_LocalRootSigs[LocalRootSignature::Type::AABB];
+        triangleRootSig[LocalRootSignature::Triangle::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
+        triangleRootSig[LocalRootSignature::Triangle::Slot::IndexBuffer].InitAsBufferSRV(1);
+        triangleRootSig[LocalRootSignature::Triangle::Slot::NormalBuffer].InitAsBufferSRV(2);
+        triangleRootSig[LocalRootSignature::Triangle::Slot::UVBuffer].InitAsBufferSRV(3);
+        triangleRootSig[LocalRootSignature::Triangle::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
+        triangleRootSig.Finalize(L"RayTracingLocalRootSignature_Triangle", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+        
+        size_t instanceCBSize = Math::AlignUp(sizeof(RayTracing::PrimitiveInstanceConstantBuffer), 4);
+        aabbRootSig[LocalRootSignature::AABB::Slot::PrimitiveInstance].InitAsConstants(2, instanceCBSize / sizeof(uint32_t));
+        aabbRootSig[LocalRootSignature::AABB::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
+        aabbRootSig[LocalRootSignature::AABB::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
+        aabbRootSig.Finalize(L"RayTracingLocalRootSignature_AABB", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
+
         m_GlobalRootSig[GlobalRootSignature::RayTracing::RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
         m_GlobalRootSig[GlobalRootSignature::RayTracing::AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
         m_GlobalRootSig[GlobalRootSignature::RayTracing::SceneConstantBuffer].InitAsConstantBuffer(0);
@@ -71,12 +80,14 @@ namespace DSM {
         // 每个子对象都需要关联到着色器
         // 1 - DXIL library
         // 2 - Triangle hit group
+        // 2 - AABB hit group
+        // 2 - Analytic primitive hit group
         // 1 - Shader config
         // 2 - Local root signature and association
         // 1 - Global root signature
         // 1 - Pipeline config
         std::vector<D3D12_STATE_SUBOBJECT> subobjects;
-        subobjects.reserve(8);
+        subobjects.reserve(12); // 注意要预留足够的空间，避免内存重新分配造成空引用
 
         ShaderDesc raytracingShaderDesc{};
         raytracingShaderDesc.m_Type = ShaderType::Lib;
@@ -108,8 +119,21 @@ namespace DSM {
             hitGroupSubobject.pDesc = &hitGroupDesc;
             subobjects.push_back(std::move(hitGroupSubobject));
         }
-    
-    
+        std::array<D3D12_HIT_GROUP_DESC, RayTracing::RayType::Count> hitGroupDescsAABB{};
+        for (int i = 0; i < RayTracing::RayType::Count; ++i) {
+            auto& hitGroupDesc = hitGroupDescsAABB[i];
+            hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+            hitGroupDesc.HitGroupExport = s_HitGroupName_AABB[i];
+            hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::AABB];
+            hitGroupDesc.IntersectionShaderImport = s_IntersectionShaderName[IntersectionShaderType::AnalyticPrimitive];
+
+            D3D12_STATE_SUBOBJECT hitGroupSubobject{};
+            hitGroupSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+            hitGroupSubobject.pDesc = &hitGroupDesc;
+            subobjects.push_back(std::move(hitGroupSubobject));
+        }
+
+
         // Shader config
         D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
         shaderConfig.MaxPayloadSizeInBytes = (std::max)(sizeof(RayTracing::RayPayload), sizeof(RayTracing::ShadowRayPayload)); // 光线的颜色
@@ -122,24 +146,38 @@ namespace DSM {
 
 
         // Local root signature and association
-        D3D12_LOCAL_ROOT_SIGNATURE localRootSig{};
-        localRootSig.pLocalRootSignature = m_LocalRootSig.GetRootSignature();
+        std::array<D3D12_LOCAL_ROOT_SIGNATURE, LocalRootSignature::Type::Count> localRootSigs{};
+        for(int i = 0; i < LocalRootSignature::Type::Count; ++i){
+            localRootSigs[i].pLocalRootSignature = m_LocalRootSigs[i].GetRootSignature();
+        }
 
-        D3D12_STATE_SUBOBJECT localRootSigSubobject{};
-        localRootSigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-        localRootSigSubobject.pDesc = &localRootSig;
-        auto& localSubobject = subobjects.emplace_back(std::move(localRootSigSubobject));
+        std::array<const D3D12_STATE_SUBOBJECT*, LocalRootSignature::Type::Count> localSubobjects{};
+        for(int i = 0; i < LocalRootSignature::Type::Count; ++i){
+            D3D12_STATE_SUBOBJECT localRootSigSubobject{};
+            localRootSigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+            localRootSigSubobject.pDesc = &localRootSigs[i];
+            localSubobjects[i] = &subobjects.emplace_back(std::move(localRootSigSubobject));
+        }
 
-        // 将局部根签名与进行渲染的 HitGroup 相关联
-        D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociation{};
-        localRootSigAssociation.pSubobjectToAssociate = &localSubobject;
-        localRootSigAssociation.NumExports = 1;
-        localRootSigAssociation.pExports = &s_HitGroupName_Triangle[RayTracing::RayType::Radiance];
+        // 关联三角形的根签名
+        D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociationTriangle{};
+        localRootSigAssociationTriangle.pSubobjectToAssociate = localSubobjects[LocalRootSignature::Type::Triangle];
+        localRootSigAssociationTriangle.NumExports = 1;
+        localRootSigAssociationTriangle.pExports = &s_HitGroupName_Triangle[RayTracing::RayType::Radiance];
         D3D12_STATE_SUBOBJECT localRootSigAssociationSubobject{};
         localRootSigAssociationSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-        localRootSigAssociationSubobject.pDesc = &localRootSigAssociation;
+        localRootSigAssociationSubobject.pDesc = &localRootSigAssociationTriangle;
         subobjects.push_back(std::move(localRootSigAssociationSubobject));
 
+        // 关联程序图元的根签名
+        D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociationProcedural{};
+        localRootSigAssociationProcedural.pSubobjectToAssociate = localSubobjects[LocalRootSignature::Type::AABB];
+        localRootSigAssociationProcedural.NumExports = 1;
+        localRootSigAssociationProcedural.pExports = &s_HitGroupName_AABB[RayTracing::RayType::Radiance];
+        D3D12_STATE_SUBOBJECT localRootSigAssociationSubobjectProcedural{};
+        localRootSigAssociationSubobjectProcedural.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+        localRootSigAssociationSubobjectProcedural.pDesc = &localRootSigAssociationProcedural;
+        subobjects.push_back(std::move(localRootSigAssociationSubobjectProcedural));
 
         // Global root signature
         D3D12_GLOBAL_ROOT_SIGNATURE globalRootSig{};
@@ -171,14 +209,17 @@ namespace DSM {
 
     Renderer::Renderer()
         :m_TextureHeap(L"Renderer::TextureHeap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096),
-        m_LocalRootSig(LocalRootSignature::Triangle::Slot::Count, 0),
-        m_GlobalRootSig(GlobalRootSignature::GlobalRootSignatureCount, GlobalRootSignature::StaticSampler::Count) {}
+        m_LocalRootSigs({{LocalRootSignature::Triangle::Slot::Count, 0}, 
+            {LocalRootSignature::AABB::Slot::Count, 0}}),
+        m_GlobalRootSig(GlobalRootSignature::GlobalRootSignatureCount, 
+            GlobalRootSignature::StaticSampler::Count) {}
 
 
 
 
 
     RayTracer::RayTracer()
+        :m_ProceduralGeometryManager(std::make_unique<ProceduralGeometryManager>())
     {
         m_DirLights.emplace_back();
 
@@ -253,6 +294,13 @@ namespace DSM {
     void RayTracer::AddModel(std::shared_ptr<Model> model)
     {
         m_Models.push_back(model);
+        CreateAccelerationStructure();
+        CreateShaderTable();
+    }
+
+    void RayTracer::AddProceduralGeometry(const ProceduralGeometryDesc &desc)
+    {
+        m_ProceduralGeometryManager->AddGeometry(desc);
         CreateAccelerationStructure();
         CreateShaderTable();
     }
@@ -346,6 +394,14 @@ namespace DSM {
                 }
             }
         }
+
+        // 添加程序图元的实例
+        for(const auto& geometry : m_ProceduralGeometryManager->GetAllGeometry()){
+            auto instanceDesc = geometry.instanceDesc;
+            instanceDesc.InstanceContributionToHitGroupIndex += instanceContributionToHitGroupIndex;
+            instanceDescs.push_back(std::move(instanceDesc));
+        }
+        
         GpuBufferDesc instanceBufferDesc{};
         instanceBufferDesc.m_Size = sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size();
         instanceBufferDesc.m_Stride = sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
@@ -402,6 +458,10 @@ namespace DSM {
         for (size_t i = 0; i < RayTracing::RayType::Count; i++) {
             hitGroupIdentifiersTriangle[i] = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName_Triangle[i]);
         }
+        std::array<void*, RayTracing::RayType::Count> hitGroupIdentifiersAABB{};
+        for (size_t i = 0; i < RayTracing::RayType::Count; i++) {
+            hitGroupIdentifiersAABB[i] = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName_AABB[i]);
+        }
 
         constexpr uint32_t shaderIdSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
@@ -457,6 +517,27 @@ namespace DSM {
                 }
             }
         }
+
+        for(const auto& geometry : m_ProceduralGeometryManager->GetAllGeometry()){
+            for(int i = 0; i < RayTracing::RayType::Count; ++i){
+                hitGroupShaderRecordData.clear();
+                hitGroupShaderRecordData.resize(hitGroupShaderRecordSize, 0);
+                memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifiersAABB[i], shaderIdSize);
+                if(i == RayTracing::RayType::Radiance){ // 只有渲染光线需要填入根参数
+                    LocalRootSignature::AABB::RootArguments rootArgs{};
+                    rootArgs.primitiveInstance.primitiveType = geometry.desc.type;
+                    rootArgs.material.baseColor = geometry.desc.material->baseColor;
+                    rootArgs.material.emissiveColor = geometry.desc.material->emissiveColor;
+                    rootArgs.material.metallicFactor = geometry.desc.material->metallicFactor;
+                    rootArgs.material.roughnessFactor = geometry.desc.material->roughnessFactor;
+                    rootArgs.material.normalTexScale = geometry.desc.material->normalTexScale;
+                    rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
+                    memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, LocalRootSignature::MaxRootArgumentsSize());
+                }
+                hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
+            }
+        }
+
         GpuBufferDesc hitShaderTableDesc = rayGenShaderTableDesc;
         hitShaderTableDesc.m_Size = Math::AlignUp(hitGroupShaderTableData.size(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
         hitShaderTableDesc.m_Stride = hitGroupShaderRecordSize;

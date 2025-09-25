@@ -2,6 +2,7 @@
 #define __RAYTRACING_HLSL_COMPAT_H__
 
 #if defined(__cplusplus)
+using float2 = std::pair<float, float>;
 using float3 = DSM::Math::Vector3;
 using float4 = DSM::Math::Vector4;
 using float3x3 = DSM::Math::Matrix3;
@@ -56,6 +57,8 @@ namespace RayTracing {
     struct ProceduralPrimitiveAttributes
     {
         float3 normal;
+        float2 uv;
+        bool frontFace;
     };
 
     // 场景的常量缓冲区
@@ -67,9 +70,9 @@ namespace RayTracing {
         float4 viewportV;
     };
 
-    struct InstanceConstantBuffer
+    struct PrimitiveInstanceConstantBuffer
     {
-        uint instanceIndex;
+        uint primitiveType; // 图元类型
     };
 
     // 使用的光线种类
@@ -97,6 +100,16 @@ namespace RayTracing {
                 1    // 用于阴影的光线
             };
         }
+    }
+
+    // 解析几何的类型
+    namespace AnalyticPrimitive{
+        enum PrimitiveType{
+            Sphere = 0,
+            Quad,
+            Cube,
+            Count
+        };
     }
 
 

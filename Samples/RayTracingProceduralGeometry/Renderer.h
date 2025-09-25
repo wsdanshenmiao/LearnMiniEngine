@@ -10,8 +10,10 @@
 #include "Graphics/PipelineState.h"
 #include "Graphics/ShaderCompiler.h"
 #include "Core/Camera.h"
-#include "Shaders/RayTracingHLSLCompat.h"
 #include "Light.h"
+#include "RayTracingHelper.h"
+#include "ProceduralGeometry.h"
+#include "Shaders/RayTracingHLSLCompat.h"
 
 
 namespace DSM {
@@ -21,81 +23,6 @@ namespace DSM {
     struct Model;
 
 
-    namespace GeometryType {
-        enum Enum {
-            Triangle = 0,
-            Count
-        };
-    }
-
-    // 根签名的布局
-    namespace GlobalRootSignature {
-        namespace RayTracing{
-            enum Slot {
-                RayTracingOutput = 0,
-                AccelerationStructure,
-                SceneConstantBuffer,
-                Count
-            };
-        }
-
-        namespace Light{
-            enum Slot {
-                LightData = RayTracing::Slot::Count,
-                DirectionalLightDatas,
-                Count
-            };
-        }
-
-        static constexpr uint32_t GlobalRootSignatureCount = Light::Slot::Count;
-
-        namespace StaticSampler {
-            enum Slot {
-                AnisoWrap = 0,
-                Count
-            };
-        }
-    }
-
-    namespace LocalRootSignature {
-        namespace Type {
-            enum Enum {
-                Triangle = 0,
-                Count
-            };
-        }
-
-        namespace Triangle {
-            enum Slot {
-                Material = 0,
-                IndexBuffer,
-                NormalBuffer,
-                UVBuffer,
-                Textures,
-                Count
-            };
-            struct RootArguments {
-                MaterialConstantBuffer material;
-                D3D12_GPU_VIRTUAL_ADDRESS indexBuffer;
-                D3D12_GPU_VIRTUAL_ADDRESS normalBuffer;
-                D3D12_GPU_VIRTUAL_ADDRESS uvBuffer;
-                D3D12_GPU_DESCRIPTOR_HANDLE textures;   // 6 个 PBR 纹理
-            };
-        };
-
-        inline uint32_t MaxRootArgumentsSize()
-        {
-            return sizeof(Triangle::RootArguments);
-        }
-    }
-
-    struct AccelerationStructureBuffers
-    {
-        GpuBuffer scratch;
-        GpuBuffer accelerationStructure;
-        GpuBuffer instanceDesc;    // Used only for top-level AS
-        uint64_t resultDataMaxSizeInBytes;
-    };
 
     
     class Renderer : public Singleton<Renderer>
@@ -122,11 +49,19 @@ namespace DSM {
             L"MissShader_Shadow"
         };
         inline static std::array<const wchar_t*, GeometryType::Count> s_ClosestHitShaderName = { 
-            L"ClosestHitShader_Triangle"
+            L"ClosestHitShader_Triangle",
+            L"ClosestHitShader_AABB"
         };
         inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_Triangle = { 
             L"HitGroup_Triangle",
             L"HitGroup_Triangle_Shadow" 
+        };
+        inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_AABB = { 
+            L"HitGroup_AABB",
+            L"HitGroup_AABB_Shadow" 
+        };
+        inline static std::array<const wchar_t*, IntersectionShaderType::Count> s_IntersectionShaderName = { 
+            L"IntersectionShader_AnalyticPrimitive"
         };
 
         static constexpr uint32_t s_MaxTraceRecursionDepth = 3;
@@ -138,7 +73,7 @@ namespace DSM {
 
         Microsoft::WRL::ComPtr<ID3D12StateObject> m_RayTracingStateObject{};
         // 生成光线时使用的根签名
-        RootSignature m_LocalRootSig;
+        std::array<RootSignature, LocalRootSignature::Type::Count> m_LocalRootSigs;
         // 全局根签名
         RootSignature m_GlobalRootSig;
         
@@ -156,6 +91,7 @@ namespace DSM {
         void TraceRays(ComputeCommandList& cmdList);
 
         void AddModel(std::shared_ptr<Model> model);
+        void AddProceduralGeometry(const ProceduralGeometryDesc& desc);
         void AddLight(const Light& light);
 
     private:
@@ -169,6 +105,7 @@ namespace DSM {
         const Camera* m_Camera;
 
         std::vector<std::shared_ptr<Model>> m_Models;
+        std::unique_ptr<ProceduralGeometryManager> m_ProceduralGeometryManager;
 
         // 加速结构
         std::vector<AccelerationStructureBuffers> m_BottomLevelASs{};

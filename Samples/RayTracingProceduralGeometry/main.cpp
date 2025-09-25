@@ -16,6 +16,7 @@
 #include "ImguiManager.h"
 #include "Renderer.h"
 #include "ModelLoader.h"
+#include "ProceduralGeometry.h"
 
 using namespace DSM;
 using namespace DirectX;
@@ -46,7 +47,7 @@ public:
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
         // m_Camera->SetPosition({ 100, 100, -100 });
-        m_Camera->SetPosition({ -2, 10, 1 });
+        m_Camera->SetPosition({ 2, 5, 1 });
         m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
         m_RayTracer = std::make_unique<RayTracer>();
@@ -66,6 +67,20 @@ public:
         m_RayTracer->AddModel(sponza);
         m_RayTracer->AddModel(plane);
         // m_RayTracer.AddModel(box);
+        
+        ProceduralGeometryDesc sphereDesc{};
+        sphereDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Sphere;
+        sphereDesc.material = std::make_shared<Material>();
+        sphereDesc.transform.SetPosition({ -2, 3, 0 });
+        m_RayTracer->AddProceduralGeometry(sphereDesc);
+        auto quadDesc = sphereDesc;
+        quadDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Quad;
+        quadDesc.transform.SetPosition({ 0, 5, 0 });
+        m_RayTracer->AddProceduralGeometry(quadDesc);
+        auto cubeDesc = sphereDesc;
+        cubeDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Cube;
+        cubeDesc.transform.SetPosition({ 4, 3, 0 });
+        m_RayTracer->AddProceduralGeometry(cubeDesc);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {

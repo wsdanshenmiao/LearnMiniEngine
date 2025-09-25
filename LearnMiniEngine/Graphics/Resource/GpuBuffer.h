@@ -23,7 +23,7 @@ namespace DSM {
     {
     public:
         GpuBuffer() = default;
-        GpuBuffer(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData = nullptr)
+        GpuBuffer(const std::wstring& name, const GpuBufferDesc& bufferDesc, const void* initData = nullptr)
             :m_BufferDesc(bufferDesc)
         {
             Create(name, bufferDesc, initData);
@@ -33,7 +33,7 @@ namespace DSM {
         GpuBuffer& operator=(GpuBuffer&& buffer) noexcept = default;
         DSM_NONCOPYABLE(GpuBuffer);
 
-        void Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData = nullptr);
+        void Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, const void* initData = nullptr);
         void Create(const std::wstring& name, ID3D12Resource* resource, std::uint32_t stride);
         virtual void Destroy() override;
 

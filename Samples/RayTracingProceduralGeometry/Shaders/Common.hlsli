@@ -12,6 +12,8 @@ RaytracingAccelerationStructure gScene : register(t0);
 ConstantBuffer<RayTracing::SceneConstantBuffer> gSceneCB : register(b0);
 
 
+static const float s_PI = 3.14159265;
+
 
 float3 GetWorldPosition()
 {

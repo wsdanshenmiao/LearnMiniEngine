@@ -58,7 +58,7 @@ Light GetDirectionalLight(uint index, Surface surface)
     ray.TMin = 0.001f;
     ray.TMax = 10000.0f;
     bool visible = TraceShadowRay(ray, surface.recursionDepth);
-    //bool visible = true;
+
     Light light;
     light.color = lightData.color.rgb;
     light.direction = normalize(lightData.direction.xyz);

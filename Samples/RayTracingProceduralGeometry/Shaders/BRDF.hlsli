@@ -1,6 +1,8 @@
 #ifndef __BRDF_HLSLI__
 #define __BRDF_HLSLI__
 
+#include "Common.hlsli"
+
 // 完整的表面响应分为漫反射项和镜面反射项
 // f = fd + fs
 
@@ -13,8 +15,6 @@
 // fd(v, l) = (c / pi) * F_Schlick(n, l, f0, f90) * F_Schlick(n, v, f0, f90)
 // 其中 c 为漫反射响应，f90 为平行入射时的菲涅尔反射
 
-
-static const float s_PI = 3.14159265;
 
 
 // 使用 GGX 模型的法线分布函数

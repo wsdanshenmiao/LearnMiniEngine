@@ -1,14 +1,12 @@
 #include "RayTracingHLSLCompat.h"
 #include "Common.hlsli"
 #include "Light.hlsli"
+#include "AnalyticPrimitives.hlsli"
 
+using namespace RayTracing;
 
-// Local
+// Common Local
 ConstantBuffer<MaterialConstantBuffer> lMaterialCB : register(b1);
-
-StructuredBuffer<uint3> lIndexBuffer : register(t1);
-StructuredBuffer<float3> lNormalBuffer : register(t2);
-StructuredBuffer<float2> lUVBuffer : register(t3);
 
 Texture2D<float4> lBaseColorTex : register(t4);
 Texture2D<float4> lDiffuseRoughnessTex : register(t5);
@@ -17,6 +15,13 @@ Texture2D<float> lOcclusionTex : register(t7);
 Texture2D<float3> lEmissiveTex : register(t8);
 Texture2D<float3> lNormalTex : register(t9);
 
+// Triangle Geometry Local
+StructuredBuffer<uint3> lIndexBuffer : register(t1);
+StructuredBuffer<float3> lNormalBuffer : register(t2);
+StructuredBuffer<float2> lUVBuffer : register(t3);
+
+// Procedural Geometry Local
+ConstantBuffer<RayTracing::PrimitiveInstanceConstantBuffer> lPrimitiveInstanceCB : register(b2);
 
 RayTracing::Ray GenerateCameraRay(int2 index, float3 cameraPos, float3 viewportU, float3 viewportV, float focusDist)
 {
@@ -129,9 +134,62 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
 
     // 计算光照
     float3 color = ShadeLighting(surface);
+    color += surface.color * 0.01;
     color *= occlusion;
     color += emissive * lMaterialCB.emissiveColor.rgb;
-    color += surface.color * 0.05;
+
+    float4 refColor = float4(0,0,0,1);
+    // 若表面很粗糙则不追踪反射光线
+    [branch]
+    if(surface.roughness <= 0.99f) {
+        // 获得反射光线
+        RayTracing::Ray reflectRay;
+        reflectRay.origin = surface.position;
+        reflectRay.direction = reflect(WorldRayDirection(), surface.normal);
+        refColor = TraceRadianceRay(reflectRay, surface.recursionDepth);
+
+        // 计算反射系数
+        float3 f0 = lerp(s_DielectricSpecular, surface.color, surface.metallic);
+        float cos = saturate(dot(surface.normal, surface.viewDir));
+        float3 F = F_Schlick(f0, 1.0, cos);
+
+        refColor.rgb *= F * (1 - perceptualRoughness);
+    }
+
+    color += refColor.rgb;
+    payload.color = float4(color, surface.alpha);
+}
+
+[shader("closesthit")]
+void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::ProceduralPrimitiveAttributes attrs)
+{
+    float2 uv = attrs.uv;
+    float4 baseCol = lBaseColorTex.SampleLevel(gAnisoWrapSampler, uv, 0);
+    baseCol *= lMaterialCB.baseColor;
+    float roughness = lDiffuseRoughnessTex.SampleLevel(gAnisoWrapSampler, uv, 0).g;
+    float metallic = lMetalnessTex.SampleLevel(gAnisoWrapSampler, uv, 0).b;
+    float occlusion = lOcclusionTex.SampleLevel(gAnisoWrapSampler, uv, 0).r;
+    float3 emissive = lEmissiveTex.SampleLevel(gAnisoWrapSampler, uv, 0).rgb;
+
+    // 感知上的粗糙度
+    float perceptualRoughness = roughness * lMaterialCB.roughnessFactor;
+
+    Surface surface;
+    surface.position = GetWorldPosition();
+    surface.recursionDepth = payload.depth;
+    surface.normal = attrs.normal;
+    surface.roughness = perceptualRoughness * perceptualRoughness;
+    surface.roughness = max(0.05, surface.roughness);
+    surface.color = baseCol.rgb;
+    surface.alpha = baseCol.a;
+    surface.viewDir = -WorldRayDirection();
+    surface.metallic = metallic * lMaterialCB.metallicFactor;
+
+    // 计算光照
+    float3 color = ShadeLighting(surface);
+    color += surface.color * 0.01;
+    color *= occlusion;
+    color += emissive * lMaterialCB.emissiveColor.rgb;
 
     float4 refColor = float4(0,0,0,1);
     // 若表面很粗糙则不追踪反射光线
@@ -166,4 +224,17 @@ void MissShader(inout RayTracing::RayPayload payload)
 void MissShader_Shadow(inout RayTracing::ShadowRayPayload payload)
 {
     payload.visible = true;
+}
+
+[shader("intersection")]
+void IntersectionShader_AnalyticPrimitive()
+{
+    Ray ray = {ObjectRayOrigin(), ObjectRayDirection()};
+    RayTracing::AnalyticPrimitive::PrimitiveType primType = (RayTracing::AnalyticPrimitive::PrimitiveType)lPrimitiveInstanceCB.primitiveType;
+    
+    float time;
+    RayTracing::ProceduralPrimitiveAttributes attrs = (RayTracing::ProceduralPrimitiveAttributes)0;
+    if(RayAnalyticPrimitiveIntersectionTest(ray, primType, attrs, time)){
+        ReportHit(time, 0, attrs);
+    }
 }

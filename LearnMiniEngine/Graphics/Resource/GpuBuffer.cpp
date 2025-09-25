@@ -3,7 +3,7 @@
 
 namespace DSM{
 
-    void GpuBuffer::Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, void* initData)
+    void GpuBuffer::Create(const std::wstring& name, const GpuBufferDesc& bufferDesc, const void* initData)
     {
         m_BufferDesc = bufferDesc;
         
