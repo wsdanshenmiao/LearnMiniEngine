@@ -117,12 +117,16 @@ namespace DSM{
             std::uint32_t srcCount[kNumTextures] = {1,1,1,1,1,1};
             g_RenderContext.GetDevice()->CopyDescriptors(
                 1, &texHandle, &destCount, destCount, defaultTexture, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        
+
+            GpuBufferDesc materialBufferDesc{};
+            materialBufferDesc.m_Size = sizeof(MaterialConstantBuffer);
+            materialBufferDesc.m_Stride = sizeof(MaterialConstantBuffer);
             ProceduralGeometry geometry{};
-            geometry.desc = desc;
+            geometry.type = desc.type;
+            geometry.materialBuffer.Create(L"MaterialCB", materialBufferDesc, desc.material.get());
             geometry.instanceDesc = std::move(instanceDesc);
             geometry.srvOffset = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
-            m_ProceduralGeometrys.push_back(geometry);
+            m_ProceduralGeometrys.push_back(std::move(geometry));
             m_InstanceContributionToHitGroupIndex += RayTracing::RayType::Count;
         };
 

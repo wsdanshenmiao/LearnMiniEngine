@@ -33,7 +33,7 @@ namespace DSM {
         
         size_t instanceCBSize = Math::AlignUp(sizeof(RayTracing::PrimitiveInstanceConstantBuffer), 4);
         aabbRootSig[LocalRootSignature::AABB::Slot::PrimitiveInstance].InitAsConstants(2, instanceCBSize / sizeof(uint32_t));
-        aabbRootSig[LocalRootSignature::AABB::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
+        aabbRootSig[LocalRootSignature::AABB::Slot::Material].InitAsConstantBuffer(1);
         aabbRootSig[LocalRootSignature::AABB::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
         aabbRootSig.Finalize(L"RayTracingLocalRootSignature_AABB", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
 
@@ -510,7 +510,7 @@ namespace DSM {
                             rootArgs.uvBuffer = mesh->m_UVStream.BufferLocation + 
                                 submesh.m_VertexOffset * mesh->m_UVStream.StrideInBytes;
                             rootArgs.textures = g_Renderer.m_TextureHeap[submesh.m_SRVTableOffset];
-                            memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, LocalRootSignature::MaxRootArgumentsSize());
+                            memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
                         }
                         hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
                     }
@@ -523,17 +523,11 @@ namespace DSM {
                 hitGroupShaderRecordData.clear();
                 hitGroupShaderRecordData.resize(hitGroupShaderRecordSize, 0);
                 memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifiersAABB[i], shaderIdSize);
-                if(i == RayTracing::RayType::Radiance){ // 只有渲染光线需要填入根参数
-                    LocalRootSignature::AABB::RootArguments rootArgs{};
-                    rootArgs.primitiveInstance.primitiveType = geometry.desc.type;
-                    rootArgs.material.baseColor = geometry.desc.material->baseColor;
-                    rootArgs.material.emissiveColor = geometry.desc.material->emissiveColor;
-                    rootArgs.material.metallicFactor = geometry.desc.material->metallicFactor;
-                    rootArgs.material.roughnessFactor = geometry.desc.material->roughnessFactor;
-                    rootArgs.material.normalTexScale = geometry.desc.material->normalTexScale;
-                    rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
-                    memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, LocalRootSignature::MaxRootArgumentsSize());
-                }
+                LocalRootSignature::AABB::RootArguments rootArgs{};
+                rootArgs.primitiveInstance.primitiveType = geometry.type;
+                rootArgs.material = geometry.materialBuffer.GetGpuVirtualAddress();
+                rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
+                memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
                 hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
             }
         }

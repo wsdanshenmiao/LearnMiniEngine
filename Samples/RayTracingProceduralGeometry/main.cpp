@@ -72,6 +72,7 @@ public:
         sphereDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Sphere;
         sphereDesc.material = std::make_shared<Material>();
         sphereDesc.transform.SetPosition({ -2, 3, 0 });
+        sphereDesc.material->roughnessFactor = 0.5f;
         m_RayTracer->AddProceduralGeometry(sphereDesc);
         auto quadDesc = sphereDesc;
         quadDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Quad;

@@ -79,7 +79,7 @@ namespace DSM {
             };
             struct RootArguments{
                 RayTracing::PrimitiveInstanceConstantBuffer primitiveInstance;
-                MaterialConstantBuffer material;
+                D3D12_GPU_VIRTUAL_ADDRESS material;
                 D3D12_GPU_DESCRIPTOR_HANDLE textures;   // 6 个 PBR 纹理
             };
         }

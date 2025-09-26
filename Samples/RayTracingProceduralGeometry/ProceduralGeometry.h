@@ -19,7 +19,8 @@ namespace DSM
 
     struct ProceduralGeometry
     {
-        ProceduralGeometryDesc desc;
+        RayTracing::AnalyticPrimitive::PrimitiveType type;
+        GpuBuffer materialBuffer;
         D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
         uint32_t srvOffset = 0;
     };
