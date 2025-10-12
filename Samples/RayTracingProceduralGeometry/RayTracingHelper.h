@@ -72,15 +72,16 @@ namespace DSM {
 
         namespace AABB{
             enum Slot{
-                PrimitiveInstance = 0,
-                Material,
+                Material = 0,
                 Textures,
+                PrimitiveInstance,
                 Count
             };
+            // 16 字节对齐
             struct RootArguments{
-                RayTracing::PrimitiveInstanceConstantBuffer primitiveInstance;
-                D3D12_GPU_VIRTUAL_ADDRESS material;
+                MaterialConstantBuffer material;
                 D3D12_GPU_DESCRIPTOR_HANDLE textures;   // 6 个 PBR 纹理
+                RayTracing::PrimitiveInstanceConstantBuffer primitiveInstance;
             };
         }
 

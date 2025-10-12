@@ -25,4 +25,9 @@ float3 LinearToSRGB(float3 linearColor)
     return pow(linearColor, 1.0 / 2.2f);
 }
 
+bool InRange(float value, float min, float max)
+{
+    return min <= value && value <= max;
+}
+
 #endif // __COMMON_HLSLI__

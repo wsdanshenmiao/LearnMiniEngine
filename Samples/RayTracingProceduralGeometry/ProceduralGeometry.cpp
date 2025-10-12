@@ -97,7 +97,10 @@ namespace DSM{
             instanceDesc.InstanceContributionToHitGroupIndex = m_InstanceContributionToHitGroupIndex;
             instanceDesc.AccelerationStructure = sphereBottomLevelAS.GetGpuVirtualAddress();
             DirectX::XMStoreFloat3x4(&reinterpret_cast<DirectX::XMFLOAT3X4&>(instanceDesc.Transform), desc.transform.GetLocalToWorld());
-                    
+            if(desc.type == RayTracing::AnalyticPrimitive::Quad){
+                instanceDesc.Transform[2][2] = 1;
+            }
+
             D3D12_CPU_DESCRIPTOR_HANDLE defaultTexture[kNumTextures] = {
                 Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
                 Graphics::GetDefaultTexture(Graphics::kWhiteOpaque2D),
@@ -123,7 +126,7 @@ namespace DSM{
             materialBufferDesc.m_Stride = sizeof(MaterialConstantBuffer);
             ProceduralGeometry geometry{};
             geometry.type = desc.type;
-            geometry.materialBuffer.Create(L"MaterialCB", materialBufferDesc, desc.material.get());
+            geometry.material = desc.material;
             geometry.instanceDesc = std::move(instanceDesc);
             geometry.srvOffset = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
             m_ProceduralGeometrys.push_back(std::move(geometry));

@@ -58,13 +58,13 @@ public:
         m_CameraController->SetMoveSpeed(1);
 
         auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
-        auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
+        // auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         auto plane = LoadModelFromeGeometry("Plane", Geometry::GeometryGenerator::CreateGrid(60, 60, 2, 2));
         plane->transform.SetPosition({ 0, -2, 0 });
         // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
 
         m_RayTracer->AddModel(lihuazou);
-        m_RayTracer->AddModel(sponza);
+        // m_RayTracer->AddModel(sponza);
         m_RayTracer->AddModel(plane);
         // m_RayTracer.AddModel(box);
         
@@ -77,6 +77,7 @@ public:
         auto quadDesc = sphereDesc;
         quadDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Quad;
         quadDesc.transform.SetPosition({ 0, 5, 0 });
+        quadDesc.transform.SetScale({1,1,10000000});
         m_RayTracer->AddProceduralGeometry(quadDesc);
         auto cubeDesc = sphereDesc;
         cubeDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Cube;

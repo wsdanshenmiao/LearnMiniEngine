@@ -30,10 +30,10 @@ namespace DSM {
         triangleRootSig[LocalRootSignature::Triangle::Slot::UVBuffer].InitAsBufferSRV(3);
         triangleRootSig[LocalRootSignature::Triangle::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
         triangleRootSig.Finalize(L"RayTracingLocalRootSignature_Triangle", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
-        
+
         size_t instanceCBSize = Math::AlignUp(sizeof(RayTracing::PrimitiveInstanceConstantBuffer), 4);
         aabbRootSig[LocalRootSignature::AABB::Slot::PrimitiveInstance].InitAsConstants(2, instanceCBSize / sizeof(uint32_t));
-        aabbRootSig[LocalRootSignature::AABB::Slot::Material].InitAsConstantBuffer(1);
+        aabbRootSig[LocalRootSignature::AABB::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
         aabbRootSig[LocalRootSignature::AABB::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
         aabbRootSig.Finalize(L"RayTracingLocalRootSignature_AABB", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
 
@@ -248,7 +248,7 @@ namespace DSM {
         if(!m_DirLights.empty()){
             static uint32_t dirLightCount = 0;
             if(dirLightCount != m_DirLights.size()){
-                LightData lightData{m_DirLights.size()};
+                LightData lightData{static_cast<uint32_t>(m_DirLights.size())};
                 cmdList.WriteBuffer(m_LightDataBuffer, 0, &lightData, sizeof(LightData));
                 cmdList.WriteBuffer(m_DirLightDataBuffer, 0, m_DirLights.data(), m_DirLights.size() * sizeof(DirectionalLightData));
             }
@@ -525,7 +525,11 @@ namespace DSM {
                 memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifiersAABB[i], shaderIdSize);
                 LocalRootSignature::AABB::RootArguments rootArgs{};
                 rootArgs.primitiveInstance.primitiveType = geometry.type;
-                rootArgs.material = geometry.materialBuffer.GetGpuVirtualAddress();
+                rootArgs.material.baseColor = geometry.material->baseColor;
+                rootArgs.material.emissiveColor = geometry.material->emissiveColor;
+                rootArgs.material.roughnessFactor = geometry.material->roughnessFactor;
+                rootArgs.material.metallicFactor = geometry.material->metallicFactor;
+                rootArgs.material.normalTexScale = geometry.material->normalTexScale;
                 rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
                 memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
                 hitGroupShaderTableData.append_range(hitGroupShaderRecordData);

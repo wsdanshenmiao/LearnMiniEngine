@@ -83,19 +83,34 @@ bool RayQuadIntersectionTest(
     out ProceduralPrimitiveAttributes attrs, 
     inout float time)
 {
-    float3 boxMin = float3(-1,-1,-0.0001f);
-    float3 boxMax = float3(1,1,0.0001f);
+    // 单位四边形的参数
+    const float3 q = float3(-1, -1, 0);
+    const float3 u = float3(2, 0, 0);
+    const float3 v = float3(0, 2, 0);
 
-    if(!RayCubeIntersectionTest(ray, boxMin, boxMax, time)){
+    float3 w = float3(0, 0, 0.25f);
+    float3 normal = float3(0, 0, 1);
+
+    // 判断射线是否与平面相交
+    float nd = dot(normal, ray.direction);
+    if(abs(nd) < 1e-4f)
         return false;
-    }
 
+    // 计算交点
+    time = -dot(normal, ray.origin) / nd;
     float3 pos = ray.origin + time * ray.direction; // 计算交点
 
+    float3 pq = pos - q;
+    float alpha = dot(w, cross(pq, v));
+    float beta = dot(w, cross(u, pq));
+
+    if(!InRange(alpha, 0, 1) || !InRange(beta, 0, 1))
+        return false;
+
     // 将法线变换到世界空间
-    float3 normal = mul(float3(0,0,-1), (float3x3)ObjectToWorld4x3());
-    attrs.uv = (pos.xy - boxMin.xy) * 0.5f;
-    attrs.frontFace = dot(ray.direction, normal) < 0;
+    normal = mul(normal, (float3x3)transpose(WorldToObject4x3()));
+    attrs.uv = float2(alpha, beta);
+    attrs.frontFace = nd < 0;
     attrs.normal = attrs.frontFace ? normal : -normal;
 
     return true;
@@ -123,7 +138,7 @@ bool RayCubeIntersectionTest(
     );
 
     // 将法线变换到世界空间
-    normal = mul(normal, (float3x3)ObjectToWorld4x3());
+    normal = mul(normal, (float3x3)transpose(WorldToObject4x3()));
     attrs.uv = (pos.xy - boxMin.xy) * 0.5f;
     attrs.frontFace = dot(ray.direction, normal) < 0;
     attrs.normal = attrs.frontFace ? normal : -normal;
