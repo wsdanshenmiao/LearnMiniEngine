@@ -58,13 +58,13 @@ public:
         m_CameraController->SetMoveSpeed(1);
 
         auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
-        // auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
+        auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         auto plane = LoadModelFromeGeometry("Plane", Geometry::GeometryGenerator::CreateGrid(60, 60, 2, 2));
         plane->transform.SetPosition({ 0, -2, 0 });
         // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
 
         m_RayTracer->AddModel(lihuazou);
-        // m_RayTracer->AddModel(sponza);
+        m_RayTracer->AddModel(sponza);
         m_RayTracer->AddModel(plane);
         // m_RayTracer.AddModel(box);
         

@@ -22,7 +22,7 @@ float3 GetWorldPosition()
 
 float3 LinearToSRGB(float3 linearColor)
 {
-    return pow(linearColor, 1.0 / 2.2f);
+    return pow(linearColor, 1.0f / 2.2f);
 }
 
 bool InRange(float value, float min, float max)

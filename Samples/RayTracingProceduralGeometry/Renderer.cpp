@@ -112,7 +112,9 @@ namespace DSM {
             auto& hitGroupDesc = hitGroupDescsTriangle[i];
             hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
             hitGroupDesc.HitGroupExport = s_HitGroupName_Triangle[i];
-            hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::Triangle];
+            if(i == RayTracing::RayType::Radiance){        
+                hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::Triangle];
+            }
 
             D3D12_STATE_SUBOBJECT hitGroupSubobject{};
             hitGroupSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
@@ -124,7 +126,9 @@ namespace DSM {
             auto& hitGroupDesc = hitGroupDescsAABB[i];
             hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
             hitGroupDesc.HitGroupExport = s_HitGroupName_AABB[i];
-            hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::AABB];
+            if(i == RayTracing::RayType::Radiance){        
+                hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::AABB];
+            }
             hitGroupDesc.IntersectionShaderImport = s_IntersectionShaderName[IntersectionShaderType::AnalyticPrimitive];
 
             D3D12_STATE_SUBOBJECT hitGroupSubobject{};
@@ -191,7 +195,7 @@ namespace DSM {
 
         // Pipeline config
         D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig{};
-        pipelineConfig.MaxTraceRecursionDepth = s_MaxTraceRecursionDepth;  // 最大递归深度
+        pipelineConfig.MaxTraceRecursionDepth = MAX_TRACE_RECURSION_DEPTH;  // 最大递归深度
 
         D3D12_STATE_SUBOBJECT pipelineConfigSubobject{};
         pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
@@ -320,15 +324,11 @@ namespace DSM {
         // 构建加速结构
         GraphicsCommandList cmdList{L"BuildAccelerationStructure"};
 
-        const auto& model = m_Models[0];
-        const auto& mesh = model->meshes[0];
-        const auto& submesh = mesh->m_SubMeshes.begin()->second;
-
         uint32_t instanceContributionToHitGroupIndex = 0;
         std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
         for(const auto& model : m_Models){
             for(const auto& mesh : model->meshes){
-                for(const auto& [name, submesh] : mesh->m_SubMeshes){
+                for(const auto& submesh : mesh->m_SubMeshes){
                     auto& bottomLevelBuffers = m_BottomLevelASs.emplace_back();
 
                     // 给底层加速结构的几何描述
@@ -381,11 +381,11 @@ namespace DSM {
 
                     cmdList.GetDXRCommandList()->BuildRaytracingAccelerationStructure(&buildBottomLevelASDesc, 0, nullptr);
                     // 等待底层加速结构构建完毕
-                    cmdList.InsertUAVBarrier(bottomLevelBuffers.accelerationStructure, true);
+                    cmdList.InsertUAVBarrier(bottomLevelBuffers.accelerationStructure);
 
                     // 顶层加速结构的输入，使用底层加速结构作为输入
                     D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
-                    instanceDesc.InstanceMask = 1;
+                    instanceDesc.InstanceMask = RayTracing::TraceRayParameters::InstanceMark;
                     instanceDesc.InstanceContributionToHitGroupIndex = instanceContributionToHitGroupIndex;
                     instanceDesc.AccelerationStructure = bottomLevelBuffers.accelerationStructure.GetGpuVirtualAddress();
                     DirectX::XMStoreFloat3x4(&reinterpret_cast<DirectX::XMFLOAT3X4&>(instanceDesc.Transform), model->transform.GetLocalToWorld());
@@ -394,6 +394,8 @@ namespace DSM {
                 }
             }
         }
+        // 等待所有的底层加速结构构建完毕
+        cmdList.FlushResourceBarriers();
 
         // 添加程序图元的实例
         for(const auto& geometry : m_ProceduralGeometryManager->GetAllGeometry()){
@@ -490,7 +492,7 @@ namespace DSM {
         std::vector<uint8_t> hitGroupShaderRecordData{};
         for (const auto& model : m_Models){
             for(const auto& mesh : model->meshes){
-                for(const auto& [name, submesh] : mesh->m_SubMeshes) {
+                for(const auto& submesh : mesh->m_SubMeshes) {
                     for(int i = 0; i < RayTracing::RayType::Count; i++) {
                         hitGroupShaderRecordData.clear();
                         // 全部清零以免残余数据影响
@@ -523,15 +525,17 @@ namespace DSM {
                 hitGroupShaderRecordData.clear();
                 hitGroupShaderRecordData.resize(hitGroupShaderRecordSize, 0);
                 memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifiersAABB[i], shaderIdSize);
-                LocalRootSignature::AABB::RootArguments rootArgs{};
-                rootArgs.primitiveInstance.primitiveType = geometry.type;
-                rootArgs.material.baseColor = geometry.material->baseColor;
-                rootArgs.material.emissiveColor = geometry.material->emissiveColor;
-                rootArgs.material.roughnessFactor = geometry.material->roughnessFactor;
-                rootArgs.material.metallicFactor = geometry.material->metallicFactor;
-                rootArgs.material.normalTexScale = geometry.material->normalTexScale;
-                rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
-                memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
+                if(i == RayTracing::RayType::Radiance){
+                    LocalRootSignature::AABB::RootArguments rootArgs{};
+                    rootArgs.primitiveInstance.primitiveType = geometry.type;
+                    rootArgs.material.baseColor = geometry.material->baseColor;
+                    rootArgs.material.emissiveColor = geometry.material->emissiveColor;
+                    rootArgs.material.roughnessFactor = geometry.material->roughnessFactor;
+                    rootArgs.material.metallicFactor = geometry.material->metallicFactor;
+                    rootArgs.material.normalTexScale = geometry.material->normalTexScale;
+                    rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
+                    memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
+                }
                 hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
             }
         }

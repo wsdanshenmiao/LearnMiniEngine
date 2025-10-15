@@ -64,8 +64,6 @@ namespace DSM {
             L"IntersectionShader_AnalyticPrimitive"
         };
 
-        static constexpr uint32_t s_MaxTraceRecursionDepth = 3;
-
         bool m_Initialized = false;
 
         Texture m_RayTracingOutput{};

@@ -63,7 +63,7 @@ public:
 		meshConstantsDesc.m_HeapType = D3D12_HEAP_TYPE_UPLOAD;
 		m_MeshConstants.Create(L"MeshConstants", meshConstantsDesc, &meshConstants);
 
-        m_Model = LoadModel("Models//Sponza//sponza.gltf");
+        m_Model = LoadModel("Models//Sponza//pbr//sponza2.gltf");
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {

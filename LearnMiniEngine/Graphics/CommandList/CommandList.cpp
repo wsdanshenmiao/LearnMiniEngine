@@ -171,7 +171,7 @@ namespace DSM {
         resourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
         m_ResourceBarriers.push_back(std::move(resourceBarrier));
         
-        if (flush) {
+        if (m_ResourceBarriers.size() >= 16 || flush) {
             FlushResourceBarriers();
         }
     }

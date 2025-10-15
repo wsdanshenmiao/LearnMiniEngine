@@ -82,7 +82,7 @@ namespace DSM {
 		g_RenderContext.GetDevice()->CopyDescriptors(
 			1, &texHandle, &destCount, destCount, defaultTexture, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		model->meshes[0]->m_SubMeshes[name].m_SRVTableOffset = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
+		model->meshes[0]->m_SubMeshes[0].m_SRVTableOffset = g_Renderer.m_TextureHeap.GetOffsetOfHandle(texHandle);
 
 		model->boundingBox = mesh->m_BoundingBox;
 		
@@ -220,7 +220,8 @@ namespace DSM {
 			submesh.m_IndexOffset = preIndexCount;
 			submesh.m_VertexCount = meshData.m_Positions.size();
 			submesh.m_VertexOffset = preVertexCount;
-			mesh.m_SubMeshes.insert(std::make_pair(meshData.m_Name, std::move(submesh)));
+			submesh.m_Name = meshData.m_Name;
+			mesh.m_SubMeshes.push_back(std::move(submesh));
 			
 			preIndexCount += indexCount;
 			preVertexCount += meshData.m_Positions.size();
@@ -394,7 +395,7 @@ namespace DSM {
 		for (auto& mesh : model.meshes) {
 			int psoFlags = 0;
 			std::uint32_t num = 1;
-			for (auto& [name, submesh] : mesh->m_SubMeshes) {
+			for (auto& submesh : mesh->m_SubMeshes) {
 				submesh.m_SRVTableOffset = srvOffsets[submesh.m_MaterialIndex];
 				auto& material = scene->mMaterials[submesh.m_MaterialIndex];
 				if (aiReturn_SUCCESS == material->Get(AI_MATKEY_TWOSIDED, &psoFlags, &num)) {

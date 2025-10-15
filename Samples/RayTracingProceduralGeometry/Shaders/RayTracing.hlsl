@@ -153,7 +153,7 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
         float cos = saturate(dot(surface.normal, surface.viewDir));
         float3 F = F_Schlick(f0, 1.0, cos);
 
-        refColor.rgb *= F * (1 - perceptualRoughness);
+        refColor.rgb *= F * (1 - roughness);
     }
 
     color += refColor.rgb;

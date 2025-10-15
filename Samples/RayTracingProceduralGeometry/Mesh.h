@@ -37,6 +37,7 @@ namespace DSM {
 		// 每次绘制需要使用的数据
 		struct SubMesh
 		{
+			std::string m_Name;
 			uint32_t m_IndexCount;
 			uint32_t m_IndexOffset;
 			uint32_t m_VertexCount;
@@ -45,7 +46,7 @@ namespace DSM {
 			// 使用的纹理在描述符堆中的偏移
 			uint16_t m_SRVTableOffset;
 		};
-		std::map<std::string, SubMesh> m_SubMeshes;
+		std::vector<SubMesh> m_SubMeshes;
 
 		GpuBuffer m_MeshData{};
 	};

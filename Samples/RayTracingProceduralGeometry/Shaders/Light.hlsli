@@ -13,7 +13,6 @@ struct Light
 };
 
 ConstantBuffer<LightData> gLightData : register(b0, space1);
-
 StructuredBuffer<DirectionalLightData> gDirLightData : register(t0, space1);
 
 
