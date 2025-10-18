@@ -1,0 +1,160 @@
+#define DEBUG
+#include <iostream>
+#include "Core/GameCore.h"
+#include "Graphics/GraphicsCommon.h"
+#include "Graphics/RenderContext.h"
+#include "Graphics/ShaderCompiler.h"
+#include "Graphics/CommandList/GraphicsCommandList.h"
+#include "Graphics/CommandList/ComputeCommandList.h"
+#include "Graphics/Resource/GpuBuffer.h"
+#include "Math/Matrix.h"
+#include "Math/Random.h"
+#include "Math/Transform.h"
+#include "Utilities/Utility.h"
+#include "Geometry.h"
+#include "CameraController.h"
+#include "ImguiManager.h"
+#include "Renderer.h"
+#include "ModelLoader.h"
+#include "ProceduralGeometry.h"
+
+using namespace DSM;
+using namespace DirectX;
+
+
+class RayTracingApp : public GameCore::IGameApp
+{
+public:
+
+    virtual void Startup()override
+    {
+        g_Renderer.Create();
+        
+		auto& swapChain = g_RenderContext.GetSwapChain();
+
+		ASSERT(ImguiManager::GetInstance().InitImGui(
+			g_RenderContext.GetDevice(),
+			g_RenderContext.GetSwapChain().GetWindowHandle(),
+			2,
+			swapChain.GetBackBufferFormat()));
+
+        uint64_t width = swapChain.GetWidth();
+        uint32_t height = swapChain.GetHeight();
+
+		m_Scissor = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+        m_Camera = std::make_unique<Camera>();
+		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
+        float aspect = float(width) / height;
+        m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
+        // m_Camera->SetPosition({ 100, 100, -100 });
+        m_Camera->SetPosition({ 2, 5, 1 });
+        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
+
+        m_RayTracer = std::make_unique<RayTracer>();
+        m_RayTracer->SetCamera(m_Camera.get());
+
+        m_CameraController = std::make_unique<CameraController>();
+        m_CameraController->InitCamera(m_Camera.get());
+        m_CameraController->SetMoveSpeed(1);
+
+        auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
+        auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
+        auto plane = LoadModelFromeGeometry("Plane", Geometry::GeometryGenerator::CreateGrid(60, 60, 2, 2));
+        plane->transform.SetPosition({ 0, -2, 0 });
+        // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
+
+        m_RayTracer->AddModel(lihuazou);
+        m_RayTracer->AddModel(sponza);
+        m_RayTracer->AddModel(plane);
+        // m_RayTracer.AddModel(box);
+        
+        ProceduralGeometryDesc sphereDesc{};
+        sphereDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Sphere;
+        sphereDesc.material = std::make_shared<Material>();
+        sphereDesc.transform.SetPosition({ -2, 3, 0 });
+        sphereDesc.material->roughnessFactor = 0.5f;
+        m_RayTracer->AddProceduralGeometry(sphereDesc);
+        auto quadDesc = sphereDesc;
+        quadDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Quad;
+        quadDesc.transform.SetPosition({ 0, 5, 0 });
+        quadDesc.transform.SetScale({1,1,10000000});
+        m_RayTracer->AddProceduralGeometry(quadDesc);
+        auto cubeDesc = sphereDesc;
+        cubeDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Cube;
+        cubeDesc.transform.SetPosition({ 4, 3, 0 });
+        m_RayTracer->AddProceduralGeometry(cubeDesc);
+    }
+    virtual void OnResize(std::uint32_t width, std::uint32_t height) override
+    {
+        // 更行颜色与深度深度缓冲区
+		m_Scissor = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+        m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
+        float aspect = float(width) / height;
+        m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 0.1f, 1000.0f);
+
+        g_Renderer.OnResize(width, height);
+    }
+    virtual void Update(float deltaTime) override
+    {
+        deltaTime = 1.f / 60;
+
+        ImguiManager::GetInstance().Update(deltaTime);
+
+        m_CameraController->Update(deltaTime);
+	}
+    virtual void RenderScene(RenderContext& renderContext) override
+    {
+        auto& swapChain = renderContext.GetSwapChain();
+        uint32_t width = swapChain.GetWidth();
+        uint32_t height = swapChain.GetHeight();
+
+        GraphicsCommandList cmdList{ L"Render Scene" };
+
+        m_RayTracer->TraceRays(cmdList.GetComputeCommandList());
+
+        assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
+        auto rect = RECT{0, 0, static_cast<long>(width), static_cast<long>(height)};
+        cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
+        cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+        cmdList.TransitionResource(g_Renderer.m_RayTracingOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        cmdList.FlushResourceBarriers();
+
+        cmdList.SetRenderTarget(swapChain.GetBackBufferRTV());
+        ImguiManager::GetInstance().RenderImGui(cmdList.GetCommandList());
+
+        cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
+        cmdList.ExecuteCommandList();
+        ASSERT_SUCCEEDED(g_RenderContext.GetDevice()->GetDeviceRemovedReason());
+        swapChain.Present();
+    }
+    virtual void Cleanup() override
+    {
+        g_Renderer.Shutdown();
+    };
+
+    virtual bool RequiresRaytracingSupport() const override {return true;}
+
+private:
+    std::unique_ptr<Camera> m_Camera{};
+    std::unique_ptr<CameraController> m_CameraController{};
+    D3D12_RECT m_Scissor{};
+
+    std::unique_ptr<RayTracer> m_RayTracer{};
+};
+
+int WinMain(
+    _In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPSTR lpCmdLine,
+    _In_ int nShowCmd)
+{
+    try {
+        RayTracingApp sandbox{};
+        return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
+    }
+    catch(const std::exception& e) {
+        std::cerr << e.what() << '\n';
+        return -1;
+    }
+    return 0;
+}
