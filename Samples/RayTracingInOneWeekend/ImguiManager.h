@@ -16,9 +16,9 @@ namespace DSM {
 		void UpdateImGui(float time) override;
 
 	public:
-		Math::Vector3 backgroundColor = Math::Vector3(0.7f, 0.8f, 1.0f);
-		uint32_t samplePerPixel = 1;
-		uint32_t maxTraceRecursionDepth = 3;
+		uint32_t maxTraceRecursionDepth = 4;
+		uint32_t samplesPerPixel = 5;
+		Math::Vector3 backgroundColor = { 0.7f, 0.8f, 1.0f };
 	};
 }
 

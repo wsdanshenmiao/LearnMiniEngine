@@ -13,14 +13,14 @@ namespace DSM
     {
         RayTracing::AnalyticPrimitive::PrimitiveType type;
         Transform transform;
-        std::shared_ptr<Material> material;
+        std::shared_ptr<RTMaterial> material;
         std::array<TextureRef, kNumTextures> textures;
     };
 
     struct ProceduralGeometry
     {
         RayTracing::AnalyticPrimitive::PrimitiveType type;
-        std::shared_ptr<Material> material;
+        std::shared_ptr<RTMaterial> material;
         D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
         uint32_t srvOffset = 0;
     };

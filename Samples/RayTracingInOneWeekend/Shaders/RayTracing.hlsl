@@ -1,20 +1,13 @@
 #include "RayTracingHLSLCompat.h"
 #include "Common.hlsli"
-#include "Light.hlsli"
 #include "AnalyticPrimitives.hlsli"
-#include "Random.hlsli"
+#include "Material.hlsli"
 
 using namespace RayTracing;
 
 // Common Local
-ConstantBuffer<MaterialConstantBuffer> lMaterialCB : register(b1);
-
 Texture2D<float4> lBaseColorTex : register(t4);
-Texture2D<float4> lDiffuseRoughnessTex : register(t5);
-Texture2D<float4> lMetalnessTex : register(t6);
-Texture2D<float> lOcclusionTex : register(t7);
-Texture2D<float3> lEmissiveTex : register(t8);
-Texture2D<float3> lNormalTex : register(t9);
+ConstantBuffer<MaterialConstants> lMaterialCB : register(b1);
 
 // Triangle Geometry Local
 StructuredBuffer<uint3> lIndexBuffer : register(t1);
@@ -24,18 +17,17 @@ StructuredBuffer<float2> lUVBuffer : register(t3);
 // Procedural Geometry Local
 ConstantBuffer<RayTracing::PrimitiveInstanceConstantBuffer> lPrimitiveInstanceCB : register(b2);
 
-RayTracing::Ray GenerateCameraRay(int2 index, float3 cameraPos, float3 viewportU, float3 viewportV, float focusDist)
+RayTracing::Ray GenerateCameraRay(
+    uint2 index, 
+    float3 cameraPos, 
+    float3 viewportStart, 
+    float3 pixelDeltaU, 
+    float3 pixelDeltaV,
+    inout uint seed)
 {
-    uint2 dimension = DispatchRaysDimensions().xy;
-    float3 front = normalize(cross(viewportV, viewportU));
-
-    float3 pixelDeltaU = viewportU / dimension.x;
-    float3 pixelDeltaV = viewportV / dimension.y;
-    
-    float3 startPixelCenter = cameraPos + front * focusDist - (viewportU + viewportV) * 0.5f;
-    startPixelCenter += (pixelDeltaU + pixelDeltaV) * 0.5f;
-
-    float3 pixelSample = startPixelCenter + index.x * pixelDeltaU + index.y * pixelDeltaV;
+    float2 offset = RandomFloat2(seed, -0.5f, 0.5f);
+    float2 pixelOffset = float2(index) + offset;
+    float3 pixelSample = viewportStart + pixelOffset.x * pixelDeltaU + pixelOffset.y * pixelDeltaV;
 
     RayTracing::Ray ray;
     ray.origin = cameraPos;
@@ -51,7 +43,7 @@ float3 GetHitAttributes(float3 attributes[3], float2 barycentrics)
 }
 
 
-float4 TraceRadianceRay(RayTracing::Ray ray, uint depth)
+float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
 {
     [branch]
     if(depth >= MAX_TRACE_RECURSION_DEPTH) {
@@ -67,6 +59,7 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth)
     RayTracing::RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
     payload.depth = depth + 1;
+    payload.seed = seed;
     TraceRay(gScene, 
         RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 
         RayTracing::TraceRayParameters::InstanceMark, 
@@ -83,18 +76,38 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth)
 [shader("raygeneration")]
 void RaygenShader()
 {
-    RayTracing::Ray ray = GenerateCameraRay(
-        DispatchRaysIndex().xy,
-        gSceneCB.cameraPosAndFocusDist.xyz,
-        gSceneCB.viewportU.xyz,
-        gSceneCB.viewportV.xyz,
-        gSceneCB.cameraPosAndFocusDist.w);
+    uint2 dimension = DispatchRaysDimensions().xy;
+    uint2 index = DispatchRaysIndex().xy;
 
-    float4 color = TraceRadianceRay(ray, 0);
+    float3 cameraPos = gSceneCB.cameraPosAndFocusDist.xyz;
+    float focusDist = gSceneCB.cameraPosAndFocusDist.w;
+    float3 viewportU = gSceneCB.viewportUAndFrameIndex.xyz;
+    float3 viewportV = gSceneCB.viewportVAndSamplePerPixel.xyz;
+    float samplesPerPixel = gSceneCB.viewportVAndSamplePerPixel.w;
+    float totalTime = gSceneCB.backgroundColorAndTotalTime.w;
+    uint frameIndex = uint(gSceneCB.viewportUAndFrameIndex.w);
+
+    uint pcgState = PCG_Init(index, asuint(frameIndex * totalTime));
+
+    float3 front = normalize(cross(viewportV, viewportU));
+
+    float3 pixelDeltaU = viewportU / dimension.x;
+    float3 pixelDeltaV = viewportV / dimension.y;
+    
+    float3 viewportStart = cameraPos + front * focusDist - (viewportU + viewportV) * 0.5f;
+    viewportStart += (pixelDeltaU + pixelDeltaV) * 0.5f;
+
+    float4 color = float4(0,0,0,1);
+    uint spp = uint(samplesPerPixel);
+    for(uint sampleIndex = 0; sampleIndex < spp; ++sampleIndex){
+        RayTracing::Ray ray = GenerateCameraRay(index, cameraPos, viewportStart, pixelDeltaU, pixelDeltaV, pcgState);
+        color += TraceRadianceRay(ray, 0, pcgState);
+    }
+    color /= spp;
 
     // 手动进行伽马映射
     color.rgb = LinearToSRGB(color.rgb);
-    gOutput[DispatchRaysIndex().xy] = color;
+    gOutput[index] = color;
 }
 
 [shader("closesthit")]
@@ -114,29 +127,63 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
 
     float4 baseCol = lBaseColorTex.SampleLevel(gAnisoWrapSampler, uv, 0);
 
-    payload.color = baseCol;
+    Surface surface;
+    surface.position = GetWorldPosition();
+    surface.normal = normal;
+    surface.frontFace = true;
+    surface.uv = uv;
+    surface.color = baseCol.rgb;
+    surface.seed = payload.seed;
+
+    float3 attenuation;
+    float3 rayDir;
+    if(GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir)){
+        Ray ray;
+        ray.origin = surface.position;
+        ray.direction = normalize(rayDir);
+        float4 scatterCol = TraceRadianceRay(ray, payload.depth, surface.seed);
+
+        payload.color = float4(attenuation, 1) * scatterCol;
+    }
+    else{
+        payload.color = float4(0,0,0,1);
+    }
 }
 
 [shader("closesthit")]
 void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::ProceduralPrimitiveAttributes attrs)
 {
     float2 uv = attrs.uv;
+    float3 normal = normalize(attrs.normal);
     float4 baseCol = lBaseColorTex.SampleLevel(gAnisoWrapSampler, uv, 0);
+    
+    Surface surface;
+    surface.position = GetWorldPosition();
+    surface.normal = normal;
+    surface.frontFace = attrs.frontFace;
+    surface.uv = uv;
+    surface.color = baseCol.rgb;
+    surface.seed = payload.seed;
 
-    payload.color = baseCol;
+    float3 attenuation;
+    float3 rayDir;
+    if(GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir)){
+        Ray ray;
+        ray.origin = surface.position;
+        ray.direction = normalize(rayDir);
+        float4 scatterCol = TraceRadianceRay(ray, payload.depth, surface.seed);
+
+        payload.color = float4(attenuation, 1) * scatterCol;
+    }
+    else{
+        payload.color = float4(0,0,0,1);
+    }
 }
 
 [shader("miss")]
 void MissShader(inout RayTracing::RayPayload payload)
 {
-    payload.color = float4(gSceneCB.bgColorAndSPP.rgb, 1);
-}
-
-// 若阴影光线不与物体相交则表示可见
-[shader("miss")]
-void MissShader_Shadow(inout RayTracing::ShadowRayPayload payload)
-{
-    payload.visible = true;
+    payload.color = float4(gSceneCB.backgroundColorAndTotalTime.rgb, 1);
 }
 
 [shader("intersection")]

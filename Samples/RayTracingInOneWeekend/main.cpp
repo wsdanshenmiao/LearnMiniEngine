@@ -46,8 +46,7 @@ public:
 		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
-        // m_Camera->SetPosition({ 100, 100, -100 });
-        m_Camera->SetPosition({ 2, 5, 1 });
+        m_Camera->SetPosition({ 13,2,3 });
         m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
 
         m_RayTracer = std::make_unique<RayTracer>();
@@ -61,28 +60,75 @@ public:
         auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         auto plane = LoadModelFromeGeometry("Plane", Geometry::GeometryGenerator::CreateGrid(60, 60, 2, 2));
         plane->transform.SetPosition({ 0, -2, 0 });
-        // auto box = LoadModelFromeGeometry("Box", Geometry::GeometryGenerator::CreateBox(2, 2, 2, 1));
 
         m_RayTracer->AddModel(lihuazou);
         m_RayTracer->AddModel(sponza);
         m_RayTracer->AddModel(plane);
-        // m_RayTracer.AddModel(box);
         
+
+        std::mt19937 engine{std::random_device{}()};
+        std::uniform_real_distribution<float> dist(0.f, 1.f);
+        auto randomFloat = [&engine, &dist]() {
+            return dist(engine);
+        };
+
         ProceduralGeometryDesc sphereDesc{};
         sphereDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Sphere;
-        sphereDesc.material = std::make_shared<Material>();
-        sphereDesc.transform.SetPosition({ -2, 3, 0 });
-        sphereDesc.material->roughnessFactor = 0.5f;
+        sphereDesc.transform.SetPosition({ 0,-1000,0 });
+        sphereDesc.transform.SetScale({ 1000,1000,1000 });
+        auto material = std::make_shared<LambertianMaterial>();
+        material->matData.albedo = Math::Vector3{0.5, 0.5, 0.5};
+        material->materialType = RayTracing::MaterialType::Lambertian;
+        sphereDesc.material = material;
         m_RayTracer->AddProceduralGeometry(sphereDesc);
-        auto quadDesc = sphereDesc;
-        quadDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Quad;
-        quadDesc.transform.SetPosition({ 0, 5, 0 });
-        quadDesc.transform.SetScale({1,1,10000000});
-        m_RayTracer->AddProceduralGeometry(quadDesc);
-        auto cubeDesc = sphereDesc;
-        cubeDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Cube;
-        cubeDesc.transform.SetPosition({ 4, 3, 0 });
-        m_RayTracer->AddProceduralGeometry(cubeDesc);
+
+        for (int a = -11; a < 11; a++) {
+            for (int b = -11; b < 11; b++) {
+                auto choose_mat = randomFloat();
+                auto desc = sphereDesc;
+                Math::Vector3 center{a + 0.9f * randomFloat(), 0.2f, b + 0.9f * randomFloat()};
+                desc.transform.SetPosition(center);
+                desc.transform.SetScale({ 0.2f, 0.2f, 0.2f });
+
+                if (Math::Vector3::Length(center - Math::Vector3{4, 0.2, 0}) > 0.9f) {
+                    if (choose_mat < 0.8) {
+                        auto material = std::make_shared<LambertianMaterial>();
+                        material->materialType = RayTracing::MaterialType::Lambertian;
+
+                        Math::Vector3 color = Math::Vector3{randomFloat(), randomFloat(), randomFloat()};
+                        color *= Math::Vector3{randomFloat(), randomFloat(), randomFloat()};
+                        material->matData.albedo = color;
+                        desc.material = material;
+                    } else if (choose_mat < 0.95) {
+                        auto material = std::make_shared<MetalMaterial>();
+                        material->materialType = RayTracing::MaterialType::Metal;
+
+                        Math::Vector3 color = Math::Vector3{randomFloat(), randomFloat(), randomFloat()};
+                        color = (color + Math::Vector3{1.0f, 1.0f, 1.0f}) * 0.5f;
+                        material->matData.albedo = color;
+                        material->matData.fuzz = 0.5f * randomFloat();
+                        desc.material = material;
+                    } else {
+                        auto material = std::make_shared<DielectricMaterial>();
+                        material->materialType = RayTracing::MaterialType::Dielectric;
+
+                        material->matData.refractiveIndex = 1.5f;
+                        desc.material = material;
+                    }
+                    m_RayTracer->AddProceduralGeometry(desc);
+                }
+            }
+        }
+
+        sphereDesc.transform.SetPosition({ 0, 1, 0 });
+        sphereDesc.transform.SetScale({ 1.0f, 1.0f, 1.0f });
+        m_RayTracer->AddProceduralGeometry(sphereDesc);
+
+        sphereDesc.transform.SetPosition({ -4, 1, 0 });
+        m_RayTracer->AddProceduralGeometry(sphereDesc);
+
+        sphereDesc.transform.SetPosition({ 4, 1, 0 });
+        m_RayTracer->AddProceduralGeometry(sphereDesc);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {

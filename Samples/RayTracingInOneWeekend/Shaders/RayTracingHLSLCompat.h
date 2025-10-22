@@ -10,30 +10,11 @@ using float4x4 = DSM::Math::Matrix4;
 using uint = uint32_t;
 #endif
 
+
 #ifndef MAX_TRACE_RECURSION_DEPTH
 #define MAX_TRACE_RECURSION_DEPTH 3
 #endif
 
-struct MaterialConstantBuffer
-{
-    float4 baseColor;
-    float4 emissiveColor;
-    float normalTexScale;
-    float metallicFactor;
-    float roughnessFactor;
-    float pad;
-};
-
-struct DirectionalLightData
-{
-    float4 color;
-    float4 direction;
-};
-
-struct LightData
-{
-    uint dirLightCount;
-};
 
 namespace RayTracing {
     struct Ray
@@ -46,11 +27,7 @@ namespace RayTracing {
     {
         float4 color;
         uint depth;
-    };
-
-    struct ShadowRayPayload
-    {
-        bool visible;
+        uint seed;
     };
 
     // 自定义图元的属性
@@ -66,9 +43,9 @@ namespace RayTracing {
     {
         // 生成光线使用的数据
         float4 cameraPosAndFocusDist;
-        float4 viewportU;
-        float4 viewportV;
-        float4 bgColorAndSPP;
+        float4 viewportUAndFrameIndex;
+        float4 viewportVAndSamplePerPixel;
+        float4 backgroundColorAndTotalTime;
     };
 
     struct PrimitiveInstanceConstantBuffer
@@ -79,7 +56,6 @@ namespace RayTracing {
     // 使用的光线种类
     enum RayType{
         Radiance = 0,
-        Shadow,
         Count
     };
 
@@ -89,7 +65,6 @@ namespace RayTracing {
         namespace HitGroup {
             static const uint Offset[RayType::Count] = {
                 0,   // 用于渲染的光线
-                1    // 用于阴影的光线
             };
             static const uint GeometryStride = RayType::Count;
         }
@@ -98,7 +73,6 @@ namespace RayTracing {
             // Miss Shader 只需要使用索引
             static const uint Offset[RayType::Count] = {
                 0,   // 用于渲染的光线
-                1    // 用于阴影的光线
             };
         }
     }
@@ -113,6 +87,40 @@ namespace RayTracing {
         };
     }
 
+    namespace MaterialType{
+        enum Type{
+            Lambertian = 0,
+            Metal,
+            Dielectric,
+            Count
+        };
+
+        struct LambertianMatData{
+            float3 albedo;
+        };
+
+        struct MetalMatData{
+            float3 albedo;
+            float fuzz;
+        };
+
+        struct DielectricMatData{
+            float refractiveIndex;
+        };
+
+        static const uint MaterialDataSize[MaterialType::Count] = {
+            12, // Lambertian
+            16, // Metal
+            4   // Dielectric
+        };
+    }
+
+    // 材质的类型及数据偏移
+    struct MaterialConstants
+    {
+        MaterialType::Type type;
+        uint matDataOffset;
+    };
 
 }
 

@@ -4,6 +4,7 @@
 
 #include <array>
 #include "Math/Vector.h"
+#include "Shaders/RayTracingHLSLCompat.h"
 
 namespace DSM {
     enum MaterialTex
@@ -18,6 +19,59 @@ namespace DSM {
         float normalTexScale = 1;
         float metallicFactor = 1;
         float roughnessFactor = 1;
+    };
+
+    struct RTMaterial 
+    {
+        RayTracing::MaterialType::Type materialType;
+        virtual ~RTMaterial() = default;
+        virtual uint32_t GetDataSize() const = 0;
+        virtual void CopyData(void* dest) const = 0;
+    };
+
+    struct LambertianMaterial : public RTMaterial
+    {
+        RayTracing::MaterialType::LambertianMatData matData{};
+        uint32_t GetDataSize() const override
+        {
+            return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Lambertian];
+        }
+        void CopyData(void* dest) const override
+        {
+            assert(dest != nullptr);
+            auto dataSize = RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Lambertian];
+            memcpy(dest, &matData.albedo, dataSize);
+        }
+    };
+
+    struct MetalMaterial : public RTMaterial
+    {
+        RayTracing::MaterialType::MetalMatData matData{};
+        uint32_t GetDataSize() const override
+        {
+            return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Metal];
+        }
+        void CopyData(void* dest) const override
+        {
+            assert(dest != nullptr);
+            memcpy(dest, &matData.albedo, 3 * sizeof(float));
+            memcpy(static_cast<uint8_t*>(dest) + 3 * sizeof(float), &matData.fuzz, sizeof(matData.fuzz));
+        }
+    };
+
+    struct DielectricMaterial : public RTMaterial
+    {
+        RayTracing::MaterialType::DielectricMatData matData{};
+        uint32_t GetDataSize() const override
+        {
+            return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Dielectric];
+        }
+
+        void CopyData(void* dest) const override
+        {
+            assert(dest != nullptr);
+            memcpy(dest, &matData.refractiveIndex, GetDataSize());
+        }
     };
 }
 

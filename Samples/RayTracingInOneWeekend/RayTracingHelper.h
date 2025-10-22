@@ -21,6 +21,7 @@ namespace DSM {
                 RayTracingOutput = 0,
                 AccelerationStructure,
                 SceneConstantBuffer,
+                MaterialBuffer,
                 Count
             };
         }
@@ -46,7 +47,7 @@ namespace DSM {
 
         namespace Triangle {
             enum Slot {
-                Material = 0,
+                MaterialType,
                 IndexBuffer,
                 NormalBuffer,
                 UVBuffer,
@@ -54,7 +55,7 @@ namespace DSM {
                 Count
             };
             struct RootArguments {
-                MaterialConstantBuffer material;
+                RayTracing::MaterialConstants material;
                 D3D12_GPU_VIRTUAL_ADDRESS indexBuffer;
                 D3D12_GPU_VIRTUAL_ADDRESS normalBuffer;
                 D3D12_GPU_VIRTUAL_ADDRESS uvBuffer;
@@ -64,14 +65,14 @@ namespace DSM {
 
         namespace AABB{
             enum Slot{
-                Material = 0,
+                MaterialType,
                 Textures,
                 PrimitiveInstance,
                 Count
             };
             // 16 字节对齐
             struct RootArguments{
-                MaterialConstantBuffer material;
+                RayTracing::MaterialConstants material;
                 D3D12_GPU_DESCRIPTOR_HANDLE textures;   // 6 个 PBR 纹理
                 RayTracing::PrimitiveInstanceConstantBuffer primitiveInstance;
             };

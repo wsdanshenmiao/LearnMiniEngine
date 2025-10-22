@@ -3,12 +3,15 @@
 #define __GAMECORE_H__
 
 #include "../pch.h"
+#include "CpuTimer.h"
 
 namespace DSM {
     class RenderContext;
 }
 
 namespace DSM::GameCore {
+    extern CpuTimer g_Timer;
+
     // 程序抽象类
     struct IGameApp
     {

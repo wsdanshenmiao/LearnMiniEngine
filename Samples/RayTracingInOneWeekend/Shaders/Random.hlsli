@@ -1,119 +1,119 @@
 #ifndef __RANDOM_HLSLI__
 #define __RANDOM_HLSLI__
 
-struct PCGState { uint state; };
 
-static PCGState sGlobalState;
+static const float sPI = 3.14159265;
 
-// 初始化随机种子（每条光线独立 RNG）
-void PCG_Init(uint2 pixel, uint frameIndex)
+// 初始化PCG状态
+uint PCG_Init(uint2 pixel, uint frameIndex)
 {
-    sGlobalState.state = pixel.x * 1973 + pixel.y * 9277 + frameIndex * 26699;
-    sGlobalState.state ^= (sGlobalState.state << 13); 
-    sGlobalState.state ^= (sGlobalState.state >> 17);
-    sGlobalState.state ^= (sGlobalState.state << 5);
+    uint state = (pixel.x * 1973u + pixel.y * 9277u + frameIndex * 26699u) | 1u;
+    return state * 747796405u + 2891336453u;
 }
 
-// 生成 0~1 随机 float
-float RandomFloat()
+// 生成32位随机整数（会更新 state）
+uint RandomUint(inout uint state)
 {
-    sGlobalState.state = sGlobalState.state * 747796405u + 2891336453u; // PCG 步进
-    uint word = ((sGlobalState.state >> ((sGlobalState.state >> 28) + 4)) ^ sGlobalState.state) * 277803737u;
-    return (word >> 22) * (1.0f / 4194304.0f);
+    // PCG状态更新 (LCG: state = state * multiplier + increment)
+    state = state * 747796405u + 2891336453u;
+
+    // PCG输出函数 (XSH-RR变体)
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
 }
 
-float RandomFloat(float min, float max)
+uint RandomUint(inout uint state, uint min, uint max)
 {
-    return RandomFloat() * (max - min) + min;
+    uint range = max - min;
+    return min + (RandomUint(state) % range);
 }
 
-int RandomInt()
+// 生成 0~1 随机 float （[0,1)）
+float RandomFloat(inout uint state)
 {
-    return int(RandomFloat());
+    return float(RandomUint(state)) * (1.0f / 4294967296.0f);
 }
 
-int RandomInt(int min, int max)
+float RandomFloat(inout uint state, float min, float max)
 {
-    return RandomInt() * (max - min) + min;
+    return lerp(min, max, RandomFloat(state));
 }
 
-uint RandomUint()
+int RandomInt(inout uint state, int minInclusive, int maxExclusive)
 {
-    return uint(RandomFloat());
+    return minInclusive + int(RandomUint(state) % asuint(maxExclusive - minInclusive));
 }
 
-uint RandomUint(uint min, uint max)
+float2 RandomFloat2(inout uint state)
 {
-    return RandomUint() * (max - min) + min;
+    return float2(RandomFloat(state), RandomFloat(state));
 }
 
-float2 RandomFloat2()
+float2 RandomFloat2(inout uint state, float2 min, float2 max)
 {
-    return float2(RandomFloat(), RandomFloat());
+    return RandomFloat2(state) * (max - min) + min;
 }
 
-float2 RandomFloat2(float2 min, float2 max)
+float3 RandomFloat3(inout uint state)
 {
-    return RandomFloat2() * (max - min) + min;
+    return float3(RandomFloat(state), RandomFloat(state), RandomFloat(state));
 }
 
-float3 RandomFloat3()
+float3 RandomFloat3(inout uint state, float3 min, float3 max)
 {
-    return float3(RandomFloat(), RandomFloat(), RandomFloat());
+    return RandomFloat3(state) * (max - min) + min;
 }
 
-float3 RandomFloat3(float3 min, float3 max)
+float4 RandomFloat4(inout uint state)
 {
-    return RandomFloat3() * (max - min) + min;
+    return float4(RandomFloat(state), RandomFloat(state), RandomFloat(state), RandomFloat(state));
 }
 
-// 生成均匀分布的随机向量
-float3 RandomUnitVector()
+float4 RandomFloat4(inout uint state, float4 min, float4 max)
 {
-    // 获取二维圆盘上的均匀分布点
-    float x1, x2, s;
-    do {
-        x1 = RandomFloat() * 2.0 - 1.0; // [-1, 1]
-        x2 = RandomFloat() * 2.0 - 1.0; // [-1, 1]
-        s = x1 * x1 + x2 * x2;
-    } while (s >= 1.0); // 这个循环通常很快收敛
-    
-    // 映射到三维单位球面上
-    float sqrt_val = sqrt(1.0 - s);
-    return float3(2.0 * x1 * sqrt_val,
-                  2.0 * x2 * sqrt_val,
-                  1.0 - 2.0 * s);
+    return RandomFloat4(state) * (max - min) + min;
+}
+
+// 生成均匀分布的随机向量（单位球面）
+float3 RandomUnitVector(inout uint state)
+{
+    float z = RandomFloat(state) * 2.0 - 1.0;           // [-1, 1]
+    float phi = 2.0 * sPI * RandomFloat(state);         // [0, 2π)
+    float r = sqrt(max(0.0, 1.0 - z * z));        // 投影到 xy 平面的半径
+    float x = r * cos(phi);
+    float y = r * sin(phi);
+    return float3(x, y, z);  
 }
 
 // 在半球体上生成均匀随机方向
-float3 RandomOnHemiSphere(float3 normal)
+float3 RandomOnHemiSphere(inout uint state, float3 normal)
 {
-    float3 dir = RandomUnitVector();
+    float3 dir = RandomUnitVector(state);
     dir = dot(dir, normal) < 0 ? -dir : dir;
     return dir;
 }
 
 // 单位圆盘上的均匀随机点
-float3 RandomInUnitDisk() {
+float3 RandomInUnitDisk(inout uint state)
+{
     // 最多尝试4次以找到盘内点
     for(int i = 0; i < 4; ++i){
-        float3 vec = float3(RandomFloat(-1,1), RandomFloat(-1,1), 0);
+        float3 vec = float3(RandomFloat(state, -1, 1), RandomFloat(state, -1, 1), 0);
         if (dot(vec, vec) < 1)
             return vec;
     }
     // 这样生成是不均匀的
-    return float3(normalize(float2(RandomFloat(-1,1), RandomFloat(-1,1))), 0);
+    return float3(normalize(float2(RandomFloat(state, -1, 1), RandomFloat(state, -1, 1))), 0);
 }
 
 // 生成余弦加权的向量
-float3 RandomCosineDirection()
+float3 RandomCosineDirection(inout uint state)
 {
-    const float PI = 3.14159265;
-    float r1 = RandomFloat();
+    float r1 = RandomFloat(state);
     // 随机极角
-    float phi = 2 * PI * r1;
+    float phi = 2 * sPI * r1;
     // 随机半径
-    float r2 = sqrt(RandomFloat());
+    float r2 = sqrt(RandomFloat(state));
 
     float x = cos(phi) * r2;
     float y = sin(phi) * r2;

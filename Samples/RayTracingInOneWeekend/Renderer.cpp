@@ -6,6 +6,7 @@
 #include "ImguiManager.h"
 #include "Model.h"
 #include "Material.h"
+#include "Core/GameCore.h"
 
 namespace DSM {
 
@@ -24,23 +25,24 @@ namespace DSM {
         // 给 HitGroup 设置的资源
         auto& triangleRootSig = m_LocalRootSigs[LocalRootSignature::Type::Triangle];
         auto& aabbRootSig = m_LocalRootSigs[LocalRootSignature::Type::AABB];
-        triangleRootSig[LocalRootSignature::Triangle::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
         triangleRootSig[LocalRootSignature::Triangle::Slot::IndexBuffer].InitAsBufferSRV(1);
         triangleRootSig[LocalRootSignature::Triangle::Slot::NormalBuffer].InitAsBufferSRV(2);
         triangleRootSig[LocalRootSignature::Triangle::Slot::UVBuffer].InitAsBufferSRV(3);
         triangleRootSig[LocalRootSignature::Triangle::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 1);
+        triangleRootSig[LocalRootSignature::Triangle::Slot::MaterialType].InitAsConstants(1, Math::AlignUp(sizeof(RayTracing::MaterialConstants), 4) / 4);
         triangleRootSig.Finalize(L"RayTracingLocalRootSignature_Triangle", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
 
         size_t instanceCBSize = Math::AlignUp(sizeof(RayTracing::PrimitiveInstanceConstantBuffer), 4);
         aabbRootSig[LocalRootSignature::AABB::Slot::PrimitiveInstance].InitAsConstants(2, instanceCBSize / sizeof(uint32_t));
-        aabbRootSig[LocalRootSignature::AABB::Slot::Material].InitAsConstants(1, Math::AlignUp(sizeof(MaterialConstantBuffer), 4) / sizeof(uint32_t));
-        aabbRootSig[LocalRootSignature::AABB::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, kNumTextures);
+        aabbRootSig[LocalRootSignature::AABB::Slot::Textures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 1);
+        aabbRootSig[LocalRootSignature::AABB::Slot::MaterialType].InitAsConstants(1, Math::AlignUp(sizeof(RayTracing::MaterialConstants), 4) / 4);
         aabbRootSig.Finalize(L"RayTracingLocalRootSignature_AABB", D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE);
 
         m_GlobalRootSig[GlobalRootSignature::RayTracing::RayTracingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  // RayTracingOutput
         m_GlobalRootSig[GlobalRootSignature::RayTracing::AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
         m_GlobalRootSig[GlobalRootSignature::RayTracing::SceneConstantBuffer].InitAsConstantBuffer(0);
-       m_GlobalRootSig.InitStaticSampler(GlobalRootSignature::StaticSampler::AnisoWrap, Graphics::SamplerAnisoWrap);
+        m_GlobalRootSig[GlobalRootSignature::RayTracing::MaterialBuffer].InitAsBufferSRV(0, D3D12_SHADER_VISIBILITY_ALL, 1);
+        m_GlobalRootSig.InitStaticSampler(GlobalRootSignature::StaticSampler::AnisoWrap, Graphics::SamplerAnisoWrap);
         m_GlobalRootSig.Finalize(L"RayTracingGlobalRootSignature");
 
         CreateStateObject();
@@ -91,8 +93,7 @@ namespace DSM {
         raytracingShaderDesc.m_Type = ShaderType::Lib;
         raytracingShaderDesc.m_Mode = ShaderMode::SM_6_6;
         raytracingShaderDesc.m_FileName = "Shaders//RayTracing.hlsl";
-        raytracingShaderDesc.m_Defines.AddDefine(
-            "MAX_TRACE_RECURSION_DEPTH", std::to_string(ImguiManager::GetInstance().maxTraceRecursionDepth));
+        raytracingShaderDesc.m_Defines.AddDefine("MAX_TRACE_RECURSION_DEPTH", std::to_string(ImguiManager::GetInstance().maxTraceRecursionDepth));
         ShaderByteCode shaderLib{raytracingShaderDesc};
 
         // DXIL library
@@ -140,7 +141,7 @@ namespace DSM {
 
         // Shader config
         D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
-        shaderConfig.MaxPayloadSizeInBytes = (std::max)(sizeof(RayTracing::RayPayload), sizeof(RayTracing::ShadowRayPayload)); // 光线的颜色
+        shaderConfig.MaxPayloadSizeInBytes = sizeof(RayTracing::RayPayload); // 光线的颜色
         shaderConfig.MaxAttributeSizeInBytes = sizeof(RayTracing::ProceduralPrimitiveAttributes); // 三角形的重心坐标
 
         D3D12_STATE_SUBOBJECT shaderConfigSubobject{};
@@ -225,47 +226,28 @@ namespace DSM {
     RayTracer::RayTracer()
         :m_ProceduralGeometryManager(std::make_unique<ProceduralGeometryManager>())
     {
-        m_DirLights.emplace_back();
-
-        GpuBufferDesc lightDataBufferDesc{};
-        lightDataBufferDesc.m_Size = Math::AlignUp(sizeof(LightData), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-        lightDataBufferDesc.m_Stride = lightDataBufferDesc.m_Size;
-        m_LightDataBuffer.Create(L"RayTracer::LightDataBuffer", lightDataBufferDesc);
-
-        GpuBufferDesc dirLightDataBufferDesc{};
-        dirLightDataBufferDesc.m_Size = sizeof(DirectionalLightData) * sm_MaxDirLightCount;
-        dirLightDataBufferDesc.m_Stride = sizeof(DirectionalLightData);
-        m_DirLightDataBuffer.Create(L"RayTracer::DirLightDataBuffer", dirLightDataBufferDesc);
     }
     
     void RayTracer::TraceRays(ComputeCommandList &cmdList)
     {
         ASSERT(m_Camera != nullptr);
 
-        if (m_Models.empty()) 
+        if (m_Models.empty() && m_ProceduralGeometryManager->GetAllGeometry().empty())
             return;
 
-        auto& imgui = ImguiManager::GetInstance();
-
-        if(m_MaxDepth != imgui.maxTraceRecursionDepth){
-            m_MaxDepth = imgui.maxTraceRecursionDepth;
-            Renderer::GetInstance().CreateStateObject();
+        if(m_HasChanged){
+            CreateAccelerationStructure();
             CreateShaderTable();
-        }
-        if(m_SamplePerPixel != imgui.samplePerPixel) {
-            m_SamplePerPixel = imgui.samplePerPixel;
-        }
-        if(m_BackgroundColor != imgui.backgroundColor) {
-            m_BackgroundColor = imgui.backgroundColor;
+            m_HasChanged = false;
         }
 
-        if(!m_DirLights.empty()){
-            static uint32_t dirLightCount = 0;
-            if(dirLightCount != m_DirLights.size()){
-                LightData lightData{static_cast<uint32_t>(m_DirLights.size())};
-                cmdList.WriteBuffer(m_LightDataBuffer, 0, &lightData, sizeof(LightData));
-                cmdList.WriteBuffer(m_DirLightDataBuffer, 0, m_DirLights.data(), m_DirLights.size() * sizeof(DirectionalLightData));
-            }
+        auto& imgui = ImguiManager::GetInstance();
+        
+        static uint32_t maxTraceRecursionDepth = imgui.maxTraceRecursionDepth;
+        if(imgui.maxTraceRecursionDepth != maxTraceRecursionDepth){
+            maxTraceRecursionDepth = imgui.maxTraceRecursionDepth;
+            g_Renderer.CreateStateObject();
+            CreateShaderTable();
         }
 
         uint32_t width = m_Camera->GetViewPort().Width;
@@ -274,20 +256,22 @@ namespace DSM {
         cmdList.SetRootSignature(g_Renderer.m_GlobalRootSig);
         cmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
 
+        static uint32_t frameIndex = 0;
         float focusDist = 10;
         auto h = std::tan(m_Camera->GetFovY() * .5f);
         auto viewportHeight = 2 * h * focusDist;
         float viewportWidth = viewportHeight * (float(width) / height);
         RayTracing::SceneConstantBuffer sceneCB{};
         sceneCB.cameraPosAndFocusDist = Math::Vector4{m_Camera->GetPosition(), focusDist};
-        sceneCB.viewportU = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth};
-        sceneCB.viewportV = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight};
-        sceneCB.bgColorAndSPP = Math::Vector4{m_BackgroundColor, static_cast<float>(m_SamplePerPixel)};
+        sceneCB.viewportUAndFrameIndex = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth, float(frameIndex++)};
+        sceneCB.viewportVAndSamplePerPixel = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight, float(imgui.samplesPerPixel)};
+        sceneCB.backgroundColorAndTotalTime = Math::Vector4{imgui.backgroundColor, GameCore::g_Timer.TotalTime()};
 
         cmdList.SetDescriptorTable(GlobalRootSignature::RayTracing::RayTracingOutput, g_Renderer.m_OutputUAV);
         cmdList.SetShaderResource(GlobalRootSignature::RayTracing::AccelerationStructure, m_TopLevelAS.accelerationStructure);
         cmdList.SetDynamicConstantBuffer(GlobalRootSignature::RayTracing::SceneConstantBuffer, sizeof(RayTracing::SceneConstantBuffer), &sceneCB);
-        
+        cmdList.SetShaderResource(GlobalRootSignature::RayTracing::MaterialBuffer, m_MaterialBuffer);
+
         D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
         dispatchDesc.HitGroupTable.StartAddress = m_HitShaderTable->GetGPUVirtualAddress();
         dispatchDesc.HitGroupTable.SizeInBytes = m_HitShaderTable.GetSize();
@@ -307,25 +291,13 @@ namespace DSM {
     void RayTracer::AddModel(std::shared_ptr<Model> model)
     {
         m_Models.push_back(model);
-        CreateAccelerationStructure();
-        CreateShaderTable();
+        m_HasChanged = true;
     }
 
     void RayTracer::AddProceduralGeometry(const ProceduralGeometryDesc &desc)
     {
         m_ProceduralGeometryManager->AddGeometry(desc);
-        CreateAccelerationStructure();
-        CreateShaderTable();
-    }
-
-    void RayTracer::AddLight(const Light &light)
-    {
-        switch (light.lightType) {
-        case LightType::Directional:
-            m_DirLights.emplace_back(light.color, -Math::Vector4{light.transform.GetForwardAxis()}); break;
-        default:
-            break;
-        }
+        m_HasChanged = true;
     }
 
     void RayTracer::CreateAccelerationStructure()
@@ -494,6 +466,9 @@ namespace DSM {
         missShaderTableDesc.m_Stride = shaderIdSize;
         m_MissShaderTable.Create(L"MissShaderTable", missShaderTableDesc, missShaderTableData.data());
 
+        uint32_t matDataOffset = 0;
+        std::vector<uint8_t> materialData{};
+
         // Hit 着色器表
         uint32_t hitGroupShaderRecordSize = shaderIdSize + LocalRootSignature::MaxRootArgumentsSize();
         hitGroupShaderRecordSize = Math::AlignUp(hitGroupShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
@@ -510,17 +485,23 @@ namespace DSM {
                         if(i == RayTracing::RayType::Radiance){ // 只有渲染光线需要填入根参数
                             LocalRootSignature::Triangle::RootArguments rootArgs{};
                             auto meshMat = model->materials[submesh.m_MaterialIndex];
-                            rootArgs.material.baseColor = meshMat->baseColor;
-                            rootArgs.material.emissiveColor = meshMat->emissiveColor;
-                            rootArgs.material.metallicFactor = meshMat->metallicFactor;
-                            rootArgs.material.roughnessFactor = meshMat->roughnessFactor;
-                            rootArgs.material.normalTexScale = meshMat->normalTexScale;
+                            
                             rootArgs.indexBuffer = mesh->m_IndexBufferViews.BufferLocation + submesh.m_IndexOffset * sizeof(uint32_t);
                             rootArgs.normalBuffer = mesh->m_NormalStream.BufferLocation + 
                                 submesh.m_VertexOffset * mesh->m_NormalStream.StrideInBytes;
                             rootArgs.uvBuffer = mesh->m_UVStream.BufferLocation + 
                                 submesh.m_VertexOffset * mesh->m_UVStream.StrideInBytes;
-                            rootArgs.textures = g_Renderer.m_TextureHeap[submesh.m_SRVTableOffset];
+                            
+                                rootArgs.textures = g_Renderer.m_TextureHeap[submesh.m_SRVTableOffset];
+
+                            LambertianMaterial lambertianMat{};
+                            lambertianMat.matData.albedo = Math::Vector3{meshMat->baseColor};
+                            rootArgs.material.type = lambertianMat.materialType;
+                            rootArgs.material.matDataOffset = matDataOffset;
+                            materialData.resize(matDataOffset + lambertianMat.GetDataSize());
+                            lambertianMat.CopyData(materialData.data() + matDataOffset);
+                            matDataOffset += lambertianMat.GetDataSize();
+                            
                             memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
                         }
                         hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
@@ -537,12 +518,15 @@ namespace DSM {
                 if(i == RayTracing::RayType::Radiance){
                     LocalRootSignature::AABB::RootArguments rootArgs{};
                     rootArgs.primitiveInstance.primitiveType = geometry.type;
-                    rootArgs.material.baseColor = geometry.material->baseColor;
-                    rootArgs.material.emissiveColor = geometry.material->emissiveColor;
-                    rootArgs.material.roughnessFactor = geometry.material->roughnessFactor;
-                    rootArgs.material.metallicFactor = geometry.material->metallicFactor;
-                    rootArgs.material.normalTexScale = geometry.material->normalTexScale;
+
                     rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
+                    
+                    rootArgs.material.type = geometry.material->materialType;
+                    rootArgs.material.matDataOffset = matDataOffset;
+                    materialData.resize(matDataOffset + geometry.material->GetDataSize());
+                    geometry.material->CopyData(materialData.data() + matDataOffset);
+                    matDataOffset += geometry.material->GetDataSize();
+                    
                     memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
                 }
                 hitGroupShaderTableData.append_range(hitGroupShaderRecordData);
@@ -554,6 +538,11 @@ namespace DSM {
         hitShaderTableDesc.m_Stride = hitGroupShaderRecordSize;
         hitGroupShaderTableData.resize(hitShaderTableDesc.m_Size);
         m_HitShaderTable.Create(L"HitShaderTable", hitShaderTableDesc, hitGroupShaderTableData.data());
+
+        GpuBufferDesc materialBufferDesc{};
+        materialBufferDesc.m_Size = materialData.size();
+        materialBufferDesc.m_Stride = 1;
+        m_MaterialBuffer.Create(L"MaterialBuffer", materialBufferDesc, materialData.data());
     }
 
 

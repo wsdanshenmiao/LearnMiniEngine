@@ -162,7 +162,7 @@ bool RayAnalyticPrimitiveIntersectionTest(
     default:
         return false;
     }
-}
+} 
 
 
 #endif

@@ -6,20 +6,20 @@ namespace DSM {
 
 	void ImguiManager::UpdateImGui(float time)
 	{
-		static std::array<float, 3> bgColor{};
+		float backgroundColorArr[3] = { backgroundColor.GetX(), backgroundColor.GetY(), backgroundColor.GetZ() };
 		float dt = time;
 		auto& io = ImGui::GetIO();
 
 		if (ImGui::Begin("ImGui"))
 		{
-			ImGui::ColorEdit3("Background Color", bgColor.data());
-			ImGui::Text("Sample Per Pixel: %d", samplePerPixel);
-			ImGui::SliderInt("##1", (int*)&samplePerPixel, 1, 100, "");
-			ImGui::Text("Max Trace Recursion Depth: %d", maxTraceRecursionDepth);
-			ImGui::SliderInt("##2", (int*)&maxTraceRecursionDepth, 1, 32, "");
+			ImGui::ColorEdit3("Background Color", backgroundColorArr);
+			ImGui::Text("Max Trace Depth: %d", maxTraceRecursionDepth);
+			ImGui::SliderInt("##1", (int*)&maxTraceRecursionDepth, 1, 32);
+			ImGui::Text("Samples Per Pixel: %d", samplesPerPixel);
+			ImGui::SliderInt("##2", (int*)&samplesPerPixel, 1, 100);
 		}
 		ImGui::End();
 
-		backgroundColor = Math::Vector3{ bgColor[0], bgColor[1], bgColor[2] };
+		backgroundColor = { backgroundColorArr[0], backgroundColorArr[1], backgroundColorArr[2] };
 	}
 }

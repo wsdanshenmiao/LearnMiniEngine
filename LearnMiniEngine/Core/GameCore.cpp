@@ -2,7 +2,6 @@
 
 #include "Window.h"
 #include "Utilities/Macros.h"
-#include "CpuTimer.h"
 #include "Graphics/RenderContext.h"
 #include <iostream>
 

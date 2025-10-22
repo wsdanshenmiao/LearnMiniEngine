@@ -86,9 +86,7 @@ namespace DSM{
 
     void ProceduralGeometryManager::AddGeometry(const ProceduralGeometryDesc &desc)
     {
-        auto createInstance = [this, &desc](auto primitiveType){
-            assert(desc.material != nullptr);
-
+        auto createInstance = [&](auto primitiveType){
             const auto& sphereBottomLevelAS = m_AnalyticPrimitives[primitiveType].accelerationStructure;
             D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
             instanceDesc.InstanceID = static_cast<UINT>(m_ProceduralGeometrys.size());
@@ -121,9 +119,6 @@ namespace DSM{
             g_RenderContext.GetDevice()->CopyDescriptors(
                 1, &texHandle, &destCount, destCount, defaultTexture, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-            GpuBufferDesc materialBufferDesc{};
-            materialBufferDesc.m_Size = sizeof(MaterialConstantBuffer);
-            materialBufferDesc.m_Stride = sizeof(MaterialConstantBuffer);
             ProceduralGeometry geometry{};
             geometry.type = desc.type;
             geometry.material = desc.material;

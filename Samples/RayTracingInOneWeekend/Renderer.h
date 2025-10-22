@@ -10,7 +10,6 @@
 #include "Graphics/PipelineState.h"
 #include "Graphics/ShaderCompiler.h"
 #include "Core/Camera.h"
-#include "Light.h"
 #include "RayTracingHelper.h"
 #include "ProceduralGeometry.h"
 #include "Shaders/RayTracingHLSLCompat.h"
@@ -45,20 +44,17 @@ namespace DSM {
     public:
         inline static const wchar_t* s_RayGenShaderName = L"RaygenShader";
         inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_MissShaderName = { 
-            L"MissShader",
-            L"MissShader_Shadow"
+            L"MissShader"
         };
         inline static std::array<const wchar_t*, GeometryType::Count> s_ClosestHitShaderName = { 
             L"ClosestHitShader_Triangle",
             L"ClosestHitShader_AABB"
         };
         inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_Triangle = { 
-            L"HitGroup_Triangle",
-            L"HitGroup_Triangle_Shadow" 
+            L"HitGroup_Triangle"
         };
         inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_AABB = { 
-            L"HitGroup_AABB",
-            L"HitGroup_AABB_Shadow" 
+            L"HitGroup_AABB"
         };
         inline static std::array<const wchar_t*, IntersectionShaderType::Count> s_IntersectionShaderName = { 
             L"IntersectionShader_AnalyticPrimitive"
@@ -90,7 +86,6 @@ namespace DSM {
 
         void AddModel(std::shared_ptr<Model> model);
         void AddProceduralGeometry(const ProceduralGeometryDesc& desc);
-        void AddLight(const Light& light);
 
     private:
         void CreateAccelerationStructure();
@@ -101,6 +96,7 @@ namespace DSM {
 
     private:
         const Camera* m_Camera;
+        bool m_HasChanged = false;
 
         std::vector<std::shared_ptr<Model>> m_Models;
         std::unique_ptr<ProceduralGeometryManager> m_ProceduralGeometryManager;
@@ -114,14 +110,7 @@ namespace DSM {
         GpuBuffer m_MissShaderTable{};
         GpuBuffer m_HitShaderTable{};
 
-        // 光照信息
-        GpuBuffer m_LightDataBuffer;
-        GpuBuffer m_DirLightDataBuffer;
-        std::vector<DirectionalLightData> m_DirLights{};
-
-        Math::Vector3 m_BackgroundColor{0.7f, 0.8f, 1.0f};
-        uint32_t m_SamplePerPixel = 0;
-        uint32_t m_MaxDepth = 5;
+        GpuBuffer m_MaterialBuffer{};
     };
 
 
