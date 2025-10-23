@@ -86,6 +86,7 @@ namespace DSM {
 
         void AddModel(std::shared_ptr<Model> model);
         void AddProceduralGeometry(const ProceduralGeometryDesc& desc);
+        void AddProceduralGeometries(std::span<ProceduralGeometryDesc> descs);
 
     private:
         void CreateAccelerationStructure();

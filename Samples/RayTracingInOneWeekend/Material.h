@@ -32,6 +32,12 @@ namespace DSM {
     struct LambertianMaterial : public RTMaterial
     {
         RayTracing::MaterialType::LambertianMatData matData{};
+
+        LambertianMaterial()
+        {
+            materialType = RayTracing::MaterialType::Lambertian;
+        }
+
         uint32_t GetDataSize() const override
         {
             return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Lambertian];
@@ -47,6 +53,12 @@ namespace DSM {
     struct MetalMaterial : public RTMaterial
     {
         RayTracing::MaterialType::MetalMatData matData{};
+
+        MetalMaterial()
+        {
+            materialType = RayTracing::MaterialType::Metal;
+        }
+
         uint32_t GetDataSize() const override
         {
             return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Metal];
@@ -62,6 +74,12 @@ namespace DSM {
     struct DielectricMaterial : public RTMaterial
     {
         RayTracing::MaterialType::DielectricMatData matData{};
+
+        DielectricMaterial()
+        {
+            materialType = RayTracing::MaterialType::Dielectric;
+        }
+
         uint32_t GetDataSize() const override
         {
             return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::Dielectric];

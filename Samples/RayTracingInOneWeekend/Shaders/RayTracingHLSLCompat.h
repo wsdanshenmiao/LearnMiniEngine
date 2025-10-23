@@ -42,10 +42,11 @@ namespace RayTracing {
     struct SceneConstantBuffer
     {
         // 生成光线使用的数据
-        float4 cameraPosAndFocusDist;
+        float4 cameraPos;
         float4 viewportUAndFrameIndex;
         float4 viewportVAndSamplePerPixel;
         float4 backgroundColorAndTotalTime;
+        float4 focusDistDefocusAngle;
     };
 
     struct PrimitiveInstanceConstantBuffer

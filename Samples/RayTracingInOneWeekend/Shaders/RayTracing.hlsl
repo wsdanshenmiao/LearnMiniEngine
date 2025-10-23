@@ -17,20 +17,30 @@ StructuredBuffer<float2> lUVBuffer : register(t3);
 // Procedural Geometry Local
 ConstantBuffer<RayTracing::PrimitiveInstanceConstantBuffer> lPrimitiveInstanceCB : register(b2);
 
-RayTracing::Ray GenerateCameraRay(
-    uint2 index, 
-    float3 cameraPos, 
-    float3 viewportStart, 
-    float3 pixelDeltaU, 
-    float3 pixelDeltaV,
-    inout uint seed)
+struct GenerateCameraRayParams
 {
+    uint2 index;
+    float3 cameraPos;
+    float3 viewportStart;
+    float3 pixelDeltaU;
+    float3 pixelDeltaV;
+    float3 defocusU;
+    float3 defocusV;
+};
+
+RayTracing::Ray GenerateCameraRay(GenerateCameraRayParams params, inout uint seed)
+{
+    // 在像素内随机取样
     float2 offset = RandomFloat2(seed, -0.5f, 0.5f);
-    float2 pixelOffset = float2(index) + offset;
-    float3 pixelSample = viewportStart + pixelOffset.x * pixelDeltaU + pixelOffset.y * pixelDeltaV;
+    float2 pixelOffset = float2(params.index) + offset;
+    float3 pixelSample = params.viewportStart + pixelOffset.x * params.pixelDeltaU + pixelOffset.y * params.pixelDeltaV;
+
+    // 进行散焦模糊的随机偏移
+    float2 defocusDisk = RandomInUnitDisk(seed);
+    float3 center = params.cameraPos + defocusDisk.x * params.defocusU + defocusDisk.y * params.defocusV;
 
     RayTracing::Ray ray;
-    ray.origin = cameraPos;
+    ray.origin = center;
     ray.direction = normalize(pixelSample - ray.origin);
     return ray;
 }
@@ -54,7 +64,7 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
     rayDesc.Origin = ray.origin;
     rayDesc.Direction = ray.direction;
     rayDesc.TMin = 0.001f;
-    rayDesc.TMax = 10000.0f;
+    rayDesc.TMax = 1000.0f;
 
     RayTracing::RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
@@ -79,16 +89,20 @@ void RaygenShader()
     uint2 dimension = DispatchRaysDimensions().xy;
     uint2 index = DispatchRaysIndex().xy;
 
-    float3 cameraPos = gSceneCB.cameraPosAndFocusDist.xyz;
-    float focusDist = gSceneCB.cameraPosAndFocusDist.w;
+    // 获取常量缓冲区中的数据
+    float3 cameraPos = gSceneCB.cameraPos.xyz;
+    float focusDist = gSceneCB.focusDistDefocusAngle.x;
+    float defocusAngle = max(0, gSceneCB.focusDistDefocusAngle.y);
     float3 viewportU = gSceneCB.viewportUAndFrameIndex.xyz;
     float3 viewportV = gSceneCB.viewportVAndSamplePerPixel.xyz;
     float samplesPerPixel = gSceneCB.viewportVAndSamplePerPixel.w;
     float totalTime = gSceneCB.backgroundColorAndTotalTime.w;
     uint frameIndex = uint(gSceneCB.viewportUAndFrameIndex.w);
 
+    // 初始化随机数状态
     uint pcgState = PCG_Init(index, asuint(frameIndex * totalTime));
 
+    // 计算摄像机光线参数
     float3 front = normalize(cross(viewportV, viewportU));
 
     float3 pixelDeltaU = viewportU / dimension.x;
@@ -96,11 +110,25 @@ void RaygenShader()
     
     float3 viewportStart = cameraPos + front * focusDist - (viewportU + viewportV) * 0.5f;
     viewportStart += (pixelDeltaU + pixelDeltaV) * 0.5f;
+    
+    // 计算散焦模糊参数
+    float defocusRadius = focusDist * tan(defocusAngle * 0.5f);
+    float3 defocusU = normalize(viewportU) * defocusRadius;
+    float3 defocusV = normalize(viewportV) * defocusRadius;
+
+    GenerateCameraRayParams genParams;
+    genParams.index = index;
+    genParams.cameraPos = cameraPos;
+    genParams.viewportStart = viewportStart;
+    genParams.pixelDeltaU = pixelDeltaU;
+    genParams.pixelDeltaV = pixelDeltaV;
+    genParams.defocusU = defocusU;
+    genParams.defocusV = defocusV;
 
     float4 color = float4(0,0,0,1);
     uint spp = uint(samplesPerPixel);
     for(uint sampleIndex = 0; sampleIndex < spp; ++sampleIndex){
-        RayTracing::Ray ray = GenerateCameraRay(index, cameraPos, viewportStart, pixelDeltaU, pixelDeltaV, pcgState);
+        RayTracing::Ray ray = GenerateCameraRay(genParams, pcgState);
         color += TraceRadianceRay(ray, 0, pcgState);
     }
     color /= spp;

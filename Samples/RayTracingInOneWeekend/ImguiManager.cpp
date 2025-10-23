@@ -17,6 +17,10 @@ namespace DSM {
 			ImGui::SliderInt("##1", (int*)&maxTraceRecursionDepth, 1, 32);
 			ImGui::Text("Samples Per Pixel: %d", samplesPerPixel);
 			ImGui::SliderInt("##2", (int*)&samplesPerPixel, 1, 100);
+			ImGui::Text("Focus Distance: %.2f", focusDist);
+			ImGui::SliderFloat("##3", &focusDist, 0.5f, 50.0f);
+			ImGui::Text("Defocus Angle: %.2f", defocusAngle);
+			ImGui::SliderFloat("##4", &defocusAngle, 0.0f, 90.0f);
 		}
 		ImGui::End();
 

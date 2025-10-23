@@ -7,6 +7,7 @@
 #include "Model.h"
 #include "Material.h"
 #include "Core/GameCore.h"
+#include <numbers>
 
 namespace DSM {
 
@@ -257,15 +258,16 @@ namespace DSM {
         cmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
 
         static uint32_t frameIndex = 0;
-        float focusDist = 10;
+        float focusDist = imgui.focusDist;
         auto h = std::tan(m_Camera->GetFovY() * .5f);
         auto viewportHeight = 2 * h * focusDist;
         float viewportWidth = viewportHeight * (float(width) / height);
         RayTracing::SceneConstantBuffer sceneCB{};
-        sceneCB.cameraPosAndFocusDist = Math::Vector4{m_Camera->GetPosition(), focusDist};
+        sceneCB.cameraPos = Math::Vector4{m_Camera->GetPosition()};
         sceneCB.viewportUAndFrameIndex = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth, float(frameIndex++)};
         sceneCB.viewportVAndSamplePerPixel = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight, float(imgui.samplesPerPixel)};
         sceneCB.backgroundColorAndTotalTime = Math::Vector4{imgui.backgroundColor, GameCore::g_Timer.TotalTime()};
+        sceneCB.focusDistDefocusAngle = Math::Vector4{focusDist, imgui.defocusAngle * float(std::numbers::pi) / 180.0f, 0.0f, 0.0f};
 
         cmdList.SetDescriptorTable(GlobalRootSignature::RayTracing::RayTracingOutput, g_Renderer.m_OutputUAV);
         cmdList.SetShaderResource(GlobalRootSignature::RayTracing::AccelerationStructure, m_TopLevelAS.accelerationStructure);
@@ -297,6 +299,14 @@ namespace DSM {
     void RayTracer::AddProceduralGeometry(const ProceduralGeometryDesc &desc)
     {
         m_ProceduralGeometryManager->AddGeometry(desc);
+        m_HasChanged = true;
+    }
+    
+    void DSM::RayTracer::AddProceduralGeometries(std::span<ProceduralGeometryDesc> descs)
+    {
+        for (const auto& desc : descs) {
+            m_ProceduralGeometryManager->AddGeometry(desc);
+        }
         m_HasChanged = true;
     }
 

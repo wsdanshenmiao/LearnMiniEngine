@@ -94,16 +94,11 @@ float3 RandomOnHemiSphere(inout uint state, float3 normal)
 }
 
 // 单位圆盘上的均匀随机点
-float3 RandomInUnitDisk(inout uint state)
+float2 RandomInUnitDisk(inout uint state)
 {
-    // 最多尝试4次以找到盘内点
-    for(int i = 0; i < 4; ++i){
-        float3 vec = float3(RandomFloat(state, -1, 1), RandomFloat(state, -1, 1), 0);
-        if (dot(vec, vec) < 1)
-            return vec;
-    }
-    // 这样生成是不均匀的
-    return float3(normalize(float2(RandomFloat(state, -1, 1), RandomFloat(state, -1, 1))), 0);
+    float radius = RandomFloat(state);
+    float angle = RandomFloat(state, 0, 2 * sPI);
+    return float2(cos(angle), sin(angle)) * radius;
 }
 
 // 生成余弦加权的向量
