@@ -17,6 +17,7 @@
 #include "Renderer.h"
 #include "ModelLoader.h"
 #include "ProceduralGeometry.h"
+#include <numbers>
 
 using namespace DSM;
 using namespace DirectX;
@@ -105,6 +106,68 @@ struct Scene
 
         return proceduralGeometries;
     }
+
+    static std::vector<ProceduralGeometryDesc> CreateCornellBox()
+    {
+        std::vector<ProceduralGeometryDesc> world;
+        float scale = 0.001f;
+
+        auto red = std::make_shared<LambertianMaterial>();
+        red->matData.albedo = Math::Vector3{.65, .05, .05};
+        auto green = std::make_shared<LambertianMaterial>();
+        green->matData.albedo = Math::Vector3{0.12, 0.45, 0.15};
+        auto white = std::make_shared<LambertianMaterial>();
+        white->matData.albedo = Math::Vector3{.73, .73, .73};
+
+        auto light = std::make_shared<DiffuseLightMaterial>();
+        light->matData.emitColor = Math::Vector3{15, 15, 15};
+
+        auto addQuad = [&world, scale](
+            const Math::Vector3& p0, 
+            float scaleU, float scaleV, 
+            const Math::Quaternion& rotation, 
+            std::shared_ptr<RTMaterial> material) {
+            ProceduralGeometryDesc quad{};
+            quad.type = RayTracing::AnalyticPrimitive::PrimitiveType::Quad;
+            quad.transform.SetPosition(p0 * scale);
+            quad.transform.SetScale(Math::Vector3{ scaleU, scaleV, 1.0f } * scale);
+            quad.transform.SetRotation(rotation);
+            quad.material = material;
+            world.push_back(quad);
+        };
+        float pi = (float)std::numbers::pi;
+        addQuad(Math::Vector3{-555,0,0}, 555, 555, Math::Quaternion{0, pi / 2, 0}, green);
+        addQuad(Math::Vector3{555,0,0}, 555, 555, Math::Quaternion{0, -pi / 2, 0}, red);
+        addQuad(Math::Vector3{343 - 555 / 2, 554, 332 - 555 / 2}, -130, -105, Math::Quaternion{pi / 2, 0, 0}, light);
+        addQuad(Math::Vector3{0,-555,0}, 555, 555, Math::Quaternion{pi / 2, 0, 0}, white);
+        addQuad(Math::Vector3{0,0,555}, -555, -555, Math::Quaternion{}, white);
+        addQuad(Math::Vector3{0,555,0}, 555, 555, Math::Quaternion{pi / 2, 0, 0}, white);
+
+        auto addBox = [&world, scale](
+            const Math::Vector3& min, 
+            const Math::Vector3& max, 
+            const Math::Quaternion& rotation, 
+            std::shared_ptr<RTMaterial> material) {
+            ProceduralGeometryDesc boxDesc{};
+            boxDesc.type = RayTracing::AnalyticPrimitive::PrimitiveType::Cube;
+            boxDesc.transform.SetPosition((min + max) * scale);
+            boxDesc.transform.SetScale((max - min) * scale);
+            boxDesc.transform.SetRotation(rotation);
+            boxDesc.material = material;
+            world.push_back(boxDesc);
+        };
+
+        addBox(
+            Math::Vector3{130 - 555 / 2, 0 - 555 / 2, 65 - 555 / 2}, 
+            Math::Vector3{295 - 555 / 2, 165 - 555 / 2, 230 - 555 / 2}, 
+            Math::Quaternion{0, -pi * 10.f / 180.f, 0}, white);
+        addBox(
+            Math::Vector3{265 - 555 / 2, 0 - 555 / 2, 295 - 555 / 2}, 
+            Math::Vector3{430 - 555 / 2, 330 - 555 / 2, 460 - 555 / 2}, 
+            Math::Quaternion{0, pi * 18.f / 180.f, 0}, white);
+
+        return world;
+    }
 };
 
 
@@ -132,8 +195,7 @@ public:
 		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
-        m_Camera->SetPosition({ 13,2,3 });
-        m_Camera->LookAt({ 0,0,0 }, { 0,1,0 });
+        m_Camera->SetPosition({ 0, 0, -2 });
 
         m_RayTracer = std::make_unique<RayTracer>();
         m_RayTracer->SetCamera(m_Camera.get());
@@ -150,8 +212,9 @@ public:
         // m_RayTracer->AddModel(lihuazou);
         // m_RayTracer->AddModel(sponza);
         // m_RayTracer->AddModel(plane);
-        
-        auto scene = Scene::CreateSphereScene();
+
+        // auto scene = Scene::CreateSphereScene();
+        auto scene = Scene::CreateCornellBox();
         m_RayTracer->AddProceduralGeometries(scene);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override

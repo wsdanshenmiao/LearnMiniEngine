@@ -135,7 +135,7 @@ void RaygenShader()
 
     // 手动进行伽马映射
     color.rgb = LinearToSRGB(color.rgb);
-    gOutput[index] = color;
+    gOutput[index] = select(isnan(color), float4(0, 0, 0, 1), color);
 }
 
 [shader("closesthit")]
@@ -165,17 +165,22 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
 
     float3 attenuation;
     float3 rayDir;
-    if(GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir)){
+    float3 emission;
+    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission);
+    [branch]
+    if(scatter) {
         Ray ray;
         ray.origin = surface.position;
         ray.direction = normalize(rayDir);
         float4 scatterCol = TraceRadianceRay(ray, payload.depth, surface.seed);
 
-        payload.color = float4(attenuation, 1) * scatterCol;
+        scatterCol *= float4(attenuation, 1);
+        payload.color = float4(scatterCol.rgb + emission, scatterCol.a);
     }
-    else{
-        payload.color = float4(0,0,0,1);
+    else {
+        payload.color = float4(emission, 1);
     }
+    payload.seed = surface.seed;
 }
 
 [shader("closesthit")]
@@ -195,17 +200,22 @@ void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::
 
     float3 attenuation;
     float3 rayDir;
-    if(GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir)){
+    float3 emission;
+    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission);
+    [branch]
+    if(scatter) {
         Ray ray;
         ray.origin = surface.position;
         ray.direction = normalize(rayDir);
         float4 scatterCol = TraceRadianceRay(ray, payload.depth, surface.seed);
 
-        payload.color = float4(attenuation, 1) * scatterCol;
+        scatterCol *= float4(attenuation, 1);
+        payload.color = float4(scatterCol.rgb + emission, scatterCol.a);
     }
-    else{
-        payload.color = float4(0,0,0,1);
+    else {
+        payload.color = float4(emission, 1);
     }
+    payload.seed = surface.seed;
 }
 
 [shader("miss")]

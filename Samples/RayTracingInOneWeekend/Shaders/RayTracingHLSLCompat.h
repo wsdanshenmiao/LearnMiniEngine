@@ -93,6 +93,7 @@ namespace RayTracing {
             Lambertian = 0,
             Metal,
             Dielectric,
+            DiffuseLight,
             Count
         };
 
@@ -109,10 +110,15 @@ namespace RayTracing {
             float refractiveIndex;
         };
 
+        struct DiffuseLightMatData{
+            float3 emitColor;
+        };
+
         static const uint MaterialDataSize[MaterialType::Count] = {
             12, // Lambertian
             16, // Metal
-            4   // Dielectric
+            4,  // Dielectric
+            12  // Light
         };
     }
 

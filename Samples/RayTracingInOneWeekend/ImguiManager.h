@@ -18,7 +18,7 @@ namespace DSM {
 	public:
 		uint32_t maxTraceRecursionDepth = 5;
 		uint32_t samplesPerPixel = 10;
-		Math::Vector3 backgroundColor = { 0.7f, 0.8f, 1.0f };
+		Math::Vector3 backgroundColor{};
 
 		float focusDist = 10.0f;	// 焦距
 		float defocusAngle = 0;		// 虚化角度

@@ -32,8 +32,23 @@ RayTracing::MaterialType::DielectricMatData GetDielectricMaterialData(uint matDa
     return matData;
 }
 
-bool ScatterLambertian(Surface surface, uint matDataOffset, out float3 attenuation, out float3 scatterDir)
+RayTracing::MaterialType::DiffuseLightMatData GetDiffuseLightMaterialData(uint matDataOffset)
 {
+    RayTracing::MaterialType::DiffuseLightMatData matData;
+    uint3 data = gMaterialBuffer.Load3(matDataOffset);
+    matData.emitColor = asfloat(data);
+    return matData;
+}
+
+bool ScatterLambertian(
+    Surface surface, 
+    uint matDataOffset, 
+    out float3 attenuation, 
+    out float3 scatterDir, 
+    out float3 emission)
+{
+    emission = float3(0,0,0);
+    
     RayTracing::MaterialType::LambertianMatData matData = GetLambertianMaterialData(matDataOffset);
     scatterDir = surface.normal + RandomUnitVector(surface.seed);
     if(NearZero(scatterDir)){
@@ -44,8 +59,10 @@ bool ScatterLambertian(Surface surface, uint matDataOffset, out float3 attenuati
     return true; 
 }
 
-bool ScatterMetal(Surface surface, uint matDataOffset, out float3 attenuation, out float3 scatterDir)
+bool ScatterMetal(Surface surface, uint matDataOffset, out float3 attenuation, out float3 scatterDir, out float3 emission)
 {
+    emission = float3(0,0,0);
+    
     RayTracing::MaterialType::MetalMatData matData = GetMetalMaterialData(matDataOffset);
     // 反射光线
     float3 reflected = reflect(WorldRayDirection(), surface.normal);
@@ -54,10 +71,12 @@ bool ScatterMetal(Surface surface, uint matDataOffset, out float3 attenuation, o
     return (dot(scatterDir, surface.normal) > 0);
 }
 
-bool ScatterDielectric(Surface surface, uint matDataOffset, out float3 attenuation, out float3 scatterDir)
+bool ScatterDielectric(Surface surface, uint matDataOffset, out float3 attenuation, out float3 scatterDir, out float3 emission)
 {
+    emission = float3(0,0,0);
+
     RayTracing::MaterialType::DielectricMatData matData = GetDielectricMaterialData(matDataOffset);
-    attenuation = float3(1.0f, 1.0f, 1.0f);
+    attenuation = surface.color;
 
     // 根据表面方向决定折射率
     float refractionRatio = surface.frontFace ? (1.0f / matData.refractiveIndex) : matData.refractiveIndex;
@@ -85,21 +104,35 @@ bool ScatterDielectric(Surface surface, uint matDataOffset, out float3 attenuati
     return true;
 }
 
+bool ScatterDiffuseLight(Surface surface, uint matDataOffset, out float3 attenuation, out float3 scatterDir, out float3 emission)
+{
+    // 发光材质不散射光线
+    attenuation = float3(0,0,0);
+    scatterDir = float3(0,0,0);
+    RayTracing::MaterialType::DiffuseLightMatData matData = GetDiffuseLightMaterialData(matDataOffset);
+    emission = matData.emitColor * surface.color;
+    return false;
+}
+
 bool GetMaterialScatter(
     MaterialConstants materialCB, 
     Surface surface,
     out float3 attenuation, 
-    out float3 scatterDir)
+    out float3 scatterDir,
+    out float3 emission)
 {
     switch(materialCB.type) {
     case RayTracing::MaterialType::Lambertian: {
-        return ScatterLambertian(surface, materialCB.matDataOffset, attenuation, scatterDir);
+        return ScatterLambertian(surface, materialCB.matDataOffset, attenuation, scatterDir, emission);
     }
     case RayTracing::MaterialType::Metal: {
-        return ScatterMetal(surface, materialCB.matDataOffset, attenuation, scatterDir);
+        return ScatterMetal(surface, materialCB.matDataOffset, attenuation, scatterDir, emission);
     }
     case RayTracing::MaterialType::Dielectric: {
-        return ScatterDielectric(surface, materialCB.matDataOffset, attenuation, scatterDir);
+        return ScatterDielectric(surface, materialCB.matDataOffset, attenuation, scatterDir, emission);
+    }
+    case RayTracing::MaterialType::DiffuseLight: {
+        return ScatterDiffuseLight(surface, materialCB.matDataOffset, attenuation, scatterDir, emission);
     }
     default:
         return false;

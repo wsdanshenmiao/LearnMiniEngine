@@ -91,6 +91,29 @@ namespace DSM {
             memcpy(dest, &matData.refractiveIndex, GetDataSize());
         }
     };
+
+
+    struct DiffuseLightMaterial : public RTMaterial
+    {
+        RayTracing::MaterialType::DiffuseLightMatData matData{};
+
+        DiffuseLightMaterial()
+        {
+            materialType = RayTracing::MaterialType::DiffuseLight;
+        }
+
+        uint32_t GetDataSize() const override
+        {
+            return RayTracing::MaterialType::MaterialDataSize[RayTracing::MaterialType::DiffuseLight];
+        }
+
+        void CopyData(void* dest) const override
+        {
+            assert(dest != nullptr);
+            memcpy(dest, &matData.emitColor, GetDataSize());
+        }
+    };
 }
+
 
 #endif
