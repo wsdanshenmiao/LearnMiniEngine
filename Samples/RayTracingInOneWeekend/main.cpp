@@ -160,7 +160,7 @@ struct Scene
         addBox(
             Math::Vector3{130 - 555 / 2, 0 - 555 / 2, 65 - 555 / 2}, 
             Math::Vector3{295 - 555 / 2, 165 - 555 / 2, 230 - 555 / 2}, 
-            Math::Quaternion{0, -pi * 10.f / 180.f, 0}, white);
+        Math::Quaternion{0, -pi * 15.f / 180.f, 0}, white);
         addBox(
             Math::Vector3{265 - 555 / 2, 0 - 555 / 2, 295 - 555 / 2}, 
             Math::Vector3{430 - 555 / 2, 330 - 555 / 2, 460 - 555 / 2}, 
@@ -204,12 +204,15 @@ public:
         m_CameraController->InitCamera(m_Camera.get());
         m_CameraController->SetMoveSpeed(1);
 
-        // auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
         // auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         // auto plane = LoadModelFromeGeometry("Plane", Geometry::GeometryGenerator::CreateGrid(60, 60, 2, 2));
         // plane->transform.SetPosition({ 0, -2, 0 });
 
-        // m_RayTracer->AddModel(lihuazou);
+        auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
+        lihuazou->transform.SetScale({ 0.3f, 0.3f, 0.3f });
+        lihuazou->transform.SetPosition({ -0.1, -0.22, -0.2 });
+        m_RayTracer->AddModel(lihuazou);
+
         // m_RayTracer->AddModel(sponza);
         // m_RayTracer->AddModel(plane);
 

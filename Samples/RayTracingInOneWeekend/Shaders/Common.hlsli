@@ -21,7 +21,6 @@ struct Surface
     bool frontFace;
     float2 uv;
     float3 color;
-    uint seed;
 };
 
 

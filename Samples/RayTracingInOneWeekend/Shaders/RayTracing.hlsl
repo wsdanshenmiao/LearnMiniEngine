@@ -78,6 +78,8 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
         RayTracing::TraceRayParameters::MissShader::Offset[RayTracing::RayType::Radiance], 
         rayDesc, 
         payload);
+
+    seed = payload.seed;
     
     return payload.color;
 }
@@ -161,18 +163,17 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
     surface.frontFace = true;
     surface.uv = uv;
     surface.color = baseCol.rgb;
-    surface.seed = payload.seed;
 
     float3 attenuation;
     float3 rayDir;
     float3 emission;
-    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission);
+    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission, payload.seed);
     [branch]
     if(scatter) {
         Ray ray;
         ray.origin = surface.position;
         ray.direction = normalize(rayDir);
-        float4 scatterCol = TraceRadianceRay(ray, payload.depth, surface.seed);
+        float4 scatterCol = TraceRadianceRay(ray, payload.depth, payload.seed);
 
         scatterCol *= float4(attenuation, 1);
         payload.color = float4(scatterCol.rgb + emission, scatterCol.a);
@@ -180,7 +181,6 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
     else {
         payload.color = float4(emission, 1);
     }
-    payload.seed = surface.seed;
 }
 
 [shader("closesthit")]
@@ -196,18 +196,17 @@ void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::
     surface.frontFace = attrs.frontFace;
     surface.uv = uv;
     surface.color = baseCol.rgb;
-    surface.seed = payload.seed;
 
     float3 attenuation;
     float3 rayDir;
     float3 emission;
-    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission);
+    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission, payload.seed);
     [branch]
     if(scatter) {
         Ray ray;
         ray.origin = surface.position;
         ray.direction = normalize(rayDir);
-        float4 scatterCol = TraceRadianceRay(ray, payload.depth, surface.seed);
+        float4 scatterCol = TraceRadianceRay(ray, payload.depth, payload.seed);
 
         scatterCol *= float4(attenuation, 1);
         payload.color = float4(scatterCol.rgb + emission, scatterCol.a);
@@ -215,7 +214,6 @@ void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::
     else {
         payload.color = float4(emission, 1);
     }
-    payload.seed = surface.seed;
 }
 
 [shader("miss")]
