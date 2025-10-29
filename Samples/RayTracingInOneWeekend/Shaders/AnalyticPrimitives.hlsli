@@ -6,64 +6,39 @@
 
 using namespace RayTracing;
 
-bool RayCubeIntersectionTest(in Ray ray, float3 boxMin, float3 boxMax, inout float time)
-{
-    float3 origin = ray.origin;
-    float3 dir = ray.direction;
-
-    // [min, max]
-    const float3 invDir = 1.0f / dir;
-    float3 t0 = (boxMin - origin) * invDir;
-    float3 t1 = (boxMax - origin) * invDir;
-    
-    float2 interval = float2(RayTMin(), RayTCurrent());
-    for (uint i = 0; i < 3; ++i) {
-        const float tmin = (t0[i] < t1[i]) ? t0[i] : t1[i];
-        const float tmax = (t0[i] < t1[i]) ? t1[i] : t0[i];
-
-        if (tmin > interval.x) interval.x = tmin;
-        if (tmax < interval.y) interval.y = tmax;
-
-        if (interval.x >= interval.y) return false;
-    }
-
-    time = interval.x;
-    return true;
-}
 
 // 测试射线是否和球体相交
 bool RaySphereIntersectionTest(
-    in Ray ray, 
+    in Ray ray,
+    float2 interval,
+    float3 center,
+    float radius,
     out ProceduralPrimitiveAttributes attrs, 
     inout float time)
 {
-    // 在局部坐标中的球心和半径
-    const float3 center = float3(0,0,0);
-    const float radius = 1;
-
     float3 oc = center - ray.origin;
     float a = dot(ray.direction, ray.direction);
     float h = dot(ray.direction, oc);
     float c = dot(oc, oc) - radius * radius;
-    float invA = 1.0f / a;
 
     float discriminant = h * h -  a * c;
     if (discriminant < 0) { // 没有根则不相交
         return false;
     }
     float sqrtD = sqrt(discriminant);
+    float invA = 1.0f / a;
     float root = (h - sqrtD) * invA;  // 计算方程的根
-    if (root < RayTMin() || root > RayTCurrent()) { //不再范围内
+    if (root <= interval.x || root >= interval.y) { //不再范围内
         root = (h + sqrtD) * invA;
-        if (root < RayTMin() || root > RayTCurrent()) { //不再范围内
+        if (root <= interval.x || root >= interval.y) { //不再范围内
             return false;
         }
     }
+    
+    time = root;
 
-    float3 pos = ray.origin + root * ray.direction; // 计算交点
-    float3 posWS = mul(float4(pos,1), ObjectToWorld4x3()).xyz; // 转到世界空间
-    float3 centerWS = mul(float4(center,1), ObjectToWorld4x3()).xyz;
-    float3 normal = normalize(posWS - centerWS);
+    float3 pos = ray.origin + time * ray.direction; // 计算交点
+    float3 normal = (pos - center) / radius;
 
     float invPI = 1.f / s_PI;
     float theta = acos(normal.y);
@@ -71,25 +46,24 @@ bool RaySphereIntersectionTest(
     attrs.uv = float2((phi + s_PI) * 0.5f * invPI, theta * invPI);
     attrs.frontFace = dot(ray.direction, normal) < 0;
     attrs.normal = attrs.frontFace ? normal : -normal;
-    
-    time = root;
 
     return true;
 }
 
 // 测试射线是否和四边形相交
 bool RayQuadIntersectionTest(
-    in Ray ray, 
+    in Ray ray,
+    float2 interval,
+    float3 q,
+    float3 u,
+    float3 v,
     out ProceduralPrimitiveAttributes attrs, 
     inout float time)
 {
-    // 单位四边形的参数
-    const float3 q = float3(-1, -1, 0);
-    const float3 u = float3(2, 0, 0);
-    const float3 v = float3(0, 2, 0);
-
-    float3 w = float3(0, 0, 0.25f);
-    float3 normal = float3(0, 0, 1);
+    float3 normal = cross(u, v);
+    float3 w = normal / dot(normal, normal);
+    normal = normalize(normal);
+    float d = dot(normal, q);
 
     // 判断射线是否与平面相交
     float nd = dot(normal, ray.direction);
@@ -97,7 +71,10 @@ bool RayQuadIntersectionTest(
         return false;
 
     // 计算交点
-    time = -dot(normal, ray.origin) / nd;
+    time = (d - dot(normal, ray.origin)) / nd;
+    if(!InRange(time, interval.x, interval.y))
+        return false;
+    
     float3 pos = ray.origin + time * ray.direction; // 计算交点
 
     float3 pq = pos - q;
@@ -108,7 +85,6 @@ bool RayQuadIntersectionTest(
         return false;
 
     // 将法线变换到世界空间
-    normal = mul(normal, (float3x3)transpose(WorldToObject4x3()));
     attrs.uv = float2(alpha, beta);
     attrs.frontFace = nd < 0;
     attrs.normal = attrs.frontFace ? normal : -normal;
@@ -117,16 +93,33 @@ bool RayQuadIntersectionTest(
 }
 
 bool RayCubeIntersectionTest(
-    in Ray ray, 
+    in Ray ray,
+    float2 interval,
+    float3 boxMin,
+    float3 boxMax,
     out ProceduralPrimitiveAttributes attrs, 
     inout float time)
 {
-    float3 boxMin = float3(-1,-1,-1);
-    float3 boxMax = float3(1,1,1);
+    float3 origin = ray.origin;
+    float3 dir = ray.direction;
 
-    if(!RayCubeIntersectionTest(ray, boxMin, boxMax, time)){
-        return false;
+    // [min, max]
+    const float3 invDir = 1.0f / dir;
+    float3 t0 = (boxMin - origin) * invDir;
+    float3 t1 = (boxMax - origin) * invDir;
+
+    for (uint i = 0; i < 3; ++i) {
+        const float tmin = min(t0[i], t1[i]);
+        const float tmax = max(t0[i], t1[i]);
+
+        interval.x = max(interval.x, tmin);
+        interval.y = min(interval.y, tmax);
+
+        if (interval.x >= interval.y) 
+            return false;
     }
+
+    time = interval.x < 0 ? interval.y : interval.x;
 
     float3 pos = ray.origin + time * ray.direction; // 计算交点
 
@@ -138,7 +131,7 @@ bool RayCubeIntersectionTest(
     );
 
     // 将法线变换到世界空间
-    normal = mul(normal, (float3x3)transpose(WorldToObject4x3()));
+    normal = normalize(normal);
     attrs.uv = (pos.xy - boxMin.xy) * 0.5f;
     attrs.frontFace = dot(ray.direction, normal) < 0;
     attrs.normal = attrs.frontFace ? normal : -normal;
@@ -147,21 +140,47 @@ bool RayCubeIntersectionTest(
 }
 
 bool RayAnalyticPrimitiveIntersectionTest(
-    in Ray ray, 
+    in Ray ray,
+    float2 interval,
     in AnalyticPrimitive::PrimitiveType primType, 
     out ProceduralPrimitiveAttributes attrs, 
     inout float time)
 {
+    bool hit = false;
+
     switch(primType){
-    case AnalyticPrimitive::PrimitiveType::Sphere:
-        return RaySphereIntersectionTest(ray, attrs, time);
-    case AnalyticPrimitive::PrimitiveType::Quad:
-        return RayQuadIntersectionTest(ray, attrs, time);
-    case AnalyticPrimitive::PrimitiveType::Cube:
-        return RayCubeIntersectionTest(ray, attrs, time);
-    default:
-        return false;
+    case AnalyticPrimitive::PrimitiveType::Sphere:{
+        // 在局部坐标中的球心和半径
+        const float3 center = float3(0,0,0);
+        const float radius = 1;
+        hit = RaySphereIntersectionTest(ray, interval, center, radius, attrs, time);
+        break;
     }
+    case AnalyticPrimitive::PrimitiveType::Quad:{
+        // 单位四边形的参数
+        const float3 q = float3(-1, -1, 0);
+        const float3 u = float3(2, 0, 0);
+        const float3 v = float3(0, 2, 0);
+        hit = RayQuadIntersectionTest(ray, interval, q, u, v, attrs, time);
+        break;
+    }
+    case AnalyticPrimitive::PrimitiveType::Cube:{
+        float3 boxMin = float3(-1,-1,-1);
+        float3 boxMax = float3(1,1,1);
+        hit = RayCubeIntersectionTest(ray, interval, boxMin, boxMax, attrs, time);
+        break;
+    }
+    default:
+        hit = false;
+        break;
+    }
+
+    if(hit){
+        attrs.normal = mul(attrs.normal, (float3x3)transpose(WorldToObject4x3()));
+        attrs.normal = normalize(attrs.normal);
+    }
+
+    return hit;
 } 
 
 

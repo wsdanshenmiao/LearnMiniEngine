@@ -30,8 +30,9 @@ uint RandomUint(inout uint state)
 
 uint RandomUint(inout uint state, uint min, uint max)
 {
-    uint range = max - min;
-    return min + (RandomUint(state) % range);
+    if(min >= max)
+        return min;
+    return min + (RandomUint(state) % (max - min + 1));
 }
 
 // 生成 0~1 随机 float （[0,1)）
@@ -45,9 +46,11 @@ float RandomFloat(inout uint state, float min, float max)
     return lerp(min, max, RandomFloat(state));
 }
 
-int RandomInt(inout uint state, int minInclusive, int maxExclusive)
+int RandomInt(inout uint state, int min, int max)
 {
-    return minInclusive + int(RandomUint(state) % uint(maxExclusive - minInclusive));
+    if(min == max) 
+        return min;
+    return min + int(RandomUint(state) % uint(max - min));
 }
 
 float2 RandomFloat2(inout uint state)
@@ -57,7 +60,7 @@ float2 RandomFloat2(inout uint state)
 
 float2 RandomFloat2(inout uint state, float2 min, float2 max)
 {
-    return RandomFloat2(state) * (max - min) + min;
+    return lerp(min, max, RandomFloat2(state));
 }
 
 float3 RandomFloat3(inout uint state)
@@ -67,7 +70,7 @@ float3 RandomFloat3(inout uint state)
 
 float3 RandomFloat3(inout uint state, float3 min, float3 max)
 {
-    return RandomFloat3(state) * (max - min) + min;
+    return lerp(min, max, RandomFloat3(state));
 }
 
 float4 RandomFloat4(inout uint state)
@@ -77,17 +80,19 @@ float4 RandomFloat4(inout uint state)
 
 float4 RandomFloat4(inout uint state, float4 min, float4 max)
 {
-    return RandomFloat4(state) * (max - min) + min;
+    return lerp(min, max, RandomFloat4(state));
 }
 
 // 生成均匀分布的随机向量（单位球面）
 float3 RandomUnitVector(inout uint state)
 {
-    float z = RandomFloat(state) * 2.0 - 1.0;           // [-1, 1]
-    float phi = 2.0 * sPI * RandomFloat(state);         // [0, 2π)
-    float r = sqrt(max(0.0, 1.0 - z * z));        // 投影到 xy 平面的半径
-    float x = r * cos(phi);
-    float y = r * sin(phi);
+    float r1 = RandomFloat(state);
+    float r2 = RandomFloat(state);
+    float sinPhi = sqrt((1.0 - r2) * r2);
+    float theta = 2.0 * sPI * r1;
+    float x = cos(theta) * sinPhi;
+    float y = sin(theta) * sinPhi;
+    float z = 1 - 2 * r2;
     return float3(x, y, z);
 }
 

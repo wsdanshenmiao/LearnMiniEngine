@@ -3,6 +3,16 @@
 
 #include "RayTracingHLSLCompat.h"
 #include "Random.hlsli"
+#include "PDF.hlsli"
+
+struct ScatterRecord
+{
+    Ray scatterRay;
+    float3 attenuation;
+    float3 emission;
+    bool skipPDF;
+    PDFType pdfType;
+};
 
 // 材质数据缓冲区
 ByteAddressBuffer gMaterialBuffer : register(t0, space1);
@@ -43,59 +53,54 @@ RayTracing::MaterialType::DiffuseLightMatData GetDiffuseLightMaterialData(uint m
 bool ScatterLambertian(
     Surface surface, 
     uint matDataOffset, 
-    out float3 attenuation, 
-    out float3 scatterDir, 
-    out float3 emission,
+    out ScatterRecord scatterRecord,
     inout uint seed)
 {
-    emission = float3(0,0,0);
-    
     RayTracing::MaterialType::LambertianMatData matData = GetLambertianMaterialData(matDataOffset);
-    scatterDir = surface.normal + RandomUnitVector(seed);
-    if(NearZero(scatterDir)){
-        scatterDir = surface.normal;
-    }
 
-    attenuation = surface.color * matData.albedo;
+    scatterRecord.emission = float3(0,0,0);
+    scatterRecord.attenuation = surface.color * matData.albedo;
+    scatterRecord.skipPDF = false;
+    scatterRecord.pdfType = PDFType::CosinePDF;
     return true; 
 }
 
 bool ScatterMetal(
     Surface surface, 
-    uint matDataOffset, 
-    out float3 attenuation, 
-    out float3 scatterDir, 
-    out float3 emission,
+    uint matDataOffset,  
+    out ScatterRecord scatterRecord,
     inout uint seed)
 {
-    emission = float3(0,0,0);
+    scatterRecord.emission = float3(0,0,0);
     
     RayTracing::MaterialType::MetalMatData matData = GetMetalMaterialData(matDataOffset);
     // 反射光线
     float3 reflected = reflect(WorldRayDirection(), surface.normal);
-    scatterDir = reflected + matData.fuzz * RandomUnitVector(seed);
-    attenuation = surface.color * matData.albedo;
+    float3 scatterDir = reflected + matData.fuzz * RandomUnitVector(seed);
+    scatterRecord.attenuation = surface.color * matData.albedo;
+    scatterRecord.scatterRay.origin = surface.position;
+    scatterRecord.scatterRay.direction = scatterDir;
+    // 不需要进行 PDF 采样
+    scatterRecord.skipPDF = true;
     return (dot(scatterDir, surface.normal) > 0);
 }
 
 bool ScatterDielectric(
     Surface surface, 
     uint matDataOffset, 
-    out float3 attenuation, 
-    out float3 scatterDir, 
-    out float3 emission,
+    out ScatterRecord scatterRecord,
     inout uint seed)
 {
-    emission = float3(0,0,0);
+    scatterRecord.emission = float3(0,0,0);
 
     RayTracing::MaterialType::DielectricMatData matData = GetDielectricMaterialData(matDataOffset);
-    attenuation = surface.color;
+    scatterRecord.attenuation = surface.color;
 
     // 根据表面方向决定折射率
     float refractionRatio = surface.frontFace ? (1.0f / matData.refractiveIndex) : matData.refractiveIndex;
 
     float3 unitDirection = WorldRayDirection();
-    float cosTheta = min(dot(-unitDirection, surface.normal), 1.0f);
+    float cosTheta   = min(dot(-unitDirection, surface.normal), 1.0f);
     float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
 
     // 发生全反射
@@ -110,49 +115,49 @@ bool ScatterDielectric(
 
     // 根据蒙特卡洛方法决定反射或折射
     if(cannotRefract || condition > RandomFloat(seed)){
-        scatterDir = reflect(unitDirection, surface.normal);
+        scatterRecord.scatterRay.direction = reflect(unitDirection, surface.normal);
     } else {
-        scatterDir = refract(unitDirection, surface.normal, refractionRatio);
+        scatterRecord.scatterRay.direction = refract(unitDirection, surface.normal, refractionRatio);
     }
+    scatterRecord.scatterRay.origin = surface.position;
+    scatterRecord.skipPDF = true;
     return true;
 }
 
 bool ScatterDiffuseLight(
     Surface surface, 
-    uint matDataOffset, 
-    out float3 attenuation, 
-    out float3 scatterDir, 
-    out float3 emission, 
+    uint matDataOffset,
+    out ScatterRecord scatterRecord,
     inout uint seed)
 {
     // 发光材质不散射光线
-    attenuation = float3(0,0,0);
-    scatterDir = float3(0,0,0);
-    RayTracing::MaterialType::DiffuseLightMatData matData = GetDiffuseLightMaterialData(matDataOffset);
-    emission = matData.emitColor * surface.color;
+    scatterRecord.attenuation = float3(0,0,0);
+    scatterRecord.scatterRay = (Ray)0;
+    if(surface.frontFace) { // 单面光源
+        RayTracing::MaterialType::DiffuseLightMatData matData = GetDiffuseLightMaterialData(matDataOffset);
+        scatterRecord.emission = matData.emitColor * surface.color;
+    }
     return false;
 }
 
 bool GetMaterialScatter(
     MaterialConstants materialCB, 
     Surface surface,
-    out float3 attenuation, 
-    out float3 scatterDir,
-    out float3 emission,
+    out ScatterRecord scatterRecord,
     inout uint seed)
 {
     switch(materialCB.type) {
     case RayTracing::MaterialType::Lambertian: {
-        return ScatterLambertian(surface, materialCB.matDataOffset, attenuation, scatterDir, emission, seed);
+        return ScatterLambertian(surface, materialCB.matDataOffset, scatterRecord, seed);
     }
     case RayTracing::MaterialType::Metal: {
-        return ScatterMetal(surface, materialCB.matDataOffset, attenuation, scatterDir, emission, seed);
+        return ScatterMetal(surface, materialCB.matDataOffset, scatterRecord, seed);
     }
     case RayTracing::MaterialType::Dielectric: {
-        return ScatterDielectric(surface, materialCB.matDataOffset, attenuation, scatterDir, emission, seed);
+        return ScatterDielectric(surface, materialCB.matDataOffset, scatterRecord, seed);
     }
     case RayTracing::MaterialType::DiffuseLight: {
-        return ScatterDiffuseLight(surface, materialCB.matDataOffset, attenuation, scatterDir, emission, seed);
+        return ScatterDiffuseLight(surface, materialCB.matDataOffset, scatterRecord, seed);
     }
     default:
         return false;

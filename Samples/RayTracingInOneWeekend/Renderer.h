@@ -42,6 +42,8 @@ namespace DSM {
         virtual ~Renderer() { Shutdown(); }
 
     public:
+        using HitGroupNames = std::array<std::array<const wchar_t*, RayTracing::RayType::Count>, IntersectionShaderType::Count>;
+
         inline static const wchar_t* s_RayGenShaderName = L"RaygenShader";
         inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_MissShaderName = { 
             L"MissShader"
@@ -53,8 +55,8 @@ namespace DSM {
         inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_Triangle = { 
             L"HitGroup_Triangle"
         };
-        inline static std::array<const wchar_t*, RayTracing::RayType::Count> s_HitGroupName_AABB = { 
-            L"HitGroup_AABB"
+        inline static HitGroupNames s_HitGroupName_AABB = { 
+            L"HitGroup_AABB_Analytic"
         };
         inline static std::array<const wchar_t*, IntersectionShaderType::Count> s_IntersectionShaderName = { 
             L"IntersectionShader_AnalyticPrimitive"
@@ -87,6 +89,11 @@ namespace DSM {
         void AddModel(std::shared_ptr<Model> model);
         void AddProceduralGeometry(const ProceduralGeometryDesc& desc);
         void AddProceduralGeometries(std::span<ProceduralGeometryDesc> descs);
+        void AddImportanceSamplingObject(std::span<ProceduralGeometryManager::ImportanceSamplingObject> objs);
+        void AddImportanceSamplingObject(ProceduralGeometryManager::ImportanceSamplingObject objs)
+        {
+            AddImportanceSamplingObject({&objs, 1});
+        }
 
     private:
         void CreateAccelerationStructure();
@@ -111,7 +118,9 @@ namespace DSM {
         GpuBuffer m_MissShaderTable{};
         GpuBuffer m_HitShaderTable{};
 
-        GpuBuffer m_MaterialBuffer{};
+        GpuBuffer m_MaterialBuffer{};   // 材质数据
+        GpuBuffer m_ImportanceSamplingObjectBuffer{};   // 重要性采样对象
+        GpuBuffer m_ImportanceSamplingObjectDataBuffer{};   // 重要性采样对象的数据
     };
 
 

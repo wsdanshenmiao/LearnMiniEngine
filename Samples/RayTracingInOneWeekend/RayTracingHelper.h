@@ -22,6 +22,8 @@ namespace DSM {
                 AccelerationStructure,
                 SceneConstantBuffer,
                 MaterialBuffer,
+                ImportanceSamplingObjectBuffer,
+                ImportanceSamplingObjectDataBuffer,
                 Count
             };
         }

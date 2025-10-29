@@ -14,9 +14,9 @@ namespace DSM {
 		{
 			ImGui::ColorEdit3("Background Color", backgroundColorArr);
 			ImGui::Text("Max Trace Depth: %d", maxTraceRecursionDepth);
-			ImGui::SliderInt("##1", (int*)&maxTraceRecursionDepth, 1, 50);
+			ImGui::SliderInt("##1", (int*)&maxTraceRecursionDepth, 1, 32);
 			ImGui::Text("Samples Per Pixel: %d", samplesPerPixel);
-			ImGui::SliderInt("##2", (int*)&samplesPerPixel, 1, 200);
+			ImGui::SliderInt("##2", (int*)&samplesPerPixel, 1, 400);
 			ImGui::Text("Focus Distance: %.2f", focusDist);
 			ImGui::SliderFloat("##3", &focusDist, 0.5f, 50.0f);
 			ImGui::Text("Defocus Angle: %.2f", defocusAngle);

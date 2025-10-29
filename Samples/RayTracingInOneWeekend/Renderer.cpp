@@ -43,6 +43,8 @@ namespace DSM {
         m_GlobalRootSig[GlobalRootSignature::RayTracing::AccelerationStructure].InitAsBufferSRV(0);  // 加速结构
         m_GlobalRootSig[GlobalRootSignature::RayTracing::SceneConstantBuffer].InitAsConstantBuffer(0);
         m_GlobalRootSig[GlobalRootSignature::RayTracing::MaterialBuffer].InitAsBufferSRV(0, D3D12_SHADER_VISIBILITY_ALL, 1);
+        m_GlobalRootSig[GlobalRootSignature::RayTracing::ImportanceSamplingObjectBuffer].InitAsBufferSRV(0, D3D12_SHADER_VISIBILITY_ALL, 2);
+        m_GlobalRootSig[GlobalRootSignature::RayTracing::ImportanceSamplingObjectDataBuffer].InitAsBufferSRV(1, D3D12_SHADER_VISIBILITY_ALL, 2);
         m_GlobalRootSig.InitStaticSampler(GlobalRootSignature::StaticSampler::AnisoWrap, Graphics::SamplerAnisoWrap);
         m_GlobalRootSig.Finalize(L"RayTracingGlobalRootSignature");
 
@@ -123,20 +125,22 @@ namespace DSM {
             hitGroupSubobject.pDesc = &hitGroupDesc;
             subobjects.push_back(std::move(hitGroupSubobject));
         }
-        std::array<D3D12_HIT_GROUP_DESC, RayTracing::RayType::Count> hitGroupDescsAABB{};
-        for (int i = 0; i < RayTracing::RayType::Count; ++i) {
-            auto& hitGroupDesc = hitGroupDescsAABB[i];
-            hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
-            hitGroupDesc.HitGroupExport = s_HitGroupName_AABB[i];
-            if(i == RayTracing::RayType::Radiance){        
-                hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::AABB];
-            }
-            hitGroupDesc.IntersectionShaderImport = s_IntersectionShaderName[IntersectionShaderType::AnalyticPrimitive];
+        std::array<std::array<D3D12_HIT_GROUP_DESC, RayTracing::RayType::Count>, IntersectionShaderType::Count> hitGroupDescsAABB{};
+        for (int i = 0; i < IntersectionShaderType::Count; ++i) {
+            for(int j = 0; j < RayTracing::RayType::Count; ++j){
+                auto& hitGroupDesc = hitGroupDescsAABB[i][j];
+                hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+                hitGroupDesc.HitGroupExport = s_HitGroupName_AABB[i][j];
+                if(i == RayTracing::RayType::Radiance){        
+                    hitGroupDesc.ClosestHitShaderImport = s_ClosestHitShaderName[GeometryType::AABB];
+                }
+                hitGroupDesc.IntersectionShaderImport = s_IntersectionShaderName[i];
 
-            D3D12_STATE_SUBOBJECT hitGroupSubobject{};
-            hitGroupSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-            hitGroupSubobject.pDesc = &hitGroupDesc;
-            subobjects.push_back(std::move(hitGroupSubobject));
+                D3D12_STATE_SUBOBJECT hitGroupSubobject{};
+                hitGroupSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+                hitGroupSubobject.pDesc = &hitGroupDesc;
+                subobjects.push_back(std::move(hitGroupSubobject));
+            }
         }
 
 
@@ -176,14 +180,17 @@ namespace DSM {
         subobjects.push_back(std::move(localRootSigAssociationSubobject));
 
         // 关联程序图元的根签名
-        D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigAssociationProcedural{};
-        localRootSigAssociationProcedural.pSubobjectToAssociate = localSubobjects[LocalRootSignature::Type::AABB];
-        localRootSigAssociationProcedural.NumExports = 1;
-        localRootSigAssociationProcedural.pExports = &s_HitGroupName_AABB[RayTracing::RayType::Radiance];
-        D3D12_STATE_SUBOBJECT localRootSigAssociationSubobjectProcedural{};
-        localRootSigAssociationSubobjectProcedural.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-        localRootSigAssociationSubobjectProcedural.pDesc = &localRootSigAssociationProcedural;
-        subobjects.push_back(std::move(localRootSigAssociationSubobjectProcedural));
+        std::array<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION, IntersectionShaderType::Count> localRootSigAssociationsProcedural{};
+        for(int i = 0; i < IntersectionShaderType::Count; ++i){
+            auto& localRootSigAssociationProcedural = localRootSigAssociationsProcedural[i];
+            localRootSigAssociationProcedural.pSubobjectToAssociate = localSubobjects[LocalRootSignature::Type::AABB];
+            localRootSigAssociationProcedural.NumExports = 1;
+            localRootSigAssociationProcedural.pExports = s_HitGroupName_AABB[i].data();
+            D3D12_STATE_SUBOBJECT localRootSigAssociationSubobjectProcedural{};
+            localRootSigAssociationSubobjectProcedural.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+            localRootSigAssociationSubobjectProcedural.pDesc = &localRootSigAssociationProcedural;
+            subobjects.push_back(std::move(localRootSigAssociationSubobjectProcedural));
+        }
 
         // Global root signature
         D3D12_GLOBAL_ROOT_SIGNATURE globalRootSig{};
@@ -197,7 +204,7 @@ namespace DSM {
 
         // Pipeline config
         D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig{};
-        pipelineConfig.MaxTraceRecursionDepth = ImguiManager::GetInstance().maxTraceRecursionDepth;  // 最大递归深度
+        pipelineConfig.MaxTraceRecursionDepth = (std::min)(ImguiManager::GetInstance().maxTraceRecursionDepth, 32u);  // 最大递归深度
 
         D3D12_STATE_SUBOBJECT pipelineConfigSubobject{};
         pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
@@ -267,12 +274,17 @@ namespace DSM {
         sceneCB.viewportUAndFrameIndex = Math::Vector4{m_Camera->GetRightAxis() * viewportWidth, float(frameIndex++)};
         sceneCB.viewportVAndSamplePerPixel = Math::Vector4{-m_Camera->GetUpAxis() * viewportHeight, float(imgui.samplesPerPixel)};
         sceneCB.backgroundColorAndTotalTime = Math::Vector4{imgui.backgroundColor, GameCore::g_Timer.TotalTime()};
-        sceneCB.focusDistDefocusAngle = Math::Vector4{focusDist, imgui.defocusAngle * float(std::numbers::pi) / 180.0f, 0.0f, 0.0f};
+        sceneCB.focusDistAndDefocusAngle = std::pair{focusDist, imgui.defocusAngle * float(std::numbers::pi) / 180.0f};
+        sceneCB.numImportanceSamplingObjects = static_cast<float>(m_ProceduralGeometryManager->GetAllImportanceSamplingObjects().size());
 
         cmdList.SetDescriptorTable(GlobalRootSignature::RayTracing::RayTracingOutput, g_Renderer.m_OutputUAV);
         cmdList.SetShaderResource(GlobalRootSignature::RayTracing::AccelerationStructure, m_TopLevelAS.accelerationStructure);
         cmdList.SetDynamicConstantBuffer(GlobalRootSignature::RayTracing::SceneConstantBuffer, sizeof(RayTracing::SceneConstantBuffer), &sceneCB);
         cmdList.SetShaderResource(GlobalRootSignature::RayTracing::MaterialBuffer, m_MaterialBuffer);
+        if(m_ImportanceSamplingObjectBuffer.GetResource() != nullptr){
+            cmdList.SetShaderResource(GlobalRootSignature::RayTracing::ImportanceSamplingObjectBuffer, m_ImportanceSamplingObjectBuffer);
+            cmdList.SetShaderResource(GlobalRootSignature::RayTracing::ImportanceSamplingObjectDataBuffer, m_ImportanceSamplingObjectDataBuffer);
+        }
 
         D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
         dispatchDesc.HitGroupTable.StartAddress = m_HitShaderTable->GetGPUVirtualAddress();
@@ -308,6 +320,78 @@ namespace DSM {
             m_ProceduralGeometryManager->AddGeometry(desc);
         }
         m_HasChanged = true;
+    }
+
+    void RayTracer::AddImportanceSamplingObject(std::span<ProceduralGeometryManager::ImportanceSamplingObject> objs)
+    {
+        if(objs.empty())
+            return;
+
+        m_ProceduralGeometryManager->AddImportanceSamplingObject(std::move(objs));
+
+        auto& objects = m_ProceduralGeometryManager->GetAllImportanceSamplingObjects();
+        std::vector<RayTracing::ImportanceSampling::ImportanceSamplingObject> importanceSamplingObjects{};
+        importanceSamplingObjects.reserve(objects.size());
+        std::vector<uint8_t> importanceSamplingObjectData{};
+
+        for (const auto& [type, objToWorld] : objects) {
+            auto offset = importanceSamplingObjectData.size();
+            auto dataSize = RayTracing::ImportanceSampling::ImportanceSamplingDataSize[type];
+            importanceSamplingObjectData.resize(offset + dataSize);
+            auto& object = importanceSamplingObjects.emplace_back();
+            object.type = type;
+            object.primitiveDataOffset = offset;
+
+            switch(type){
+            case RayTracing::ImportanceSampling::ImportanceSamplingPrimitiveType::Sphere:{
+                Math::Vector4 center = Math::Vector4{0,0,0,1} * objToWorld;
+                std::memcpy(importanceSamplingObjectData.data() + offset, &center, sizeof(float) * 3);
+                offset += sizeof(float) * 3;
+                float radius = objToWorld.GetX().GetX();
+                radius = (std::max)(radius, (float)objToWorld.GetY().GetY());
+                radius = (std::max)(radius, (float)objToWorld.GetZ().GetZ());
+                std::memcpy(importanceSamplingObjectData.data() + offset, &radius, sizeof(radius));
+                offset += sizeof(radius);
+                break;
+            }
+            case RayTracing::ImportanceSampling::ImportanceSamplingPrimitiveType::Quad:{
+                auto worldToObj = Math::Matrix4::Inverse(objToWorld);
+                std::memcpy(importanceSamplingObjectData.data() + offset, &worldToObj, sizeof(worldToObj));
+                offset += sizeof(worldToObj);
+                std::array<Math::Vector3, 3> quadData{
+                    Math::Vector3{-1, -1, 0},
+                    Math::Vector3{ 2,  0, 0},
+                    Math::Vector3{ 0,  2, 0}
+                };
+                quadData[0] = Math::Vector3{Math::Vector4{quadData[0]} * objToWorld};
+                quadData[1] = quadData[1] * Math::Matrix3{objToWorld};
+                quadData[2] = quadData[2] * Math::Matrix3{objToWorld};
+                for(int i = 0; i < quadData.size(); ++i){
+                    std::memcpy(importanceSamplingObjectData.data() + offset, &quadData[i], sizeof(float) * 3);
+                    offset += sizeof(float) * 3;
+                }
+                break;
+            }
+            default:
+                assert(!"Unknown importance sampling primitive type");
+                break;
+            }
+        }
+
+        m_ImportanceSamplingObjectBuffer.Create(L"ImportanceSamplingObjectBuffer", 
+            GpuBufferDesc{
+                .m_Size = sizeof(RayTracing::ImportanceSampling::ImportanceSamplingObject) * importanceSamplingObjects.size(),
+                .m_Stride = sizeof(RayTracing::ImportanceSampling::ImportanceSamplingObject),
+                .m_HeapType = D3D12_HEAP_TYPE_DEFAULT
+            },
+            importanceSamplingObjects.data());
+        m_ImportanceSamplingObjectDataBuffer.Create(L"ImportanceSamplingObjectDataBuffer", 
+            GpuBufferDesc{
+                .m_Size = importanceSamplingObjectData.size(),
+                .m_Stride = 1,
+                .m_HeapType = D3D12_HEAP_TYPE_DEFAULT
+            },
+            importanceSamplingObjectData.data());
     }
 
     void RayTracer::CreateAccelerationStructure()
@@ -451,9 +535,11 @@ namespace DSM {
         for (size_t i = 0; i < RayTracing::RayType::Count; i++) {
             hitGroupIdentifiersTriangle[i] = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName_Triangle[i]);
         }
-        std::array<void*, RayTracing::RayType::Count> hitGroupIdentifiersAABB{};
-        for (size_t i = 0; i < RayTracing::RayType::Count; i++) {
-            hitGroupIdentifiersAABB[i] = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName_AABB[i]);
+        std::array<std::array<void*, RayTracing::RayType::Count>, IntersectionShaderType::Count> hitGroupIdentifiersAABB{};
+        for (size_t i = 0; i < IntersectionShaderType::Count; i++) {
+            for(size_t j = 0; j < RayTracing::RayType::Count; j++){
+                hitGroupIdentifiersAABB[i][j] = stateObjectProps->GetShaderIdentifier(Renderer::s_HitGroupName_AABB[i][j]);
+            }
         }
 
         constexpr uint32_t shaderIdSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -522,21 +608,30 @@ namespace DSM {
 
         for(const auto& geometry : m_ProceduralGeometryManager->GetAllGeometry()){
             for(int i = 0; i < RayTracing::RayType::Count; ++i){
+                void* hitGroupID = nullptr;
+                switch (geometry.intersectionShaderType) {
+                case IntersectionShaderType::AnalyticPrimitive:
+                    hitGroupID = hitGroupIdentifiersAABB[IntersectionShaderType::AnalyticPrimitive][i];
+                    break;
+                default:
+                    break;
+                }
                 hitGroupShaderRecordData.clear();
                 hitGroupShaderRecordData.resize(hitGroupShaderRecordSize, 0);
-                memcpy(hitGroupShaderRecordData.data(), hitGroupIdentifiersAABB[i], shaderIdSize);
+                memcpy(hitGroupShaderRecordData.data(), hitGroupID, shaderIdSize);
                 if(i == RayTracing::RayType::Radiance){
                     LocalRootSignature::AABB::RootArguments rootArgs{};
                     rootArgs.primitiveInstance.primitiveType = geometry.type;
 
                     rootArgs.textures = g_Renderer.m_TextureHeap[geometry.srvOffset];
                     
+                    // Material Data
                     rootArgs.material.type = geometry.material->materialType;
                     rootArgs.material.matDataOffset = matDataOffset;
                     materialData.resize(matDataOffset + geometry.material->GetDataSize());
                     geometry.material->CopyData(materialData.data() + matDataOffset);
                     matDataOffset += geometry.material->GetDataSize();
-                    
+
                     memcpy(hitGroupShaderRecordData.data() + shaderIdSize, &rootArgs, sizeof(rootArgs));
                 }
                 hitGroupShaderTableData.append_range(hitGroupShaderRecordData);

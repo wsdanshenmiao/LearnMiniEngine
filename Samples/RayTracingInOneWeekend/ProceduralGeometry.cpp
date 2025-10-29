@@ -95,6 +95,11 @@ namespace DSM{
             instanceDesc.InstanceContributionToHitGroupIndex = m_InstanceContributionToHitGroupIndex;
             instanceDesc.AccelerationStructure = sphereBottomLevelAS.GetGpuVirtualAddress();
             DirectX::XMStoreFloat3x4(&reinterpret_cast<DirectX::XMFLOAT3X4&>(instanceDesc.Transform), desc.transform.GetLocalToWorld());
+            if(desc.type == RayTracing::AnalyticPrimitive::Sphere){
+                // 对于球体，缩放矩阵的 Z 分量需要和 X、Y 一致
+                float scale = (std::max)((std::max)(desc.transform.GetScale().GetX(), desc.transform.GetScale().GetY()), desc.transform.GetScale().GetZ());
+                instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = scale;
+            }
             if(desc.type == RayTracing::AnalyticPrimitive::Quad){
                 instanceDesc.Transform[2][2] = 1;
             }
@@ -120,6 +125,7 @@ namespace DSM{
                 1, &texHandle, &destCount, destCount, defaultTexture, srcCount, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
             ProceduralGeometry geometry{};
+            geometry.intersectionShaderType = desc.intersectionShaderType;
             geometry.type = desc.type;
             geometry.material = desc.material;
             geometry.instanceDesc = std::move(instanceDesc);
@@ -139,4 +145,6 @@ namespace DSM{
             break;
         }
     }
+
+    
 }

@@ -20,6 +20,8 @@ ConstantBuffer<RayTracing::PrimitiveInstanceConstantBuffer> lPrimitiveInstanceCB
 struct GenerateCameraRayParams
 {
     uint2 index;
+    uint2 subPixelIndex;
+    float invSPP;
     float3 cameraPos;
     float3 viewportStart;
     float3 pixelDeltaU;
@@ -31,7 +33,9 @@ struct GenerateCameraRayParams
 RayTracing::Ray GenerateCameraRay(GenerateCameraRayParams params, inout uint seed)
 {
     // 在像素内随机取样
-    float2 offset = RandomFloat2(seed, -0.5f, 0.5f);
+    float2 offset = RandomFloat2(seed) + params.subPixelIndex;
+    offset *= params.invSPP;
+    offset -= 0.5f;
     float2 pixelOffset = float2(params.index) + offset;
     float3 pixelSample = params.viewportStart + pixelOffset.x * params.pixelDeltaU + pixelOffset.y * params.pixelDeltaV;
 
@@ -63,8 +67,8 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
     rayDesc.Direction = ray.direction;
-    rayDesc.TMin = 0.001f;
-    rayDesc.TMax = 1000.0f;
+    rayDesc.TMin = MIN_RAY_LENGTH;
+    rayDesc.TMax = MAX_RAY_LENGTH;
 
     RayTracing::RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
@@ -84,6 +88,51 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
     return payload.color;
 }
 
+float4 GetColor(inout RayTracing::RayPayload payload, Surface surface)
+{
+    Ray incomingRay = {WorldRayOrigin(), WorldRayDirection()};
+
+    ScatterRecord scatterRecord;
+    float4 color = 0;
+    [branch]
+    if(!GetMaterialScatter(lMaterialCB, surface, scatterRecord, payload.seed)){
+        return float4(scatterRecord.emission, 1);
+    }
+
+    // 是否需要根据 PDF 进行采样
+    [branch]
+    if(scatterRecord.skipPDF) {
+        color = TraceRadianceRay(scatterRecord.scatterRay, payload.depth, payload.seed);
+        color *= float4(scatterRecord.attenuation, 1);
+    }
+    else{
+        // 使用混合 PDF 进行采样，一个是与物体表面 BRDF 相关的 PDF，一个是重要性采样 PDF
+        PDFType pdfTypes[2] = {scatterRecord.pdfType, scatterRecord.pdfType};
+        if(gSceneCB.numImportanceSamplingObjects > 0) {
+            pdfTypes[1] = PDFType::ImportanceSamplingPDF;
+        }
+
+        // 根据 pdf 进行采样
+        float3 pdfSampleDir = SampleMixturePDF(pdfTypes, surface, payload.seed);
+
+        Ray scatterRay;
+        scatterRay.origin = surface.position;
+        scatterRay.direction = pdfSampleDir;
+        // 获取材质的 PDF
+        float pdfVal = GetMixturePDFValue(pdfTypes, incomingRay, scatterRay, surface);
+        
+        // 材质在特定方向进行散射的概率
+        float scatterPDF = GetScatteringPDF(lMaterialCB.type, incomingRay, scatterRay, surface);
+        
+        color = TraceRadianceRay(scatterRay, payload.depth, payload.seed);
+        color = (color * float4(scatterRecord.attenuation, 1) * scatterPDF) / pdfVal;
+    }
+
+    color.rgb += scatterRecord.emission;
+
+    return color;
+}
+
 
 [shader("raygeneration")]
 void RaygenShader()
@@ -93,8 +142,8 @@ void RaygenShader()
 
     // 获取常量缓冲区中的数据
     float3 cameraPos = gSceneCB.cameraPos.xyz;
-    float focusDist = gSceneCB.focusDistDefocusAngle.x;
-    float defocusAngle = max(0, gSceneCB.focusDistDefocusAngle.y);
+    float focusDist = gSceneCB.focusDistAndDefocusAngle.x;
+    float defocusAngle = max(0, gSceneCB.focusDistAndDefocusAngle.y);
     float3 viewportU = gSceneCB.viewportUAndFrameIndex.xyz;
     float3 viewportV = gSceneCB.viewportVAndSamplePerPixel.xyz;
     float samplesPerPixel = gSceneCB.viewportVAndSamplePerPixel.w;
@@ -128,10 +177,20 @@ void RaygenShader()
     genParams.defocusV = defocusV;
 
     float4 color = float4(0,0,0,1);
-    uint spp = uint(samplesPerPixel);
-    for(uint sampleIndex = 0; sampleIndex < spp; ++sampleIndex){
-        RayTracing::Ray ray = GenerateCameraRay(genParams, pcgState);
-        color += TraceRadianceRay(ray, 0, pcgState);
+    uint sqrtSPP = uint(sqrt(samplesPerPixel));
+    uint spp = sqrtSPP * sqrtSPP;
+    if(spp == 0) {
+        gOutput[index] = float4(0, 0, 0, 1);
+        return;
+    }
+    genParams.invSPP = 1.0f / float(spp);
+    for(uint i = 0; i < sqrtSPP; ++i){
+        for(uint j = 0; j < sqrtSPP; ++j){
+            genParams.subPixelIndex = uint2(i, j);
+            RayTracing::Ray ray = GenerateCameraRay(genParams, pcgState);
+            float4 sampleColor = TraceRadianceRay(ray, 0, pcgState);
+            color += sampleColor;
+        }
     }
     color /= spp;
 
@@ -164,30 +223,14 @@ void ClosestHitShader_Triangle(inout RayTracing::RayPayload payload, in BuiltInT
     surface.uv = uv;
     surface.color = baseCol.rgb;
 
-    float3 attenuation;
-    float3 rayDir;
-    float3 emission;
-    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission, payload.seed);
-    [branch]
-    if(scatter) {
-        Ray ray;
-        ray.origin = surface.position;
-        ray.direction = normalize(rayDir);
-        float4 scatterCol = TraceRadianceRay(ray, payload.depth, payload.seed);
-
-        scatterCol *= float4(attenuation, 1);
-        payload.color = float4(scatterCol.rgb + emission, scatterCol.a);
-    }
-    else {
-        payload.color = float4(emission, 1);
-    }
+    payload.color = GetColor(payload, surface);
 }
 
 [shader("closesthit")]
 void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::ProceduralPrimitiveAttributes attrs)
 {
     float2 uv = attrs.uv;
-    float3 normal = normalize(attrs.normal);
+    float3 normal = attrs.normal;
     float4 baseCol = lBaseColorTex.SampleLevel(gAnisoWrapSampler, uv, 0);
     
     Surface surface;
@@ -197,23 +240,7 @@ void ClosestHitShader_AABB(inout RayTracing::RayPayload payload, in RayTracing::
     surface.uv = uv;
     surface.color = baseCol.rgb;
 
-    float3 attenuation;
-    float3 rayDir;
-    float3 emission;
-    bool scatter = GetMaterialScatter(lMaterialCB, surface, attenuation, rayDir, emission, payload.seed);
-    [branch]
-    if(scatter) {
-        Ray ray;
-        ray.origin = surface.position;
-        ray.direction = normalize(rayDir);
-        float4 scatterCol = TraceRadianceRay(ray, payload.depth, payload.seed);
-
-        scatterCol *= float4(attenuation, 1);
-        payload.color = float4(scatterCol.rgb + emission, scatterCol.a);
-    }
-    else {
-        payload.color = float4(emission, 1);
-    }
+    payload.color = GetColor(payload, surface);
 }
 
 [shader("miss")]
@@ -230,7 +257,7 @@ void IntersectionShader_AnalyticPrimitive()
     
     float time;
     RayTracing::ProceduralPrimitiveAttributes attrs = (RayTracing::ProceduralPrimitiveAttributes)0;
-    if(RayAnalyticPrimitiveIntersectionTest(ray, primType, attrs, time)){
+    if(RayAnalyticPrimitiveIntersectionTest(ray, float2(RayTMin(), RayTCurrent()), primType, attrs, time)){
         ReportHit(time, 0, attrs);
     }
 }

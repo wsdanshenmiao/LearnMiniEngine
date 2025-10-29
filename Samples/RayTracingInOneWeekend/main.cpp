@@ -19,6 +19,7 @@
 #include "ProceduralGeometry.h"
 #include <numbers>
 
+
 using namespace DSM;
 using namespace DirectX;
 
@@ -107,10 +108,11 @@ struct Scene
         return proceduralGeometries;
     }
 
-    static std::vector<ProceduralGeometryDesc> CreateCornellBox()
+    static std::vector<ProceduralGeometryDesc> CreateCornellBox(std::vector<ProceduralGeometryManager::ImportanceSamplingObject>& outImportanceSamplingObjects)
     {
         std::vector<ProceduralGeometryDesc> world;
-        float scale = 0.001f;
+        // float scale = 0.001;
+        const float scale = 1.0f;
 
         auto red = std::make_shared<LambertianMaterial>();
         red->matData.albedo = Math::Vector3{.65, .05, .05};
@@ -139,6 +141,9 @@ struct Scene
         addQuad(Math::Vector3{-555,0,0}, 555, 555, Math::Quaternion{0, pi / 2, 0}, green);
         addQuad(Math::Vector3{555,0,0}, 555, 555, Math::Quaternion{0, -pi / 2, 0}, red);
         addQuad(Math::Vector3{343 - 555 / 2, 554, 332 - 555 / 2}, -130, -105, Math::Quaternion{pi / 2, 0, 0}, light);
+        
+        outImportanceSamplingObjects.emplace_back(RayTracing::ImportanceSampling::Quad, world.back().transform.GetLocalToWorld());
+        
         addQuad(Math::Vector3{0,-555,0}, 555, 555, Math::Quaternion{pi / 2, 0, 0}, white);
         addQuad(Math::Vector3{0,0,555}, -555, -555, Math::Quaternion{}, white);
         addQuad(Math::Vector3{0,555,0}, 555, 555, Math::Quaternion{pi / 2, 0, 0}, white);
@@ -160,7 +165,7 @@ struct Scene
         addBox(
             Math::Vector3{130 - 555 / 2, 0 - 555 / 2, 65 - 555 / 2}, 
             Math::Vector3{295 - 555 / 2, 165 - 555 / 2, 230 - 555 / 2}, 
-        Math::Quaternion{0, -pi * 15.f / 180.f, 0}, white);
+            Math::Quaternion{0, -pi * 15.f / 180.f, 0}, white);
         addBox(
             Math::Vector3{265 - 555 / 2, 0 - 555 / 2, 295 - 555 / 2}, 
             Math::Vector3{430 - 555 / 2, 330 - 555 / 2, 460 - 555 / 2}, 
@@ -168,7 +173,41 @@ struct Scene
 
         return world;
     }
+
+    static std::vector<ProceduralGeometryDesc> CreateCornellBoxAndSphere(std::vector<ProceduralGeometryManager::ImportanceSamplingObject>& outImportanceSamplingObjects)
+    {
+        auto world = CreateCornellBox(outImportanceSamplingObjects);
+
+        auto aluminum = std::make_shared<MetalMaterial>();
+        aluminum->matData.albedo = Math::Vector3{0.8, 0.85, 0.88};
+        aluminum->matData.fuzz = 0;
+        auto glass =  std::make_shared<DielectricMaterial>();
+        glass->matData.refractiveIndex = 1.5f;
+
+        auto it = std::ranges::find_if(world, [](const ProceduralGeometryDesc& desc) {
+            return desc.type == RayTracing::AnalyticPrimitive::PrimitiveType::Cube
+                && desc.transform.GetRotation() == Math::Quaternion{0, std::numbers::pi * 18.f / 180.f, 0};
+        });
+        if (it != world.end()) {
+            it->material = aluminum;
+        }
+
+        it = std::ranges::find_if(world, [](const ProceduralGeometryDesc& desc) {
+            return desc.type == RayTracing::AnalyticPrimitive::PrimitiveType::Cube
+                && desc.transform.GetRotation() == Math::Quaternion{0, -std::numbers::pi * 15.f / 180.f, 0};
+        });
+        if (it != world.end()) {
+            it->type = RayTracing::AnalyticPrimitive::PrimitiveType::Sphere;
+            it->transform.SetRotation(Math::Quaternion{});
+            it->material = glass;
+            outImportanceSamplingObjects.emplace_back(RayTracing::ImportanceSampling::Sphere, it->transform.GetLocalToWorld());
+        }
+
+        return world;
+    }
 };
+
+
 
 
 class RayTracingApp : public GameCore::IGameApp
@@ -190,35 +229,41 @@ public:
         uint64_t width = swapChain.GetWidth();
         uint32_t height = swapChain.GetHeight();
 
+        // const float scale = 1;
+        const float scale = 1000;
+
 		m_Scissor = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
         m_Camera = std::make_unique<Camera>();
 		m_Camera->SetViewPort(0, 0, static_cast<float>(width), static_cast<float>(height));
         float aspect = float(width) / height;
         m_Camera->SetFrustum(DirectX::XM_PIDIV4, aspect == 0 ? 1 : aspect, 1.f, 1000.0f);
-        m_Camera->SetPosition({ 0, 0, -2 });
+        m_Camera->SetPosition({ 0, 0, -2 * scale });
 
         m_RayTracer = std::make_unique<RayTracer>();
         m_RayTracer->SetCamera(m_Camera.get());
 
         m_CameraController = std::make_unique<CameraController>();
         m_CameraController->InitCamera(m_Camera.get());
-        m_CameraController->SetMoveSpeed(1);
+        m_CameraController->SetMoveSpeed(0.5f * scale);
 
         // auto sponza = LoadModel("Models/Sponza/pbr/sponza2.gltf");
         // auto plane = LoadModelFromeGeometry("Plane", Geometry::GeometryGenerator::CreateGrid(60, 60, 2, 2));
         // plane->transform.SetPosition({ 0, -2, 0 });
 
         auto lihuazou = LoadModel("Models/AB/AliceADefault/AliceADefault.fbx");
-        lihuazou->transform.SetScale({ 0.3f, 0.3f, 0.3f });
-        lihuazou->transform.SetPosition({ -0.1, -0.22, -0.2 });
+        lihuazou->transform.SetScale(Math::Vector3{ 0.3f, 0.3f, 0.3f } * scale);
+        lihuazou->transform.SetPosition(Math::Vector3{ -0.1, -0.22, -0.2 } * scale);
         m_RayTracer->AddModel(lihuazou);
 
         // m_RayTracer->AddModel(sponza);
         // m_RayTracer->AddModel(plane);
 
+        std::vector<ProceduralGeometryManager::ImportanceSamplingObject> importanceSamplingObjects{};
         // auto scene = Scene::CreateSphereScene();
-        auto scene = Scene::CreateCornellBox();
+        // auto scene = Scene::CreateCornellBox(importanceSamplingObjects);
+        auto scene = Scene::CreateCornellBoxAndSphere(importanceSamplingObjects);
         m_RayTracer->AddProceduralGeometries(scene);
+        m_RayTracer->AddImportanceSamplingObject(importanceSamplingObjects);
     }
     virtual void OnResize(std::uint32_t width, std::uint32_t height) override
     {

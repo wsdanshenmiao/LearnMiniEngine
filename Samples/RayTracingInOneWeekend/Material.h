@@ -113,6 +113,7 @@ namespace DSM {
             memcpy(dest, &matData.emitColor, GetDataSize());
         }
     };
+
 }
 
 

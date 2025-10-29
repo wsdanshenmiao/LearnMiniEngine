@@ -11,16 +11,18 @@ namespace DSM
 {
     struct ProceduralGeometryDesc
     {
-        RayTracing::AnalyticPrimitive::PrimitiveType type;
+        IntersectionShaderType::Enum intersectionShaderType = IntersectionShaderType::AnalyticPrimitive;
+        RayTracing::AnalyticPrimitive::PrimitiveType type = RayTracing::AnalyticPrimitive::Sphere;
         Transform transform;
-        std::shared_ptr<RTMaterial> material;
+        std::shared_ptr<RTMaterial> material = nullptr;
         std::array<TextureRef, kNumTextures> textures;
     };
 
     struct ProceduralGeometry
     {
-        RayTracing::AnalyticPrimitive::PrimitiveType type;
-        std::shared_ptr<RTMaterial> material;
+        IntersectionShaderType::Enum intersectionShaderType = IntersectionShaderType::AnalyticPrimitive;
+        RayTracing::AnalyticPrimitive::PrimitiveType type = RayTracing::AnalyticPrimitive::Sphere;
+        std::shared_ptr<RTMaterial> material = nullptr;
         D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
         uint32_t srvOffset = 0;
     };
@@ -29,11 +31,29 @@ namespace DSM
     class ProceduralGeometryManager
     {
     public:
+        struct ImportanceSamplingObject
+        {
+            RayTracing::ImportanceSampling::ImportanceSamplingPrimitiveType type = RayTracing::ImportanceSampling::Sphere;
+            Math::Matrix4 objToWorld{};
+        };
+
         ProceduralGeometryManager();
 
         void AddGeometry(const ProceduralGeometryDesc& desc);
+        void AddImportanceSamplingObject(std::span<ImportanceSamplingObject> objs) 
+        {
+            if(!objs.empty()) {
+                m_ImportanceSamplingObjects.insert(m_ImportanceSamplingObjects.end(), objs.begin(), objs.end());
+            }
+        }
+        void AddImportanceSamplingObject(ImportanceSamplingObject obj) 
+        {
+            m_ImportanceSamplingObjects.push_back(std::move(obj));
+        }
 
         const std::vector<ProceduralGeometry>& GetAllGeometry() const { return m_ProceduralGeometrys; }
+
+        const std::vector<ImportanceSamplingObject>& GetAllImportanceSamplingObjects() const { return m_ImportanceSamplingObjects; }
 
 
     private:
@@ -42,6 +62,7 @@ namespace DSM
 
         // 程序图元实例数据
         std::vector<ProceduralGeometry> m_ProceduralGeometrys{};
+        std::vector<ImportanceSamplingObject> m_ImportanceSamplingObjects{};
         uint32_t m_InstanceContributionToHitGroupIndex = 0;
     };
 } // namespace DSM

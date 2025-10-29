@@ -16,6 +16,14 @@ using uint = uint32_t;
 #endif
 
 
+#ifndef MAX_RAY_LENGTH
+#define MAX_RAY_LENGTH 10000.0f
+#endif
+
+#ifndef MIN_RAY_LENGTH
+#define MIN_RAY_LENGTH 0.001f
+#endif
+
 namespace RayTracing {
     struct Ray
     {
@@ -46,7 +54,9 @@ namespace RayTracing {
         float4 viewportUAndFrameIndex;
         float4 viewportVAndSamplePerPixel;
         float4 backgroundColorAndTotalTime;
-        float4 focusDistDefocusAngle;
+        float2 focusDistAndDefocusAngle;
+        float numImportanceSamplingObjects;
+        float pad;
     };
 
     struct PrimitiveInstanceConstantBuffer
@@ -129,7 +139,41 @@ namespace RayTracing {
         uint matDataOffset;
     };
 
-}
 
+    namespace ImportanceSampling {
+        enum ImportanceSamplingPrimitiveType
+        {
+            Sphere = 0,
+            Quad,
+            Count
+        };
+
+        // 重要性采样对象
+        struct ImportanceSamplingObject
+        {
+            ImportanceSamplingPrimitiveType type;
+            uint primitiveDataOffset;
+        };
+
+        static const uint ImportanceSamplingDataSize[ImportanceSamplingPrimitiveType::Count] = {
+            16, // Sphere
+            100 // Quad
+        };
+
+        struct SphereData
+        {
+            float3 center;
+            float radius;
+        };
+
+        struct QuadData
+        {
+            float4x4 worldToObj;
+            float3 q;
+            float3 u;
+            float3 v;
+        };
+    }
+}
 
 #endif
