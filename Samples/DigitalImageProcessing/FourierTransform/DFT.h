@@ -73,7 +73,7 @@ namespace DSM{
             size_t threadCountX = inputTex.GetWidth();
             size_t threadCountY = inputTex.GetHeight();
 
-            cmdList.Dispatch2D(threadCountX, threadCountY, 1, 1);
+            cmdList.Dispatch2D(threadCountX, threadCountY, sm_ThreadSize, 1);
             cmdList.ExecuteCommandList(true);
             
             // 垂直变换
@@ -85,7 +85,7 @@ namespace DSM{
                 cmdList.SetDescriptorTable(2, m_DFTDebugUAV);
             }
 
-            cmdList.Dispatch2D(threadCountX, threadCountY, 1, 1);
+            cmdList.Dispatch2D(threadCountX, threadCountY, 1, sm_ThreadSize);
             cmdList.ExecuteCommandList(true);
         }
 
@@ -172,6 +172,8 @@ namespace DSM{
         DescriptorHandle GetDFTDebugSRV() const { return m_DFTDebugSRV; }
 
     private:
+        static constexpr uint32_t sm_ThreadSize = 256;
+
         const bool m_EnableDebug = true;
 
         Texture m_DFTOutputTex{};
