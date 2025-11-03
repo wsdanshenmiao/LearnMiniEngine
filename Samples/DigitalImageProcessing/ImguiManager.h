@@ -25,6 +25,7 @@ namespace DSM {
 		float defocusAngle = 0;		// 虚化角度
 		
 		DescriptorHandle ftOutputHandle;
+		DescriptorHandle iftOuputHandle;
 	};
 }
 

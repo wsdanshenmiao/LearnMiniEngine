@@ -28,6 +28,9 @@ namespace DSM {
 			if(ftOutputHandle.IsValid()){
 				ImGui::Image(ImTextureID{ftOutputHandle.GetGpuPtr()}, ImVec2{ 256, 256 });
 			}
+			if(iftOuputHandle.IsValid()){
+				ImGui::Image(ImTextureID{iftOuputHandle.GetGpuPtr()}, ImVec2{ 256, 256 });
+			}
 		}
 		ImGui::End();
 
