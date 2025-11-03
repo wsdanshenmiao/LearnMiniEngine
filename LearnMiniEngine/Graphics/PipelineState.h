@@ -89,7 +89,11 @@ namespace DSM {
     class ComputePSO : public PSO
     {
     public:
-        ComputePSO(const std::wstring& name = L"Unnamed ComputePSO");
+        ComputePSO(const std::wstring& name = L"Unnamed ComputePSO")
+            : PSO(name)
+        {
+            m_PSODesc.NodeMask = 1;
+        }
 
         void SetComputeShader(const void* binary, std::size_t size) { m_PSODesc.CS = {binary, size}; };
         void SetComputeShader(const D3D12_SHADER_BYTECODE& binary) { m_PSODesc.CS = binary; }
