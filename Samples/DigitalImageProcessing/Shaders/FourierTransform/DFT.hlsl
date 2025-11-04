@@ -116,7 +116,7 @@ Complex CalculateIDFT(Complex fxy, float u, float x, float factor)
 }
 
 [numthreads(THREAD_SIZE, 1, 1)]
-void HorizLuminanceIDFTCS(
+void LuminanceIDFTCS(
     uint3 groupID : SV_GroupID, 
     uint3 groupThreadID : SV_GroupThreadID, 
     uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -126,79 +126,51 @@ void HorizLuminanceIDFTCS(
 
     uint u = dispatchThreadID.x;
     uint v = dispatchThreadID.y;
+    uint len = width;
+    uint selectedDim = dispatchThreadID.x;  // 垂直的时候是 y 轴的坐标 
+
+#if defined(IS_VERTIC_DFT)
+    // 交换 u,v 以及长度
+    u = dispatchThreadID.y;
+    v = dispatchThreadID.x;
+    len = height;
+#endif
     
     if (u >= width || v >= height)
         return;
 
-    Complex sum = (Complex)0;
-
-    float factor = sTwoPI / float(width);
+    uint2 threadIndex = uint2(u, v);
 
     // 储存数据到组内共享内存
-    DataCache[groupThreadID.x] = Complex(gIDFTInputTex[uint2(u, v)].xy);
+    DataCache[groupThreadID.x] = Complex(gIDFTInputTex[threadIndex].xy);
     GroupMemoryBarrierWithGroupSync();
 
-    uint startX = groupID.x * THREAD_SIZE;
-    // 先计算共享内存中的 DFT
-    for (uint i = 0; i < THREAD_SIZE && (startX + i) < width; ++i) {
-        sum = cadd(sum, CalculateIDFT(DataCache[i], u, i + startX, factor));
-    }
-
-    [loop]
-    for (uint x = 0; x < startX; ++x) {
-        Complex fxy = Complex(gIDFTInputTex[uint2(x, v)].xy);
-        sum = cadd(sum, CalculateIDFT(fxy, u, x, factor));
-    }
-    [loop]
-    for(uint x = startX + THREAD_SIZE; x < width; ++x) {
-        Complex fxy = Complex(gIDFTInputTex[uint2(x, v)].xy);
-        sum = cadd(sum, CalculateIDFT(fxy, u, x, factor));
-    }
-    sum.value /= float(width);
-
-    gIDFTHorizOutputTex[dispatchThreadID.xy] = sum.value;
-}
-
-[numthreads(1, THREAD_SIZE, 1)]
-void VerticLuminanceIDFTCS(
-    uint3 groupID : SV_GroupID, 
-    uint3 groupThreadID : SV_GroupThreadID, 
-    uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    uint width, height;
-    gIDFTInputTex.GetDimensions(width, height);
-
-    uint u = dispatchThreadID.x;
-    uint v = dispatchThreadID.y;
-    
-    if (u >= width || v >= height)
-        return;
-    
-    // 储存数据到组内共享内存
-    DataCache[groupThreadID.y] = Complex(gIDFTInputTex[uint2(u, v)].xy);
-    GroupMemoryBarrierWithGroupSync();
-    
     Complex sum = (Complex)0;
+    float factor = sTwoPI / float(len);
+    uint start = groupID.x * THREAD_SIZE;
 
-    float factor = sTwoPI / float(height);
-
-    uint startY = groupID.y * THREAD_SIZE;
     // 先计算共享内存中的 DFT
-    for (uint i = 0; i < THREAD_SIZE && (startY + i) < height; ++i) {
-        sum = cadd(sum, CalculateIDFT(DataCache[i], v, i + startY, factor));
+    for (uint i = 0; i < THREAD_SIZE && (start + i) < len; ++i) {
+        sum = cadd(sum, CalculateIDFT(DataCache[i], selectedDim, i + start, factor));
     }
 
     [loop]
-    for (uint y = 0; y < startY; ++y) {
-        Complex fxy = Complex(gIDFTInputTex[uint2(u, y)].xy);
-        sum = cadd(sum, CalculateIDFT(fxy, v, y, factor));
+    for (uint i = 0; i < len; ++i) {
+        if(i == start)
+            i += THREAD_SIZE;
+#if defined(IS_VERTIC_DFT)
+        uint2 index = uint2(u, i);
+#else
+        uint2 index = uint2(i, v);
+#endif
+        Complex fxy = Complex(gIDFTInputTex[index].xy);
+        sum = cadd(sum, CalculateIDFT(fxy, selectedDim, i, factor));
     }
-    [loop]
-    for(uint y = startY + THREAD_SIZE; y < height; ++y) {
-        Complex fxy = Complex(gIDFTInputTex[uint2(u, y)].xy);
-        sum = cadd(sum, CalculateIDFT(fxy, v, y, factor));
-    }
-    sum.value /= float(height);
+    sum.value /= float(len);
 
-    gIDFTVerticOutputTex[dispatchThreadID.xy] = float4(sum.value.rrr, 1);
+#if defined(IS_VERTIC_DFT)
+    gIDFTVerticOutputTex[threadIndex] = float4(sum.value.rrr, 1);
+#else
+    gIDFTHorizOutputTex[threadIndex] = sum.value;
+#endif
 }

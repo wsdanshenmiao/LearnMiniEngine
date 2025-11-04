@@ -51,14 +51,15 @@ namespace DSM{
             // IDFT
             m_IDFTHorizPSO.SetRootSignature(m_RootSig);
             auto idftHorizCSDesc = horizCSDesc;
-            idftHorizCSDesc.m_EnterPoint = "HorizLuminanceIDFTCS";
+            idftHorizCSDesc.m_EnterPoint = "LuminanceIDFTCS";
             ShaderByteCode idftHorizCS{idftHorizCSDesc};
             m_IDFTHorizPSO.SetComputeShader(idftHorizCS);
             m_IDFTHorizPSO.Finalize();
 
             m_IDFTVerticPSO.SetRootSignature(m_RootSig);
             auto idftVerticCSDesc = horizCSDesc;
-            idftVerticCSDesc.m_EnterPoint = "VerticLuminanceIDFTCS";
+            idftVerticCSDesc.m_Defines.AddDefine("IS_VERTIC_DFT", "1");
+            idftVerticCSDesc.m_EnterPoint = "LuminanceIDFTCS";
             ShaderByteCode idftVerticCS{idftVerticCSDesc};
             m_IDFTVerticPSO.SetComputeShader(idftVerticCS);
             m_IDFTVerticPSO.Finalize();
@@ -103,7 +104,7 @@ namespace DSM{
 
             size_t threadCountX = inputTex.GetWidth();
             size_t threadCountY = inputTex.GetHeight();
-            cmdList.Dispatch2D(threadCountX, threadCountY, 1, 1);
+            cmdList.Dispatch2D(threadCountX, threadCountY, sm_ThreadSize, 1);
             cmdList.ExecuteCommandList(true);
             
             // 垂直变换
@@ -112,7 +113,7 @@ namespace DSM{
             cmdList.SetDescriptorTable(0, m_IDFTTmpSRV);
             cmdList.SetDescriptorTable(1, m_IDFTOutputUAV);
 
-            cmdList.Dispatch2D(threadCountX, threadCountY, 1, 1);
+            cmdList.Dispatch2D(threadCountY, threadCountX, sm_ThreadSize, 1);
             cmdList.ExecuteCommandList(true);
         }
         
