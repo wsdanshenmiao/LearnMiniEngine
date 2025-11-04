@@ -25,12 +25,13 @@ namespace DSM{
             }
             m_RootSig.Finalize(L"DFT Root Signature");
 
+            // DFT
             m_DFTHorizPSO.SetRootSignature(m_RootSig);
             ShaderDesc horizCSDesc{
                 .m_Type = ShaderType::Compute,
                 .m_Mode = ShaderMode::SM_6_6,
                 .m_FileName = "Shaders/FourierTransform/DFT.hlsl",
-                .m_EnterPoint = "HorizLuminanceDFTCS"
+                .m_EnterPoint = "LuminanceDFTCS"
             };
             ShaderByteCode horizDFTCS{horizCSDesc};
             m_DFTHorizPSO.SetComputeShader(horizDFTCS);
@@ -38,7 +39,8 @@ namespace DSM{
 
             m_DFTVerticPSO.SetRootSignature(m_RootSig);
             auto verticCSDesc = horizCSDesc;
-            verticCSDesc.m_EnterPoint = "VerticLuminanceDFTCS";
+            verticCSDesc.m_EnterPoint = "LuminanceDFTCS";
+            verticCSDesc.m_Defines.AddDefine("IS_VERTIC_DFT", "1");
             if(m_EnableDebug){
                 verticCSDesc.m_Defines.AddDefine("ENABLE_DEBUG_OUTPUT", "1");
             }
@@ -46,6 +48,7 @@ namespace DSM{
             m_DFTVerticPSO.SetComputeShader(verticDFTCS);
             m_DFTVerticPSO.Finalize();
 
+            // IDFT
             m_IDFTHorizPSO.SetRootSignature(m_RootSig);
             auto idftHorizCSDesc = horizCSDesc;
             idftHorizCSDesc.m_EnterPoint = "HorizLuminanceIDFTCS";
@@ -54,7 +57,7 @@ namespace DSM{
             m_IDFTHorizPSO.Finalize();
 
             m_IDFTVerticPSO.SetRootSignature(m_RootSig);
-            auto idftVerticCSDesc = verticCSDesc;
+            auto idftVerticCSDesc = horizCSDesc;
             idftVerticCSDesc.m_EnterPoint = "VerticLuminanceIDFTCS";
             ShaderByteCode idftVerticCS{idftVerticCSDesc};
             m_IDFTVerticPSO.SetComputeShader(idftVerticCS);
@@ -63,15 +66,16 @@ namespace DSM{
 
         void ExecuteDFT(class ComputeCommandList& cmdList, const Texture& inputTex, DescriptorHandle inputTexHandle)
         {
+            size_t threadCountX = inputTex.GetWidth();
+            size_t threadCountY = inputTex.GetHeight();
+
             cmdList.SetRootSignature(m_RootSig);
+            
+            // 水平变换
             cmdList.SetPipelineState(m_DFTHorizPSO);
 
             cmdList.SetDescriptorTable(0, inputTexHandle);
             cmdList.SetDescriptorTable(1, m_DFTTmpUAV);
-
-            // 水平变换
-            size_t threadCountX = inputTex.GetWidth();
-            size_t threadCountY = inputTex.GetHeight();
 
             cmdList.Dispatch2D(threadCountX, threadCountY, sm_ThreadSize, 1);
             cmdList.ExecuteCommandList(true);
@@ -85,7 +89,7 @@ namespace DSM{
                 cmdList.SetDescriptorTable(2, m_DFTDebugUAV);
             }
 
-            cmdList.Dispatch2D(threadCountX, threadCountY, 1, sm_ThreadSize);
+            cmdList.Dispatch2D(threadCountY, threadCountX, sm_ThreadSize, 1);
             cmdList.ExecuteCommandList(true);
         }
 
