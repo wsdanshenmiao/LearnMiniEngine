@@ -64,8 +64,8 @@ namespace DSM {
         void Reset();
         void FlushResourceBarriers();
         
-        void ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const float* clearColor = nullptr);
-        void ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor = nullptr);
+        void ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const float* clearColor);
+        void ClearUAV(GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE uav, const std::uint32_t* clearColor);
         
         void CopyResource(GpuResource& dest, GpuResource& src);
         void CopyBufferRegion(GpuResource& dest,

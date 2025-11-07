@@ -25,6 +25,29 @@ namespace DSM::Math {
     template <typename T>
     concept XMVectorType = std::is_same_v<T, Scalar> || std::is_same_v<T, Vector3> || std::is_same_v<T, Vector4>;
     
+    inline uint32_t ReverseBits(uint32_t val, uint32_t numBits)
+    {
+        val = ((val & 0xaaaaaaaa) >> 1) | ((val & 0x55555555) << 1);
+        val = ((val & 0xcccccccc) >> 2) | ((val & 0x33333333) << 2);
+        val = ((val & 0xf0f0f0f0) >> 4) | ((val & 0x0f0f0f0f) << 4);
+        val = ((val & 0xff00ff00) >> 8) | ((val & 0x00ff00ff) << 8);
+        val = (val >> 16) | (val << 16);
+        return val >> (32 - numBits);
+    }
+
+    template <std::unsigned_integral T>
+    inline T NextPowerOf2(T val)
+    {
+        val--;
+        val |= val >> 1;
+        val |= val >> 2;
+        val |= val >> 4;
+        val |= val >> 8;
+        val |= val >> 16;
+        val++;
+
+        return val;
+    }
     
     template <typename T> requires std::is_arithmetic_v<T>
     __forceinline constexpr T AlignUp( T value, std::uint64_t alignment ) noexcept

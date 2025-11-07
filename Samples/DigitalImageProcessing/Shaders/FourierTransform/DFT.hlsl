@@ -1,7 +1,7 @@
 #include "../Complex.hlsli"
 
 #ifndef THREAD_SIZE
-#define THREAD_SIZE 256
+#define THREAD_SIZE 512
 #endif
 
 static const float sPI = 3.14159265359f;

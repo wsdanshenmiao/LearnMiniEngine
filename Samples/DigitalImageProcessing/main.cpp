@@ -18,6 +18,7 @@
 #include "ModelLoader.h"
 #include "ProceduralGeometry.h"
 #include "FourierTransform/DFT.h"
+#include "FourierTransform//FFT.h"
 #include <numbers>
 
 
@@ -234,6 +235,7 @@ public:
         const float scale = 1000;
 
         m_DFT.Initialize(width, height);
+        m_FFT.Initialize(width, height);
 
         m_Camera = std::make_unique<Camera>();
 		OnResize(width, height);
@@ -277,6 +279,7 @@ public:
 
         g_Renderer.OnResize(width, height);
         m_DFT.Resize(width, height);
+        m_FFT.Resize(width, height);
         TextureDesc texDesc;
         texDesc.m_Width = width;
         texDesc.m_Height = height;
@@ -304,10 +307,13 @@ public:
 
         m_RayTracer->TraceRays(cmdList.GetComputeCommandList());
 
-        m_DFT.ExecuteDFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
-        ImguiManager::GetInstance().ftOutputHandle = m_DFT.GetDFTDebugSRV();
-        m_DFT.ExecuteIDFT(cmdList.GetComputeCommandList(), m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
-        ImguiManager::GetInstance().iftOuputHandle = m_DFT.GetIDFTSRV();
+        // m_DFT.ExecuteDFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
+        // ImguiManager::GetInstance().ftOutputHandle = m_DFT.GetDFTDebugSRV();
+        // m_DFT.ExecuteIDFT(cmdList.GetComputeCommandList(), m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
+        // ImguiManager::GetInstance().iftOuputHandle = m_DFT.GetIDFTSRV();
+        
+        m_FFT.ExecuteFFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
+        ImguiManager::GetInstance().ftOutputHandle = m_FFT.GetFFTDebugSRV();
 
         assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
@@ -338,6 +344,7 @@ private:
 
     std::unique_ptr<RayTracer> m_RayTracer{};
     DFT m_DFT{};
+    FFT m_FFT{};
 };
 
 int WinMain(
@@ -348,7 +355,7 @@ int WinMain(
 {
     try {
         RayTracingApp sandbox{};
-        return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
+        return GameCore::RunApplication(sandbox, 512, 512, "DSMEngine", hInstance, nShowCmd);
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';

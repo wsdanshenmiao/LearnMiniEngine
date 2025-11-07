@@ -16,6 +16,20 @@ namespace DSM{
 
         void Initialize(std::uint32_t width, std::uint32_t height)
         {
+            m_DFTOutputUAV = g_Renderer.m_TextureHeap.Allocate();
+            m_DFTOutputSRV = g_Renderer.m_TextureHeap.Allocate();
+            m_DFTTmpUAV = g_Renderer.m_TextureHeap.Allocate();
+            m_DFTTmpSRV = g_Renderer.m_TextureHeap.Allocate();
+
+            m_IDFTOutputUAV = g_Renderer.m_TextureHeap.Allocate();
+            m_IDFTOutputSRV = g_Renderer.m_TextureHeap.Allocate();
+            m_IDFTTmpUAV = g_Renderer.m_TextureHeap.Allocate();
+            m_IDFTTmpSRV = g_Renderer.m_TextureHeap.Allocate();
+
+            if(m_EnableDebug){
+                m_DFTDebugUAV = g_Renderer.m_TextureHeap.Allocate();
+                m_DFTDebugSRV = g_Renderer.m_TextureHeap.Allocate();
+            }
             Resize(width, height);
 
             m_RootSig[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
@@ -79,7 +93,7 @@ namespace DSM{
             cmdList.SetDescriptorTable(1, m_DFTTmpUAV);
 
             cmdList.Dispatch2D(threadCountX, threadCountY, sm_ThreadSize, 1);
-            cmdList.ExecuteCommandList(true);
+            cmdList.InsertUAVBarrier(m_DFTTmpTex, true);
             
             // 垂直变换
             cmdList.SetPipelineState(m_DFTVerticPSO);
@@ -129,10 +143,6 @@ namespace DSM{
             m_DFTOutputTex.Create(L"DFT Output Texture", texDesc);
             m_DFTTmpTex.Create(L"DFT Temp Texture", texDesc);
 
-            m_DFTOutputUAV = g_Renderer.m_TextureHeap.Allocate();
-            m_DFTOutputSRV = g_Renderer.m_TextureHeap.Allocate();
-            m_DFTTmpUAV = g_Renderer.m_TextureHeap.Allocate();
-            m_DFTTmpSRV = g_Renderer.m_TextureHeap.Allocate();
             m_DFTOutputTex.CreateUnorderedAccessView(m_DFTOutputUAV);
             m_DFTOutputTex.CreateShaderResourceView(m_DFTOutputSRV);
             m_DFTTmpTex.CreateUnorderedAccessView(m_DFTTmpUAV);
@@ -141,8 +151,6 @@ namespace DSM{
             if(m_EnableDebug){
                 texDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 m_DFTDebugOutputTex.Create(L"DFT Debug Output Texture", texDesc);
-                m_DFTDebugUAV = g_Renderer.m_TextureHeap.Allocate();
-                m_DFTDebugSRV = g_Renderer.m_TextureHeap.Allocate();
                 m_DFTDebugOutputTex.CreateUnorderedAccessView(m_DFTDebugUAV);
                 m_DFTDebugOutputTex.CreateShaderResourceView(m_DFTDebugSRV);
             }
@@ -151,10 +159,6 @@ namespace DSM{
             m_IDFTOutputTex.Create(L"IDFT Output Texture", texDesc);
             m_IDFTTmpTex.Create(L"IDFT Temp Texture", texDesc);
 
-            m_IDFTOutputUAV = g_Renderer.m_TextureHeap.Allocate();
-            m_IDFTOutputSRV = g_Renderer.m_TextureHeap.Allocate();
-            m_IDFTTmpUAV = g_Renderer.m_TextureHeap.Allocate();
-            m_IDFTTmpSRV = g_Renderer.m_TextureHeap.Allocate();
             m_IDFTOutputTex.CreateUnorderedAccessView(m_IDFTOutputUAV);
             m_IDFTOutputTex.CreateShaderResourceView(m_IDFTOutputSRV);
             m_IDFTTmpTex.CreateUnorderedAccessView(m_IDFTTmpUAV);
@@ -177,7 +181,7 @@ namespace DSM{
         DescriptorHandle GetDFTDebugSRV() const { return m_DFTDebugSRV; }
 
     private:
-        static constexpr uint32_t sm_ThreadSize = 256;
+        static constexpr uint32_t sm_ThreadSize = 512;
 
         const bool m_EnableDebug = true;
 

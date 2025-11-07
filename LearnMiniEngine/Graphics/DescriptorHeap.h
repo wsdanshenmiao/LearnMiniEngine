@@ -29,6 +29,11 @@ namespace DSM {
         // 便于偏移内部虚拟地址
         DescriptorHandle operator+(int offset) const noexcept;
         void operator+=(int offset) noexcept;
+        bool operator==(const DescriptorHandle& other) const noexcept
+        {
+            return m_CPUHandle.ptr == other.m_CPUHandle.ptr && 
+                m_GPUHandle.ptr == other.m_GPUHandle.ptr;
+        }
         const D3D12_CPU_DESCRIPTOR_HANDLE* operator&() const noexcept;
         // 隐式转换
         operator D3D12_CPU_DESCRIPTOR_HANDLE() const noexcept;
