@@ -64,6 +64,25 @@ namespace DSM{
             if(m_EnabledDebugOutput){
                 verticDefines.emplace_back("ENABLE_DEBUG_OUTPUT", "1");
             }
+            // m_RootSig[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+            // m_RootSig[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+            // if(m_EnabledDebugOutput){
+            //     m_RootSig[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+            // }
+            // m_RootSig.Finalize(L"DFT Root Signature");
+            // m_FFTVerticPSO.SetRootSignature(m_RootSig);
+            // ShaderDesc verticCSDesc{};
+            // verticCSDesc.m_Type = ShaderType::Compute;
+            // verticCSDesc.m_Mode = ShaderMode::SM_6_6;
+            // verticCSDesc.m_FileName = "Shaders/FourierTransform/DFT.hlsl";
+            // verticCSDesc.m_EnterPoint = "LuminanceDFTCS";
+            // verticCSDesc.m_Defines.AddDefine("IS_VERTIC_DFT", "1");
+            // if(m_EnabledDebugOutput){
+            //     verticCSDesc.m_Defines.AddDefine("ENABLE_DEBUG_OUTPUT", "1");
+            // }
+            // ShaderByteCode verticDFTCS{verticCSDesc};
+            // m_FFTVerticPSO.SetComputeShader(verticDFTCS);
+            // m_FFTVerticPSO.Finalize();
             createPSO(m_FFTVerticPSO, "VerticFFTCS", verticDefines);
             createPSO(m_FFTConvertDataPSO, "ConvertData");
         }
@@ -114,29 +133,39 @@ namespace DSM{
             if((states % 2) == 0){
                 std::swap(outputUAVs[0], outputUAVs[1]);
             }
-            // 垂直FFT
-            cmdList.SetPipelineState(m_FFTVerticBitReversedPSO);
-            cmdList.SetDescriptorTable(0, inputSRVs[1]);
-            cmdList.SetDescriptorTable(1, outputUAVs[1]);
-            cmdList.SetShaderResource(2, m_VerticReverseIndicesBuffer);
-            cmdList.Dispatch2D(width, height, 1, 1);
-            cmdList.InsertUAVBarrier(outputUAVs[1] == m_FFTOutputUAV ? 
-                m_FFTOutputTex : m_FFTTmpTex, true);
+            // cmdList.SetRootSignature(m_RootSig);
+            // cmdList.SetPipelineState(m_FFTVerticPSO);
 
-            cmdList.SetPipelineState(m_FFTVerticPSO);
-            cmdList.SetShaderResource(2, m_VerticReverseIndicesBuffer);
-            states = std::log2(Math::NextPowerOf2(m_FFTOutputTex.GetHeight()));
-            for(uint32_t stage = 0; stage < states; ++stage){
-                cmdList.SetDescriptorTable(0, inputSRVs[stage % 2]);
-                cmdList.SetDescriptorTable(1, outputUAVs[stage % 2]);
-                cmdList.SetConstant(3, 0, stage);
-                if(m_EnabledDebugOutput){
-                    cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
-                }
-                cmdList.Dispatch2D(width, height, 1, 1);
-                cmdList.InsertUAVBarrier(outputUAVs[stage % 2] == m_FFTOutputUAV ?
-                    m_FFTOutputTex : m_FFTTmpTex, true);
-            }
+            // cmdList.SetDescriptorTable(0, inputSRVs[1]);
+            // cmdList.SetDescriptorTable(1, outputUAVs[1]);
+            // if (m_EnabledDebugOutput) {
+            //     cmdList.SetDescriptorTable(2, m_FFTDebugUAV);
+            // }
+
+            // cmdList.Dispatch2D(height, width, sm_ThreadSize, 1);
+            // // 垂直FFT
+            // cmdList.SetPipelineState(m_FFTVerticBitReversedPSO);
+            // cmdList.SetDescriptorTable(0, inputSRVs[1]);
+            // cmdList.SetDescriptorTable(1, outputUAVs[1]);
+            // cmdList.SetShaderResource(2, m_VerticReverseIndicesBuffer);
+            // cmdList.Dispatch2D(width, height, 1, 1);
+            // cmdList.InsertUAVBarrier(outputUAVs[1] == m_FFTOutputUAV ? 
+            //     m_FFTOutputTex : m_FFTTmpTex, true);
+
+            // cmdList.SetPipelineState(m_FFTVerticPSO);
+            // cmdList.SetShaderResource(2, m_VerticReverseIndicesBuffer);
+            // states = std::log2(Math::NextPowerOf2(m_FFTOutputTex.GetHeight()));
+            // for(uint32_t stage = 0; stage < states; ++stage){
+            //     cmdList.SetDescriptorTable(0, inputSRVs[stage % 2]);
+            //     cmdList.SetDescriptorTable(1, outputUAVs[stage % 2]);
+            //     cmdList.SetConstant(3, 0, stage);
+            //     if(m_EnabledDebugOutput){
+            //         cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
+            //     }
+            //     cmdList.Dispatch2D(width, height, 1, 1);
+            //     cmdList.InsertUAVBarrier(outputUAVs[stage % 2] == m_FFTOutputUAV ?
+            //         m_FFTOutputTex : m_FFTTmpTex, true);
+            // }
 
             cmdList.ExecuteCommandList(true);
         }
@@ -225,6 +254,8 @@ namespace DSM{
         DescriptorHandle m_FFTDebugUAV{};
 
         RootSignature m_FFTRootSig;
+        // RootSignature m_RootSig{3, 0};
+
         ComputePSO m_FFTHorizPSO;
         ComputePSO m_FFTHorizBitReversedPSO;
         ComputePSO m_FFTVerticPSO;
