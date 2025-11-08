@@ -25,11 +25,15 @@ namespace DSM {
 		ImGui::End();
 
 		if(ImGui::Begin("Fourier Transform Output")){
-			if(ftOutputHandle.IsValid()){
-				ImGui::Image(ImTextureID{ftOutputHandle.GetGpuPtr()}, ImVec2{ 256, 256 });
+			if(ftOutputTex != nullptr){
+				static auto handle = m_ImGuiSrvHeap.Allocate();
+				ftOutputTex->CreateShaderResourceView(handle);
+				ImGui::Image(ImTextureID{handle.GetGpuPtr()}, ImVec2{ 256, 256 });
 			}
-			if(iftOuputHandle.IsValid()){
-				ImGui::Image(ImTextureID{iftOuputHandle.GetGpuPtr()}, ImVec2{ 256, 256 });
+			if(iftOutputTex != nullptr){
+				static auto handle = m_ImGuiSrvHeap.Allocate();
+				iftOutputTex->CreateShaderResourceView(handle);
+				ImGui::Image(ImTextureID{handle.GetGpuPtr()}, ImVec2{ 256, 256 });
 			}
 		}
 		ImGui::End();

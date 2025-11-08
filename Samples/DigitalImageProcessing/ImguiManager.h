@@ -2,7 +2,7 @@
 #ifndef __IMGUIMANAGER__H__
 #define __IMGUIMANAGER__H__
 
-#include "Graphics/DescriptorHeap.h"
+#include "Graphics/Resource/Texture.h"
 #include "Utilities/BaseImGuiManager.h"
 #include "Math/Transform.h"
 
@@ -23,9 +23,9 @@ namespace DSM {
 
 		float focusDist = 10.0f;	// 焦距
 		float defocusAngle = 0;		// 虚化角度
-		
-		DescriptorHandle ftOutputHandle;
-		DescriptorHandle iftOuputHandle;
+
+		Texture* ftOutputTex = nullptr;
+		Texture* iftOutputTex = nullptr;
 	};
 }
 

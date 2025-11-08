@@ -311,9 +311,11 @@ public:
         // ImguiManager::GetInstance().ftOutputHandle = m_DFT.GetDFTDebugSRV();
         // m_DFT.ExecuteIDFT(cmdList.GetComputeCommandList(), m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
         // ImguiManager::GetInstance().iftOuputHandle = m_DFT.GetIDFTSRV();
-        
+
         m_FFT.ExecuteFFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
-        ImguiManager::GetInstance().ftOutputHandle = m_FFT.GetFFTDebugSRV();
+        ImguiManager::GetInstance().ftOutputTex = &m_FFT.GetFFTDebugTex();
+        m_FFT.ExecuteIFFT(cmdList.GetComputeCommandList(), m_FFT.GetFFTOutputTex(), m_FFT.GetFFTOutputSRV());
+        ImguiManager::GetInstance().iftOutputTex = &m_FFT.GetIFFTOutputTex();
 
         assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);

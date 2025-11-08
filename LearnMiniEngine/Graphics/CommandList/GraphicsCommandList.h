@@ -83,7 +83,6 @@ namespace DSM {
         void SetBlendFactor(const float factor[4]){m_CmdList->OMSetBlendFactor(factor);}
         void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology){m_CmdList->IASetPrimitiveTopology(topology);}
 
-        template <typename T>
         void SetConstantArray(std::uint32_t rootIndex, std::uint32_t numConstants, const void * pConstants)
         {
             m_CmdList->SetGraphicsRoot32BitConstants(rootIndex, numConstants, pConstants, 0);

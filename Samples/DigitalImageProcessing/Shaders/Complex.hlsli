@@ -29,10 +29,10 @@ Complex cmul(Complex a, Complex b)
         dot(a.value, float2(b.value.y,  b.value.x))));
 }
 
-// e^{-iθ} = cos(θ) - i*sin(θ)
+// e^{iθ} = cos(θ) + i * sin(θ)
 Complex cexp(float theta)
 {
-    return Complex(float2(cos(theta), -sin(theta)));
+    return Complex(float2(cos(theta), sin(theta)));
 }
 
 // 复数共轭

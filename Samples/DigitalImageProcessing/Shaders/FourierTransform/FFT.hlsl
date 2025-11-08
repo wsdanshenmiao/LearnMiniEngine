@@ -30,7 +30,8 @@ RWTexture2D<float4> gDebugOutputTex : register(u1);
 
 cbuffer FFTConstants : register(b0)
 {
-    uint gState;
+    uint gStage;
+    float gSign; // FFT 时为负，IFFT 时为正
 }
 
 [numthreads(32, 32, 1)]
@@ -53,104 +54,97 @@ void ConvertData(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 
-[numthreads(1, 1, 1)]
+#if defined(IS_VERTICAL)
+[numthreads(1, THREAD_SIZE, 1)]
+#else
+[numthreads(THREAD_SIZE, 1, 1)]
+#endif
 void BitReverseCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width, height;
     gFFTInputTex.GetDimensions(width, height);
 
-    uint2 globalID = dispatchThreadID.xy;
-    if (globalID.x >= width)
-        return;
+    uint selectedID = dispatchThreadID.x;
+    uint constantID = dispatchThreadID.y;
+    uint dimension = width;
+    bool swap = false;
 
-
-#if defined(IS_VERTIC_FFT)
-    uint reverseIndex = gReverseIndices[globalID.y];
-    // globalID.x = dispatchThreadID.y;
-    // globalID.y = dispatchThreadID.x;
-    uint2 reverseID = uint2(globalID.x, reverseIndex);
-#else
-    uint reverseIndex = gReverseIndices[globalID.x];
-    uint2 reverseID = uint2(reverseIndex, globalID.y);
+#if defined(IS_VERTICAL)
+    selectedID = dispatchThreadID.y;
+    constantID = dispatchThreadID.x;
+    dimension = height;
+    swap = true;
 #endif
-    gFFTOutputTex[globalID] = gFFTInputTex[reverseID].xy;
+
+    if(selectedID >= dimension)
+        return;
+    uint reverseIndex = gReverseIndices[selectedID];
+    uint2 reverseID = uint2(reverseIndex, constantID);
+    if(swap)
+        reverseID = reverseID.yx;
+    gFFTOutputTex[dispatchThreadID.xy] = gFFTInputTex[reverseID].xy;
 }
 
-[numthreads(1, 1, 1)]
-void HorizFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(THREAD_SIZE, 1, 1)]
+void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint2 globalID = dispatchThreadID.xy;
+    uint selectedID = globalID.x;
+
+#if defined(IS_VERTICAL)
+    globalID = globalID.yx;
+    selectedID = globalID.y;
+#endif
 
     uint width, height;
     gFFTOutputTex.GetDimensions(width, height);
     if(globalID.x >= width || globalID.y >= height)
         return;
     
-    uint butterStep = 1u << gState;
+    uint butterStep = 1u << gStage;
     uint groupSize = butterStep << 1;   // 每个蝶形组的大小
 
-    uint groupOffset = globalID.x % groupSize;
+    uint groupOffset = selectedID % groupSize;
     if(groupOffset >= butterStep)
         return;
     
-    uint index0 = globalID.x;
-    uint index1 = index0 + butterStep;
+    uint index1 = selectedID + butterStep;
     if(index1 >= width)
         return;
 
-    float angle = -sTwoPI * groupOffset / groupSize;
+    float angle = gSign * sTwoPI * groupOffset / groupSize;
     Complex twiddle = cexp(angle);
 
-    uint2 texIndex0 = uint2(index0, globalID.y);
     uint2 texIndex1 = uint2(index1, globalID.y);
-    Complex fEven = Complex(gFFTInputTex[texIndex0].xy);
+#if defined(IS_VERTICAL)
+    texIndex1 = uint2(globalID.x, index1);
+#endif
+    Complex fEven = Complex(gFFTInputTex[globalID].xy);
     Complex fOdd = Complex(gFFTInputTex[texIndex1].xy);
 
     Butterfly(fEven, fOdd, twiddle);
 
-    gFFTOutputTex[texIndex0] = fEven.value;
-    gFFTOutputTex[texIndex1] = fOdd.value;
-}
-
-
-[numthreads(1, 1, 1)]
-void VerticFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    uint2 globalID = dispatchThreadID.xy;
-
-    uint width, height;
-    gFFTOutputTex.GetDimensions(width, height);
-    if(globalID.x >= width || globalID.y >= height)
-        return;
-
-    uint butterStep = 1u << gState;
-    uint groupSize = butterStep << 1;   // 每个蝶形组的大小
-
-    uint groupOffset = globalID.y % groupSize;
-    if(groupOffset >= butterStep)
-        return;
-
-    uint index0 = globalID.y;
-    uint index1 = index0 + butterStep;
-    if(index1 >= height)
-        return;
-
-    float angle = -sTwoPI * groupOffset / groupSize;
-    Complex twiddle = cexp(angle);
-
-    uint2 texIndex0 = uint2(globalID.x, index0);
-    uint2 texIndex1 = uint2(globalID.x, index1);
-    Complex fEven = Complex(gFFTInputTex[texIndex0].xy);
-    Complex fOdd = Complex(gFFTInputTex[texIndex1].xy);
-
-    Butterfly(fEven, fOdd, twiddle);
-
-    gFFTOutputTex[texIndex0] = fEven.value;
+    gFFTOutputTex[globalID] = fEven.value;
     gFFTOutputTex[texIndex1] = fOdd.value;
 
 #if defined(ENABLE_DEBUG_OUTPUT)
-    gDebugOutputTex[globalID] = float4(length(gFFTOutputTex[globalID]).rrr / (width + height), 1);
+    if(gSign == -1){
+        gDebugOutputTex[globalID] = float4(length(gFFTOutputTex[globalID]).rrr / (width + height), 1);
+        gDebugOutputTex[texIndex1] = float4(length(gFFTOutputTex[texIndex1]).rrr / (width + height), 1);
+    }
 #endif
+}
+
+
+[numthreads(32, 32, 1)]
+void IFFTScale(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    uint width, height;
+    gFFTOutputTex.GetDimensions(width, height);
+    if(dispatchThreadID.x >= width || dispatchThreadID.y >= height)
+        return;
+
+    gFFTOutputTex[dispatchThreadID.xy] = gFFTInputTex[dispatchThreadID.xy].xy / float(width * height);
 }
 
 

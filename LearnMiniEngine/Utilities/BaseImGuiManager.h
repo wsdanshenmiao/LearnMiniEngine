@@ -3,7 +3,7 @@
 #define __BASEIMGUIMANAGER__H__
 
 
-#include <d3d12.h>
+#include "Graphics/DescriptorHeap.h"
 #include <wrl/client.h>
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
@@ -23,15 +23,17 @@ namespace DSM {
 		void ImGuiNewFrame();
 		void Update(float time);
 		virtual void RenderImGui(ID3D12GraphicsCommandList* cmdList);
+		const DescriptorHeap& GetDescriptorHeap() const { return m_ImGuiSrvHeap; }
 
 	protected:
-		BaseImGuiManager() = default;
+		BaseImGuiManager()
+			: m_ImGuiSrvHeap(L"ImGuiSrvHeap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256) {}
 		virtual ~BaseImGuiManager() override;
 
 		virtual void UpdateImGui(float time) = 0;
 
 	protected:
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_ImGuiSrvHeap;		// 提供给ImGui的着色器资源描述符堆
+		DescriptorHeap m_ImGuiSrvHeap;		// 提供给ImGui的着色器资源描述符堆
 	};
 
 	template<typename Driver>
@@ -48,22 +50,16 @@ namespace DSM {
 
 		ImGui::StyleColorsDark();
 
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NodeMask = 0;
-		desc.NumDescriptors = 64;
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		if (device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(m_ImGuiSrvHeap.GetAddressOf())) != S_OK)
-			return false;
+		auto handle = m_ImGuiSrvHeap.Allocate();
 
 		ImGui_ImplWin32_Init(hMainWnd);
 		ImGui_ImplDX12_Init(
 			device,
 			frameCount,
 			bufferFormat,
-			m_ImGuiSrvHeap.Get(),
-			m_ImGuiSrvHeap->GetCPUDescriptorHandleForHeapStart(),
-			m_ImGuiSrvHeap->GetGPUDescriptorHandleForHeapStart());
+			m_ImGuiSrvHeap.GetHeap(),
+			handle,
+			handle);
 
 		return true;
 	}
@@ -87,11 +83,12 @@ namespace DSM {
 	void BaseImGuiManager<Driver>::RenderImGui(ID3D12GraphicsCommandList* cmdList)
 	{
 		ImGui::Render();
-		cmdList->SetDescriptorHeaps(1, m_ImGuiSrvHeap.GetAddressOf());
+		auto heap = m_ImGuiSrvHeap.GetHeap();
+		cmdList->SetDescriptorHeaps(1, &heap);
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList);
 	}
 
-	template<typename Driver>
+    template<typename Driver>
 	BaseImGuiManager<Driver> ::~BaseImGuiManager()
 	{
 		ImGui_ImplDX12_Shutdown();
