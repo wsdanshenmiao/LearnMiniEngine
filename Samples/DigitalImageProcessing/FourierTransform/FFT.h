@@ -189,7 +189,7 @@ namespace DSM{
             uint32_t vertStages = std::log2(Math::NextPowerOf2(height));
             std::array<DescriptorHandle, 2> inputSRVs = { m_TmpSRV, outputSRV };
             std::array<DescriptorHandle, 2> outputUAVs = { outputUAV, m_TmpUAV };
-            if((inverse && (horizStages + vertStages) % 2 == 0) || (horizStages + vertStages) % 2 != 0){
+            if (inverse == (horizStages + vertStages) % 2 == 0) {
                 std::swap(inputSRVs[0], inputSRVs[1]);
                 std::swap(outputUAVs[0], outputUAVs[1]);
             }

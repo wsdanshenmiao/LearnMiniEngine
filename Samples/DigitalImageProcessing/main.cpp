@@ -307,15 +307,15 @@ public:
 
         m_RayTracer->TraceRays(cmdList.GetComputeCommandList());
 
-        // m_DFT.ExecuteDFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
-        // ImguiManager::GetInstance().ftOutputHandle = m_DFT.GetDFTDebugSRV();
-        // m_DFT.ExecuteIDFT(cmdList.GetComputeCommandList(), m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
-        // ImguiManager::GetInstance().iftOuputHandle = m_DFT.GetIDFTSRV();
+        m_DFT.ExecuteDFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
+        ImguiManager::GetInstance().ftOutputTex = &m_DFT.GetDFTDebugOutputTex();
+        m_DFT.ExecuteIDFT(cmdList.GetComputeCommandList(), m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
+        ImguiManager::GetInstance().iftOutputTex = &m_DFT.GetIDFTOutputTex();
 
-        m_FFT.ExecuteFFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
-        ImguiManager::GetInstance().ftOutputTex = &m_FFT.GetFFTDebugTex();
-        m_FFT.ExecuteIFFT(cmdList.GetComputeCommandList(), m_FFT.GetFFTOutputTex(), m_FFT.GetFFTOutputSRV());
-        ImguiManager::GetInstance().iftOutputTex = &m_FFT.GetIFFTOutputTex();
+        // m_FFT.ExecuteFFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
+        // ImguiManager::GetInstance().ftOutputTex = &m_FFT.GetFFTDebugTex();
+        // m_FFT.ExecuteIFFT(cmdList.GetComputeCommandList(), m_FFT.GetFFTOutputTex(), m_FFT.GetFFTOutputSRV());
+        // ImguiManager::GetInstance().iftOutputTex = &m_FFT.GetIFFTOutputTex();
 
         assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);

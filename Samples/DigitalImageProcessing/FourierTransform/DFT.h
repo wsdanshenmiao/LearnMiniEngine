@@ -53,8 +53,7 @@ namespace DSM{
 
             m_DFTVerticPSO.SetRootSignature(m_RootSig);
             auto verticCSDesc = horizCSDesc;
-            verticCSDesc.m_EnterPoint = "LuminanceDFTCS";
-            verticCSDesc.m_Defines.AddDefine("IS_VERTIC_DFT", "1");
+            verticCSDesc.m_Defines.AddDefine("IS_VERTICAL", "1");
             if(m_EnableDebug){
                 verticCSDesc.m_Defines.AddDefine("ENABLE_DEBUG_OUTPUT", "1");
             }
@@ -65,15 +64,15 @@ namespace DSM{
             // IDFT
             m_IDFTHorizPSO.SetRootSignature(m_RootSig);
             auto idftHorizCSDesc = horizCSDesc;
-            idftHorizCSDesc.m_EnterPoint = "LuminanceIDFTCS";
+            idftHorizCSDesc.m_Defines.AddDefine("IS_INVERSE_DFT", "1");
             ShaderByteCode idftHorizCS{idftHorizCSDesc};
             m_IDFTHorizPSO.SetComputeShader(idftHorizCS);
             m_IDFTHorizPSO.Finalize();
 
             m_IDFTVerticPSO.SetRootSignature(m_RootSig);
             auto idftVerticCSDesc = horizCSDesc;
-            idftVerticCSDesc.m_Defines.AddDefine("IS_VERTIC_DFT", "1");
-            idftVerticCSDesc.m_EnterPoint = "LuminanceIDFTCS";
+            idftVerticCSDesc.m_Defines.AddDefine("IS_VERTICAL", "1");
+            idftVerticCSDesc.m_Defines.AddDefine("IS_INVERSE_DFT", "1");
             ShaderByteCode idftVerticCS{idftVerticCSDesc};
             m_IDFTVerticPSO.SetComputeShader(idftVerticCS);
             m_IDFTVerticPSO.Finalize();
@@ -148,16 +147,15 @@ namespace DSM{
             m_DFTTmpTex.CreateUnorderedAccessView(m_DFTTmpUAV);
             m_DFTTmpTex.CreateShaderResourceView(m_DFTTmpSRV);
 
+            m_IDFTOutputTex.Create(L"IDFT Output Texture", texDesc);
+            m_IDFTTmpTex.Create(L"IDFT Temp Texture", texDesc);
+
             if(m_EnableDebug){
                 texDesc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 m_DFTDebugOutputTex.Create(L"DFT Debug Output Texture", texDesc);
                 m_DFTDebugOutputTex.CreateUnorderedAccessView(m_DFTDebugUAV);
                 m_DFTDebugOutputTex.CreateShaderResourceView(m_DFTDebugSRV);
             }
-
-            texDesc.m_Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-            m_IDFTOutputTex.Create(L"IDFT Output Texture", texDesc);
-            m_IDFTTmpTex.Create(L"IDFT Temp Texture", texDesc);
 
             m_IDFTOutputTex.CreateUnorderedAccessView(m_IDFTOutputUAV);
             m_IDFTOutputTex.CreateShaderResourceView(m_IDFTOutputSRV);
