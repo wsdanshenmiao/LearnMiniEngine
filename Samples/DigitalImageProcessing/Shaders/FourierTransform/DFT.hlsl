@@ -1,7 +1,7 @@
 #include "../Complex.hlsli"
 
 #ifndef THREAD_SIZE
-#define THREAD_SIZE 512
+#define THREAD_SIZE 256
 #endif
 
 static const float sPI = 3.14159265359f;
@@ -83,8 +83,11 @@ void LuminanceDFTCS(
 
     [loop]
     for (uint i = 0; i < len; ++i) {
-        if(i == start)
+        if(i == start){
             i += THREAD_SIZE;
+            if(i >= len)
+                break;
+        }
 #if defined(IS_VERTICAL)
         uint2 index = uint2(u, i);
 #else

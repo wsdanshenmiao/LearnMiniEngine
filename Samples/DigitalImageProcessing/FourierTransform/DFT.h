@@ -179,7 +179,7 @@ namespace DSM{
         DescriptorHandle GetDFTDebugSRV() const { return m_DFTDebugSRV; }
 
     private:
-        static constexpr uint32_t sm_ThreadSize = 512;
+        static constexpr uint32_t sm_ThreadSize = 256;
 
         const bool m_EnableDebug = true;
 

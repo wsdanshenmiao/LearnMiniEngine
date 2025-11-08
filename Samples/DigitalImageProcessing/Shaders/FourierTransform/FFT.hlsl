@@ -62,7 +62,7 @@ void ConvertData(uint3 dispatchThreadID : SV_DispatchThreadID)
 void BitReverseCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width, height;
-    gFFTInputTex.GetDimensions(width, height);
+    gFFTOutputTex.GetDimensions(width, height);
 
     uint selectedID = dispatchThreadID.x;
     uint constantID = dispatchThreadID.y;
@@ -82,7 +82,11 @@ void BitReverseCS(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint2 reverseID = uint2(reverseIndex, constantID);
     if(swap)
         reverseID = reverseID.yx;
-    gFFTOutputTex[dispatchThreadID.xy] = gFFTInputTex[reverseID].xy;
+    if(selectedID < reverseIndex){
+        float2 origin = gFFTOutputTex[dispatchThreadID.xy].xy;
+        gFFTOutputTex[dispatchThreadID.xy] = gFFTOutputTex[reverseID];
+        gFFTOutputTex[reverseID] = origin;
+    }
 }
 
 [numthreads(THREAD_SIZE, 1, 1)]
@@ -119,8 +123,8 @@ void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 #if defined(IS_VERTICAL)
     texIndex1 = uint2(globalID.x, index1);
 #endif
-    Complex fEven = Complex(gFFTInputTex[globalID].xy);
-    Complex fOdd = Complex(gFFTInputTex[texIndex1].xy);
+    Complex fEven = Complex(gFFTOutputTex[globalID].xy);
+    Complex fOdd = Complex(gFFTOutputTex[texIndex1].xy);
 
     Butterfly(fEven, fOdd, twiddle);
 
@@ -144,7 +148,7 @@ void IFFTScale(uint3 dispatchThreadID : SV_DispatchThreadID)
     if(dispatchThreadID.x >= width || dispatchThreadID.y >= height)
         return;
 
-    gFFTOutputTex[dispatchThreadID.xy] = gFFTInputTex[dispatchThreadID.xy].xy / float(width * height);
+    gFFTOutputTex[dispatchThreadID.xy] = gFFTOutputTex[dispatchThreadID.xy].xy / float(width * height);
 }
 
 

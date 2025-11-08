@@ -19,8 +19,6 @@ namespace DSM{
         {
             m_FFTOutputUAV = g_Renderer.m_TextureHeap.Allocate();
             m_FFTOutputSRV = g_Renderer.m_TextureHeap.Allocate();
-            m_TmpUAV = g_Renderer.m_TextureHeap.Allocate();
-            m_TmpSRV = g_Renderer.m_TextureHeap.Allocate();
             m_IFFTOutputUAV = g_Renderer.m_TextureHeap.Allocate();
             m_IFFTOutputSRV = g_Renderer.m_TextureHeap.Allocate();
 
@@ -62,14 +60,14 @@ namespace DSM{
             std::vector<std::pair<std::string, std::string>> defines{};
             createPSO(m_FFTConvertDataPSO, "ConvertData");
             createPSO(m_IFFTScalePSO, "IFFTScale");
+            if(m_EnabledDebugOutput){
+                defines.emplace_back("ENABLE_DEBUG_OUTPUT", "1");
+            }
 
             createPSO(m_FFTHorizBitReversedPSO, "BitReverseCS", defines);
             createPSO(m_FFTHorizPSO, "LuminanceFFTCS", defines);
 
             defines.emplace_back("IS_VERTICAL", "1");
-            if(m_EnabledDebugOutput){
-                defines.emplace_back("ENABLE_DEBUG_OUTPUT", "1");
-            }
             createPSO(m_FFTVerticBitReversedPSO, "BitReverseCS", defines);
             createPSO(m_FFTVerticPSO, "LuminanceFFTCS", defines);
         }
@@ -108,12 +106,6 @@ namespace DSM{
             m_FFTOutputTex.Create(L"FFT Output Texture", fftOutputDesc);
             m_FFTOutputTex.CreateUnorderedAccessView(m_FFTOutputUAV);
             m_FFTOutputTex.CreateShaderResourceView(m_FFTOutputSRV);
-
-            TextureDesc fftTmpDesc = fftOutputDesc;
-            m_TmpTex.Create(L"FFT Temporary Texture", fftTmpDesc);
-            m_TmpTex.CreateUnorderedAccessView(m_TmpUAV);
-            m_TmpTex.CreateShaderResourceView(m_TmpSRV);
-
             TextureDesc ifftOutputDesc = fftOutputDesc;
             m_IFFTOutputTex.Create(L"IFFT Output Texture", ifftOutputDesc);
             m_IFFTOutputTex.CreateUnorderedAccessView(m_IFFTOutputUAV);
@@ -187,13 +179,6 @@ namespace DSM{
             uint32_t height = outputTex.GetHeight();
             uint32_t horizStages = std::log2(Math::NextPowerOf2(width));
             uint32_t vertStages = std::log2(Math::NextPowerOf2(height));
-            std::array<DescriptorHandle, 2> inputSRVs = { m_TmpSRV, outputSRV };
-            std::array<DescriptorHandle, 2> outputUAVs = { outputUAV, m_TmpUAV };
-            if (inverse == (horizStages + vertStages) % 2 == 0) {
-                std::swap(inputSRVs[0], inputSRVs[1]);
-                std::swap(outputUAVs[0], outputUAVs[1]);
-            }
-            uint32_t bufferIndex = 0;
             FFTConstants constants{0, -1};
             if(inverse){
                 constants.sign = 1;
@@ -201,44 +186,33 @@ namespace DSM{
 
             cmdList.SetRootSignature(m_FFTRootSig);
 
-            initFunc(outputUAVs[bufferIndex % 2] == outputUAV ?
-                outputTex : m_TmpTex, outputUAVs[bufferIndex % 2]);
-            bufferIndex++;
+            initFunc(outputTex, outputUAV);
 
             // 水平FFT
             cmdList.SetPipelineState(m_FFTHorizBitReversedPSO);
-            cmdList.SetDescriptorTable(0, inputSRVs[bufferIndex % 2]);
-            cmdList.SetDescriptorTable(1, outputUAVs[bufferIndex % 2]);
+            cmdList.SetDescriptorTable(1, outputUAV);
             cmdList.SetShaderResource(2, m_HorizReverseIndicesBuffer);
             cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-            cmdList.InsertUAVBarrier(outputUAVs[bufferIndex % 2] == outputUAV ?
-                outputTex : m_TmpTex, true);
-            bufferIndex++;
+            cmdList.InsertUAVBarrier(outputTex, true);
 
             cmdList.SetPipelineState(m_FFTHorizPSO);
             if(m_EnabledDebugOutput){
                 cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
             }
             for(uint32_t stage = 0; stage < horizStages; ++stage){
-                cmdList.SetDescriptorTable(0, inputSRVs[bufferIndex % 2]);
-                cmdList.SetDescriptorTable(1, outputUAVs[bufferIndex % 2]);
+                cmdList.SetDescriptorTable(1, outputUAV);
                 constants.stage = stage;
                 cmdList.SetConstantArray(3, 2, &constants);
                 cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-                cmdList.InsertUAVBarrier(outputUAVs[bufferIndex % 2] == outputUAV ? 
-                    outputTex : m_TmpTex, true);
-                bufferIndex++;
+                cmdList.InsertUAVBarrier(outputTex, true);
             }
 
             // 垂直FFT
             cmdList.SetPipelineState(m_FFTVerticBitReversedPSO);
-            cmdList.SetDescriptorTable(0, inputSRVs[bufferIndex % 2]);
-            cmdList.SetDescriptorTable(1, outputUAVs[bufferIndex % 2]);
+            cmdList.SetDescriptorTable(1, outputUAV);
             cmdList.SetShaderResource(2, m_VerticReverseIndicesBuffer);
             cmdList.Dispatch2D(width, height, 1, sm_ThreadSize);
-            cmdList.InsertUAVBarrier(outputUAVs[bufferIndex % 2] == outputUAV ? 
-                outputTex : m_TmpTex, true);
-            bufferIndex++;
+            cmdList.InsertUAVBarrier(outputTex, true);
 
             cmdList.SetPipelineState(m_FFTVerticPSO);
             if(m_EnabledDebugOutput){
@@ -246,21 +220,16 @@ namespace DSM{
             }
             vertStages = std::log2(Math::NextPowerOf2(height));
             for(uint32_t stage = 0; stage < vertStages; ++stage){
-                cmdList.SetDescriptorTable(0, inputSRVs[bufferIndex % 2]);
-                cmdList.SetDescriptorTable(1, outputUAVs[bufferIndex % 2]);
+                cmdList.SetDescriptorTable(1, outputUAV);
                 constants.stage = stage;
                 cmdList.SetConstantArray(3, 2, &constants);
                 cmdList.Dispatch2D(height, width, sm_ThreadSize, 1);
-                cmdList.InsertUAVBarrier(outputUAVs[bufferIndex % 2] == outputUAV ?
-                    outputTex : m_TmpTex, true);
-                bufferIndex++;
+                cmdList.InsertUAVBarrier(outputTex, true);
             }
             if(inverse){
                 cmdList.SetPipelineState(m_IFFTScalePSO);
-                cmdList.SetDescriptorTable(0, inputSRVs[bufferIndex % 2]);
-                cmdList.SetDescriptorTable(1, outputUAVs[bufferIndex % 2]);
+                cmdList.SetDescriptorTable(1, outputUAV);
                 cmdList.Dispatch2D(width, height, 32, 32);
-                bufferIndex++;
             }
 
             cmdList.ExecuteCommandList(true);
@@ -285,10 +254,6 @@ namespace DSM{
         Texture m_FFTOutputTex;
         DescriptorHandle m_FFTOutputUAV{};
         DescriptorHandle m_FFTOutputSRV{};
-
-        Texture m_TmpTex;
-        DescriptorHandle m_TmpUAV{};
-        DescriptorHandle m_TmpSRV{};
 
         Texture m_IFFTOutputTex;
         DescriptorHandle m_IFFTOutputUAV{};
