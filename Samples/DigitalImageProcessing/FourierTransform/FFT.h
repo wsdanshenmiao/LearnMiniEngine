@@ -66,10 +66,12 @@ namespace DSM{
 
             createPSO(m_FFTHorizBitReversedPSO, "BitReverseCS", defines);
             createPSO(m_FFTHorizPSO, "LuminanceFFTCS", defines);
+            createPSO(m_FFTHorizGroupMemPSO, "LuminanceFFTCSWithGroupMem", defines);
 
             defines.emplace_back("IS_VERTICAL", "1");
             createPSO(m_FFTVerticBitReversedPSO, "BitReverseCS", defines);
             createPSO(m_FFTVerticPSO, "LuminanceFFTCS", defines);
+            createPSO(m_FFTVerticGroupMemPSO, "LuminanceFFTCSWithGroupMem", defines);
         }
 
         void ExecuteFFT(ComputeCommandList& cmdList, Texture& inputTex, DescriptorHandle inputSRV)
@@ -179,53 +181,82 @@ namespace DSM{
             uint32_t height = outputTex.GetHeight();
             uint32_t horizStages = std::log2(Math::NextPowerOf2(width));
             uint32_t vertStages = std::log2(Math::NextPowerOf2(height));
-            FFTConstants constants{0, -1};
+            FFTConstants constants{
+                .numStages = 1,
+                .stage = 0,
+                .sign = -1.0f
+            };
             if(inverse){
                 constants.sign = 1;
             }
+
+            auto computeFFT = [&](auto& bitReversePSO,
+                auto& groupMemPSO,
+                auto& fftPSO,
+                GpuBuffer& indicesBuffer,
+                uint32_t numStages,
+                uint32_t axisStages,
+                uint32_t width, 
+                uint32_t height){
+                cmdList.SetPipelineState(bitReversePSO);
+                cmdList.SetDescriptorTable(1, outputUAV);
+                cmdList.SetShaderResource(2, indicesBuffer);
+                cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
+                cmdList.InsertUAVBarrier(outputTex, true);
+
+                cmdList.SetPipelineState(groupMemPSO);
+                if(m_EnabledDebugOutput){
+                    cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
+                }
+                cmdList.SetDescriptorTable(1, outputUAV);
+                constants.numStages = numStages;
+                constants.stage = 0;
+                cmdList.SetConstantArray(3, sizeof(FFTConstants) / sizeof(uint32_t), &constants);
+                cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
+                cmdList.InsertUAVBarrier(outputTex, true);
+
+                cmdList.SetPipelineState(fftPSO);
+                if(m_EnabledDebugOutput){
+                    cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
+                }
+                constants.numStages = 1;
+                for(uint32_t stage = numStages; stage < axisStages; ++stage){
+                    cmdList.SetDescriptorTable(1, outputUAV);
+                    constants.stage = stage;
+                    cmdList.SetConstantArray(3, sizeof(FFTConstants) / sizeof(uint32_t), &constants);
+                    cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
+                    cmdList.InsertUAVBarrier(outputTex, true);
+                }
+            };
 
             cmdList.SetRootSignature(m_FFTRootSig);
 
             initFunc(outputTex, outputUAV);
 
             // 水平FFT
-            cmdList.SetPipelineState(m_FFTHorizBitReversedPSO);
-            cmdList.SetDescriptorTable(1, outputUAV);
-            cmdList.SetShaderResource(2, m_HorizReverseIndicesBuffer);
-            cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-            cmdList.InsertUAVBarrier(outputTex, true);
-
-            cmdList.SetPipelineState(m_FFTHorizPSO);
-            if(m_EnabledDebugOutput){
-                cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
-            }
-            for(uint32_t stage = 0; stage < horizStages; ++stage){
-                cmdList.SetDescriptorTable(1, outputUAV);
-                constants.stage = stage;
-                cmdList.SetConstantArray(3, 2, &constants);
-                cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-                cmdList.InsertUAVBarrier(outputTex, true);
-            }
+            uint32_t numStages = (std::min)(uint32_t(std::log2(sm_ThreadSize)), horizStages);
+            computeFFT(
+                m_FFTHorizBitReversedPSO,
+                m_FFTHorizGroupMemPSO,
+                m_FFTHorizPSO,
+                m_HorizReverseIndicesBuffer,
+                numStages,
+                horizStages,
+                width,
+                height);
 
             // 垂直FFT
-            cmdList.SetPipelineState(m_FFTVerticBitReversedPSO);
-            cmdList.SetDescriptorTable(1, outputUAV);
-            cmdList.SetShaderResource(2, m_VerticReverseIndicesBuffer);
-            cmdList.Dispatch2D(width, height, 1, sm_ThreadSize);
-            cmdList.InsertUAVBarrier(outputTex, true);
+            numStages = (std::min)(uint32_t(std::log2(sm_ThreadSize)), vertStages);
+            computeFFT(
+                m_FFTVerticBitReversedPSO,
+                m_FFTVerticGroupMemPSO,
+                m_FFTVerticPSO,
+                m_VerticReverseIndicesBuffer,
+                numStages,
+                vertStages,
+                height,
+                width);
 
-            cmdList.SetPipelineState(m_FFTVerticPSO);
-            if(m_EnabledDebugOutput){
-                cmdList.SetDescriptorTable(4, m_FFTDebugUAV);
-            }
-            vertStages = std::log2(Math::NextPowerOf2(height));
-            for(uint32_t stage = 0; stage < vertStages; ++stage){
-                cmdList.SetDescriptorTable(1, outputUAV);
-                constants.stage = stage;
-                cmdList.SetConstantArray(3, 2, &constants);
-                cmdList.Dispatch2D(height, width, sm_ThreadSize, 1);
-                cmdList.InsertUAVBarrier(outputTex, true);
-            }
             if(inverse){
                 cmdList.SetPipelineState(m_IFFTScalePSO);
                 cmdList.SetDescriptorTable(1, outputUAV);
@@ -239,6 +270,7 @@ namespace DSM{
     private:
         struct FFTConstants
         {
+            uint32_t numStages;
             uint32_t stage;
             float sign;
         };
@@ -265,6 +297,8 @@ namespace DSM{
 
         RootSignature m_FFTRootSig;
 
+        ComputePSO m_FFTHorizGroupMemPSO;
+        ComputePSO m_FFTVerticGroupMemPSO;
         ComputePSO m_FFTHorizPSO;
         ComputePSO m_FFTVerticPSO;
         

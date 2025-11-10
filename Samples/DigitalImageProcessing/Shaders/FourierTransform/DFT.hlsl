@@ -77,6 +77,7 @@ void LuminanceDFTCS(
 #endif
 
     // 先计算共享内存中的 DFT
+    [unroll(THREAD_SIZE)]
     for (uint i = 0; i < THREAD_SIZE && (start + i) < len; ++i) {
         sum = cadd(sum, CalculateDFT(DataCache[i], selectedDim, i + start, factor));
     }

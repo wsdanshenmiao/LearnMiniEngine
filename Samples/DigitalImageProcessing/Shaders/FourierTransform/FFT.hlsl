@@ -27,9 +27,11 @@ StructuredBuffer<uint> gReverseIndices : register(t1);
 RWTexture2D<float4> gDebugOutputTex : register(u1);
 #endif
 
+groupshared Complex DataCache[THREAD_SIZE];
 
 cbuffer FFTConstants : register(b0)
 {
+    uint gNumStages;
     uint gStage;
     float gSign; // FFT 时为负，IFFT 时为正
 }
@@ -54,40 +56,86 @@ void ConvertData(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 
-#if defined(IS_VERTICAL)
-[numthreads(1, THREAD_SIZE, 1)]
-#else
 [numthreads(THREAD_SIZE, 1, 1)]
-#endif
 void BitReverseCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width, height;
     gFFTOutputTex.GetDimensions(width, height);
 
-    uint selectedID = dispatchThreadID.x;
-    uint constantID = dispatchThreadID.y;
+    uint2 globalID = dispatchThreadID.xy;
     uint dimension = width;
     bool swap = false;
 
 #if defined(IS_VERTICAL)
-    selectedID = dispatchThreadID.y;
-    constantID = dispatchThreadID.x;
+    globalID = globalID.yx;
     dimension = height;
     swap = true;
 #endif
 
-    if(selectedID >= dimension)
+    if(dispatchThreadID.x >= dimension)
         return;
-    uint reverseIndex = gReverseIndices[selectedID];
-    uint2 reverseID = uint2(reverseIndex, constantID);
+    uint reverseIndex = gReverseIndices[dispatchThreadID.x];
+    uint2 reverseID = uint2(reverseIndex, dispatchThreadID.y);
     if(swap)
         reverseID = reverseID.yx;
-    if(selectedID < reverseIndex){
-        float2 origin = gFFTOutputTex[dispatchThreadID.xy].xy;
-        gFFTOutputTex[dispatchThreadID.xy] = gFFTOutputTex[reverseID];
+    if(dispatchThreadID.x < reverseIndex){
+        float2 origin = gFFTOutputTex[globalID].xy;
+        gFFTOutputTex[globalID] = gFFTOutputTex[reverseID];
         gFFTOutputTex[reverseID] = origin;
     }
 }
+
+[numthreads(THREAD_SIZE, 1, 1)]
+void LuminanceFFTCSWithGroupMem(
+    uint3 groupThreadID : SV_GroupThreadID, 
+    uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    uint2 globalID = dispatchThreadID.xy;
+    uint selectedID = globalID.x;
+    uint selectedGroupThreadID = groupThreadID.x;
+
+#if defined(IS_VERTICAL)
+    globalID = globalID.yx;
+#endif
+
+    uint width, height;
+    gFFTOutputTex.GetDimensions(width, height);
+    if(globalID.x >= width || globalID.y >= height)
+        return;
+
+    DataCache[selectedGroupThreadID] = Complex(gFFTOutputTex[globalID]);
+    GroupMemoryBarrierWithGroupSync();
+
+    for(uint stage = 0; stage < gNumStages; ++stage){
+        uint butterStep = 1u << (stage + gStage);
+        uint groupSize = butterStep << 1;   // 每个蝶形组的大小
+
+        uint groupOffset = selectedGroupThreadID % groupSize;
+        uint index1 = selectedGroupThreadID + butterStep;
+        if(groupOffset < butterStep && index1 < THREAD_SIZE){
+            float angle = gSign * sTwoPI * groupOffset / groupSize;
+            Complex twiddle = cexp(angle);
+
+            Complex fEven = DataCache[selectedGroupThreadID];
+            Complex fOdd = DataCache[index1];
+
+            Butterfly(fEven, fOdd, twiddle);
+
+            DataCache[selectedGroupThreadID] = fEven;
+            DataCache[index1] = fOdd;
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    gFFTOutputTex[globalID] = DataCache[selectedGroupThreadID].value;
+#if defined(ENABLE_DEBUG_OUTPUT)
+    if(gSign == -1){
+        gDebugOutputTex[globalID] = float4(length(gFFTOutputTex[globalID]).rrr / (width + height), 1);
+    }
+#endif
+}
+
 
 [numthreads(THREAD_SIZE, 1, 1)]
 void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -138,7 +186,6 @@ void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 #endif
 }
-
 
 [numthreads(32, 32, 1)]
 void IFFTScale(uint3 dispatchThreadID : SV_DispatchThreadID)
