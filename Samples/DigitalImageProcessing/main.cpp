@@ -390,7 +390,7 @@ int WinMain(
 {
     try {
         RayTracingApp sandbox{};
-        return GameCore::RunApplication(sandbox, 512, 512, "DSMEngine", hInstance, nShowCmd);
+        return GameCore::RunApplication(sandbox, 1024, 720, "DSMEngine", hInstance, nShowCmd);
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';

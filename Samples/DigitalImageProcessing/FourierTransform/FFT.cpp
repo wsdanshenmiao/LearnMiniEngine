@@ -72,7 +72,7 @@ namespace DSM {
 
         auto rect = RECT{0, 0, static_cast<LONG>(inputTex.GetWidth()), static_cast<LONG>(inputTex.GetHeight())};
         cmdList.CopyTextureRegion(m_FFTOutputTex, 0, 0, 0, inputTex, rect);
-        Execute(cmdList, false);
+        Execute(cmdList, m_FFTOutputTex, m_FFTOutputUAV, false);
     }
     
     void FFT::ExecuteIFFT(ComputeCommandList &cmdList, Texture &inputTex, DescriptorHandle inputSRV)
@@ -87,7 +87,7 @@ namespace DSM {
 
         auto rect = RECT{0, 0, static_cast<LONG>(inputTex.GetWidth()), static_cast<LONG>(inputTex.GetHeight())};
         cmdList.CopyTextureRegion(m_IFFTOutputTex, 0, 0, 0, inputTex, rect);
-        Execute(cmdList, true);
+        Execute(cmdList, m_IFFTOutputTex, m_IFFTOutputUAV, true);
     }
     
     void FFT::Resize(uint32_t width, uint32_t height)
@@ -146,12 +146,8 @@ namespace DSM {
             reverseIndices.data());
     }
     
-    void FFT::Execute(ComputeCommandList &cmdList, bool inverse)
+    void FFT::Execute(ComputeCommandList &cmdList, Texture& outputTex, DescriptorHandle outputUAV, bool inverse)
     {
-        auto& outputTex = inverse ? m_IFFTOutputTex : m_FFTOutputTex;
-        auto& outputUAV = inverse ? m_IFFTOutputUAV : m_FFTOutputUAV;
-        auto& outputSRV = inverse ? m_IFFTOutputSRV : m_FFTOutputSRV;
-        
         uint32_t width = outputTex.GetWidth();
         uint32_t height = outputTex.GetHeight();
         uint32_t horizStages = std::log2(Math::NextPowerOf2(width));
@@ -236,6 +232,6 @@ namespace DSM {
             cmdList.Dispatch2D(width, height, 32, 32);
         }
 
-        cmdList.ExecuteCommandList(true);
+        cmdList.ExecuteCommandList();
     }
 }

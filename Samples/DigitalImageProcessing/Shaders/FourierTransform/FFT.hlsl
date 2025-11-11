@@ -120,15 +120,19 @@ void LuminanceFFTCSWithGroupMem(
 void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint2 globalID = dispatchThreadID.xy;
+    
+    uint width, height;
+    gFFTOutputTex.GetDimensions(width, height);
+
     uint selectedID = globalID.x;
+    uint selectedDim = width;
 
 #if defined(IS_VERTICAL)
     globalID = globalID.yx;
     selectedID = globalID.y;
+    selectedDim = height;
 #endif
 
-    uint width, height;
-    gFFTOutputTex.GetDimensions(width, height);
     if(globalID.x >= width || globalID.y >= height)
         return;
     
@@ -140,7 +144,7 @@ void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
         return;
     
     uint index1 = selectedID + butterStep;
-    if(index1 >= width)
+    if(index1 >= selectedDim)
         return;
 
     float angle = gSign * sTwoPI * groupOffset / groupSize;

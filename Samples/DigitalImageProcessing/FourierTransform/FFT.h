@@ -33,7 +33,7 @@ namespace DSM{
 
     private:
         void CreateReverseIndicesBuffer(uint32_t width, uint32_t height);
-        void Execute(ComputeCommandList& cmdList, bool inverse);
+        void Execute(ComputeCommandList& cmdList, Texture& outputTex, DescriptorHandle outputUAV, bool inverse);
 
     private:
         struct FFTConstants
@@ -58,6 +58,8 @@ namespace DSM{
         Texture m_IFFTOutputTex;
         DescriptorHandle m_IFFTOutputUAV{};
         DescriptorHandle m_IFFTOutputSRV{};
+
+        Texture m_TmpTex;
 
         Texture m_FFTDebugTex;
         DescriptorHandle m_FFTDebugSRV{};
