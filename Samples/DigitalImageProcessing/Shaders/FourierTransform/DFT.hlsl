@@ -28,13 +28,7 @@ Complex CalculateDFT(Complex fxy, float u, float x, float factor)
 
 Complex GetInputData(uint2 index)
 {
-#if defined(IS_VERTICAL) || defined(IS_INVERSE_DFT)
     Complex fxy = Complex(gDFTInputTex[index].xy);
-#else
-    float4 data = gDFTInputTex[index];
-    float luminance = dot(data.rgb, float3(0.299f, 0.587f, 0.114f));
-    Complex fxy = Complex(float2(luminance, 0.0f));
-#endif
     return fxy;
 }
 
@@ -67,7 +61,7 @@ void LuminanceDFTCS(
     uint2 threadIndex = uint2(u, v);
 
     // 储存数据到组内共享内存
-    DataCache[groupThreadID.x] = GetInputData(threadIndex);
+    DataCache[groupThreadID.x] = Complex(gDFTInputTex[threadIndex].xy);
     GroupMemoryBarrierWithGroupSync();
     
     Complex sum = Complex(float2(0.0f, 0.0f));
@@ -94,7 +88,7 @@ void LuminanceDFTCS(
 #else
         uint2 index = uint2(i, v);
 #endif
-        Complex fxy = GetInputData(index);
+        Complex fxy = Complex(gDFTInputTex[index].xy);
         sum = cadd(sum, CalculateDFT(fxy, selectedDim, i, factor));
     }
 #if defined(IS_INVERSE_DFT)

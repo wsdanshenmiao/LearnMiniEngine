@@ -237,6 +237,21 @@ public:
         m_DFT.Initialize(width, height);
         m_FFT.Initialize(width, height);
 
+        m_LuminanceSRV = g_Renderer.m_TextureHeap.Allocate();
+        m_LuminanceUAV = g_Renderer.m_TextureHeap.Allocate();
+        m_CalcuLuminanceRootSig[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+        m_CalcuLuminanceRootSig[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+        m_CalcuLuminanceRootSig.Finalize(L"CalcuLuminanceRootSig");
+        m_CalcuLuminancePSO.SetRootSignature(m_CalcuLuminanceRootSig);
+        ShaderByteCode luminanceCS{ShaderDesc{
+            .m_Type = ShaderType::Compute,
+            .m_Mode = ShaderMode::SM_6_6,
+            .m_FileName = "Shaders/CalculateLuminance.hlsl",
+            .m_EnterPoint = "CalculateLuminance"
+        }};
+        m_CalcuLuminancePSO.SetComputeShader(luminanceCS);
+        m_CalcuLuminancePSO.Finalize();
+
         m_Camera = std::make_unique<Camera>();
 		OnResize(width, height);
         m_Camera->SetPosition({ 0, 0, -2 * scale });
@@ -285,6 +300,10 @@ public:
         texDesc.m_Height = height;
         texDesc.m_Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         texDesc.m_Format = DXGI_FORMAT_R32G32_FLOAT;
+        texDesc.m_Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        m_LuminanceTex.Create(L"LuminanceTex", texDesc);
+        m_LuminanceTex.CreateUnorderedAccessView(m_LuminanceUAV);
+        m_LuminanceTex.CreateShaderResourceView(m_LuminanceSRV);
     }
 
     virtual void Update(float deltaTime) override
@@ -304,17 +323,25 @@ public:
         auto rect = RECT{0, 0, static_cast<long>(width), static_cast<long>(height)};
 
         GraphicsCommandList cmdList{ L"Render Scene" };
+        auto& computeCmdList = cmdList.GetComputeCommandList();
 
-        m_RayTracer->TraceRays(cmdList.GetComputeCommandList());
+        m_RayTracer->TraceRays(computeCmdList);
 
-        // m_DFT.ExecuteDFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
+        computeCmdList.SetRootSignature(m_CalcuLuminanceRootSig);
+        computeCmdList.SetPipelineState(m_CalcuLuminancePSO);
+        computeCmdList.SetDescriptorTable(0, g_Renderer.m_OutputSRV);
+        computeCmdList.SetDescriptorTable(1, m_LuminanceUAV);
+        computeCmdList.Dispatch2D(width, height, 32, 32);
+        computeCmdList.InsertUAVBarrier(m_LuminanceTex, true);
+
+        // m_DFT.ExecuteDFT(computeCmdList, m_LuminanceTex, m_LuminanceSRV);
         // ImguiManager::GetInstance().ftOutputTex = &m_DFT.GetDFTDebugOutputTex();
-        // m_DFT.ExecuteIDFT(cmdList.GetComputeCommandList(), m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
+        // m_DFT.ExecuteIDFT(computeCmdList, m_DFT.GetDFTOutputTex(), m_DFT.GetDFTSRV());
         // ImguiManager::GetInstance().iftOutputTex = &m_DFT.GetIDFTOutputTex();
 
-        m_FFT.ExecuteFFT(cmdList.GetComputeCommandList(), g_Renderer.m_RayTracingOutput, g_Renderer.m_OutputSRV);
+        m_FFT.ExecuteFFT(computeCmdList, m_LuminanceTex, m_LuminanceSRV);
         ImguiManager::GetInstance().ftOutputTex = &m_FFT.GetFFTDebugTex();
-        m_FFT.ExecuteIFFT(cmdList.GetComputeCommandList(), m_FFT.GetFFTOutputTex(), m_FFT.GetFFTOutputSRV());
+        m_FFT.ExecuteIFFT(computeCmdList, m_FFT.GetFFTOutputTex(), m_FFT.GetFFTOutputSRV());
         ImguiManager::GetInstance().iftOutputTex = &m_FFT.GetIFFTOutputTex();
 
         assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
@@ -343,6 +370,12 @@ private:
     std::unique_ptr<Camera> m_Camera{};
     std::unique_ptr<CameraController> m_CameraController{};
     D3D12_RECT m_Scissor{};
+
+    RootSignature m_CalcuLuminanceRootSig{2, 0};
+    ComputePSO m_CalcuLuminancePSO{};
+    Texture m_LuminanceTex{};
+    DescriptorHandle m_LuminanceSRV{};
+    DescriptorHandle m_LuminanceUAV{};
 
     std::unique_ptr<RayTracer> m_RayTracer{};
     DFT m_DFT{};

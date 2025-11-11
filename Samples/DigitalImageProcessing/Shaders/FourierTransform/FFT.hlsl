@@ -19,9 +19,8 @@ void Butterfly(inout Complex a, inout Complex b, Complex twiddle)
 static const float sPI = 3.14159265359f;
 static const float sTwoPI = 6.28318530718f;
 
-Texture2D gFFTInputTex : register(t0);
 RWTexture2D<float2> gFFTOutputTex : register(u0);
-StructuredBuffer<uint> gReverseIndices : register(t1);
+StructuredBuffer<uint> gReverseIndices : register(t0);
 
 #if defined(ENABLE_DEBUG_OUTPUT)
 RWTexture2D<float4> gDebugOutputTex : register(u1);
@@ -35,26 +34,6 @@ cbuffer FFTConstants : register(b0)
     uint gStage;
     float gSign; // FFT 时为负，IFFT 时为正
 }
-
-[numthreads(32, 32, 1)]
-void ConvertData(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    uint inputWidth, inputHeight;
-    gFFTInputTex.GetDimensions(inputWidth, inputHeight);
-    uint outputWidth, outputHeight;
-    gFFTOutputTex.GetDimensions(outputWidth, outputHeight);
-    if(dispatchThreadID.x >= inputWidth || dispatchThreadID.y >= inputHeight){
-        if(dispatchThreadID.x < outputWidth && dispatchThreadID.y < outputHeight){
-            gFFTOutputTex[dispatchThreadID.xy] = float2(0, 0);
-        }
-        return;
-    }
-
-    float4 data = gFFTInputTex[dispatchThreadID.xy];
-    float luminance = dot(data.rgb, float3(0.299f, 0.587f, 0.114f));
-    gFFTOutputTex[dispatchThreadID.xy] = float2(luminance, 0);
-}
-
 
 [numthreads(THREAD_SIZE, 1, 1)]
 void BitReverseCS(uint3 dispatchThreadID : SV_DispatchThreadID)
