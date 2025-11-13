@@ -331,7 +331,7 @@ public:
         computeCmdList.SetPipelineState(m_CalcuLuminancePSO);
         computeCmdList.SetDescriptorTable(0, g_Renderer.m_OutputSRV);
         computeCmdList.SetDescriptorTable(1, m_LuminanceUAV);
-        computeCmdList.Dispatch2D(width, height, 32, 32);
+        computeCmdList.Dispatch2D(width, height, 16, 16);
         computeCmdList.InsertUAVBarrier(m_LuminanceTex, true);
 
         // m_DFT.ExecuteDFT(computeCmdList, m_LuminanceTex, m_LuminanceSRV);
@@ -390,7 +390,7 @@ int WinMain(
 {
     try {
         RayTracingApp sandbox{};
-        return GameCore::RunApplication(sandbox, 1024, 720, "DSMEngine", hInstance, nShowCmd);
+        return GameCore::RunApplication(sandbox, 512, 512, "DSMEngine", hInstance, nShowCmd);
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';

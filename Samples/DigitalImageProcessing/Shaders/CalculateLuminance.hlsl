@@ -1,7 +1,7 @@
 Texture2D gInputTex : register(t0);
 RWTexture2D<float2> gOutputTex : register(u0);
 
-[numthreads(32, 32, 1)]
+[numthreads(16, 16, 1)]
 void CalculateLuminance(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     float4 data = gInputTex[dispatchThreadID.xy];

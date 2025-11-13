@@ -10,9 +10,7 @@ namespace DSM{
     class FFT
     {
     public:
-        FFT(bool enabledOutput = true) : 
-            m_EnabledDebugOutput(enabledOutput), 
-            m_FFTRootSig{enabledOutput ? 4u : 3u, 0} {}
+        FFT(bool enabledOutput = true);
 
         void Initialize(uint32_t width, uint32_t height);
 
@@ -33,7 +31,11 @@ namespace DSM{
 
     private:
         void CreateReverseIndicesBuffer(uint32_t width, uint32_t height);
-        void Execute(ComputeCommandList& cmdList, Texture& outputTex, DescriptorHandle outputUAV, bool inverse);
+        void ExecuteRadix2(ComputeCommandList& cmdList, Texture& outputTex, DescriptorHandle outputUAV, bool inverse);
+        void Execute(ComputeCommandList& cmdList,
+            Texture& inputTex, DescriptorHandle inputSRV,
+            Texture& outputTex, DescriptorHandle outputUAV, 
+            bool inverse);
 
     private:
         struct FFTConstants
@@ -49,7 +51,9 @@ namespace DSM{
 
         // 位反转后的索引
         GpuBuffer m_HorizReverseIndicesBuffer{};
+        DescriptorHandle m_HorizReverseIndicesSRV{};
         GpuBuffer m_VerticReverseIndicesBuffer{};
+        DescriptorHandle m_VerticReverseIndicesSRV{};
 
         Texture m_FFTOutputTex;
         DescriptorHandle m_FFTOutputUAV{};
@@ -59,11 +63,16 @@ namespace DSM{
         DescriptorHandle m_IFFTOutputUAV{};
         DescriptorHandle m_IFFTOutputSRV{};
 
-        Texture m_TmpTex;
-
         Texture m_FFTDebugTex;
         DescriptorHandle m_FFTDebugSRV{};
         DescriptorHandle m_FFTDebugUAV{};
+
+        Texture m_ConvolutionKernelTex;
+        DescriptorHandle m_ConvolutionKernelUAV{};
+        DescriptorHandle m_ConvolutionKernelSRV{};
+        Texture m_SequenceTex;
+        DescriptorHandle m_SequenceUAV{};
+        DescriptorHandle m_SequenceSRV{};
 
         RootSignature m_FFTRootSig;
 
@@ -76,6 +85,10 @@ namespace DSM{
         ComputePSO m_FFTVerticBitReversedPSO;
 
         ComputePSO m_IFFTScalePSO;
+
+        ComputePSO m_CalcuSequencePSO{};
+        ComputePSO m_FrequencyMultiplicationPSO{};
+        ComputePSO m_PhaseFactorPSO{};
     };
 }
 

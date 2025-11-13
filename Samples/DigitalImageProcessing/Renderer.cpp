@@ -302,6 +302,7 @@ namespace DSM {
         dispatchDesc.Depth = 1;
         cmdList.GetDXRCommandList()->SetPipelineState1(g_Renderer.m_RayTracingStateObject.Get());
         cmdList.GetDXRCommandList()->DispatchRays(&dispatchDesc);
+        cmdList.ExecuteCommandList();
     }
 
     void RayTracer::AddModel(std::shared_ptr<Model> model)

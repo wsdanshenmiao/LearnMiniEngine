@@ -1,6 +1,3 @@
-#ifndef __FFT_HLSL__
-#define __FFT_HLSL__
-
 #include "../Complex.hlsli"
 
 #ifndef THREAD_SIZE
@@ -65,7 +62,7 @@ void BitReverseCS(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 [numthreads(THREAD_SIZE, 1, 1)]
-void LuminanceFFTCSWithGroupMem(
+void FFTRadix2WithGroupMemCS(
     uint3 groupThreadID : SV_GroupThreadID, 
     uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -117,7 +114,7 @@ void LuminanceFFTCSWithGroupMem(
 
 
 [numthreads(THREAD_SIZE, 1, 1)]
-void LuminanceFFTCS(uint3 dispatchThreadID : SV_DispatchThreadID)
+void FFTRadix2CS(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint2 globalID = dispatchThreadID.xy;
     
@@ -181,5 +178,3 @@ void IFFTScale(uint3 dispatchThreadID : SV_DispatchThreadID)
     gFFTOutputTex[dispatchThreadID.xy] = gFFTOutputTex[dispatchThreadID.xy].xy / float(width * height);
 }
 
-
-#endif

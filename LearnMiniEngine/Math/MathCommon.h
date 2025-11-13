@@ -48,6 +48,12 @@ namespace DSM::Math {
 
         return val;
     }
+
+    template <std::unsigned_integral T>
+    inline bool IsPowerOf2(T val)
+    {
+        return (val != 0) && ((val & (val - 1)) == 0);
+    }
     
     template <typename T> requires std::is_arithmetic_v<T>
     __forceinline constexpr T AlignUp( T value, std::uint64_t alignment ) noexcept
