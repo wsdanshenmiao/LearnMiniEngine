@@ -1,6 +1,6 @@
 #include "FFT.h"
 #include "Graphics/ShaderCompiler.h"
-#include "../Renderer.h"
+#include "../../Renderer.h"
 #include <complex>
 #include <numbers>
 
@@ -56,7 +56,7 @@ namespace DSM {
         };
 
         // 基2 FFT
-        std::string fftRadix2FileName = "Shaders/FourierTransform/FFTRadix2.hlsl";
+        std::string fftRadix2FileName = "Shaders/DigitalImageProcessing/FFTRadix2.hlsl";
         std::vector<std::pair<std::string, std::string>> defines{};
         createPSO(m_IFFTScalePSO, fftRadix2FileName, "IFFTScale");
         if(m_EnabledDebugOutput){
@@ -73,7 +73,7 @@ namespace DSM {
         createPSO(m_FFTVerticGroupMemPSO, fftRadix2FileName, "FFTRadix2WithGroupMemCS", defines);
 
         // Bluestein FFT
-        std::string fftBluesteinFileName = "Shaders/FourierTransform/FFTBluestein.hlsl";
+        std::string fftBluesteinFileName = "Shaders/DigitalImageProcessing/FFTBluestein.hlsl";
         createPSO(m_CalcuSequencePSO, fftBluesteinFileName, "CalcuSequenceCS");
         createPSO(m_FrequencyMultiplicationPSO, fftBluesteinFileName, "FrequencyMultiplicationCS");
         createPSO(m_PhaseFactorPSO, fftBluesteinFileName, "PhaseFactorCS");

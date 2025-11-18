@@ -4,7 +4,6 @@
 #define THREAD_SIZE 256
 #endif
 
-static const float sPI = 3.14159265359f;
 static const float sTwoPI = 6.28318530718f;
 
 Texture2D gDFTInputTex : register(t0);

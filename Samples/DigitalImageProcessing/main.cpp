@@ -17,8 +17,9 @@
 #include "Renderer.h"
 #include "ModelLoader.h"
 #include "ProceduralGeometry.h"
-#include "FourierTransform/DFT.h"
-#include "FourierTransform//FFT.h"
+#include "DigitalImageProcessing/FourierTransform/DFT.h"
+#include "DigitalImageProcessing/FourierTransform/FFT.h"
+#include "DigitalImageProcessing/DCT.h"
 #include <numbers>
 
 
@@ -236,6 +237,7 @@ public:
 
         m_DFT.Initialize(width, height);
         m_FFT.Initialize(width, height);
+        m_DCT.Initialize(width, height);
 
         m_LuminanceSRV = g_Renderer.m_TextureHeap.Allocate();
         m_LuminanceUAV = g_Renderer.m_TextureHeap.Allocate();
@@ -295,6 +297,7 @@ public:
         g_Renderer.OnResize(width, height);
         m_DFT.Resize(width, height);
         m_FFT.Resize(width, height);
+        m_DCT.Resize(width, height);
         TextureDesc texDesc;
         texDesc.m_Width = width;
         texDesc.m_Height = height;
@@ -344,6 +347,11 @@ public:
         m_FFT.ExecuteIFFT(computeCmdList, m_FFT.GetFFTOutputTex(), m_FFT.GetFFTOutputSRV());
         ImguiManager::GetInstance().iftOutputTex = &m_FFT.GetIFFTOutputTex();
 
+        // m_DCT.ExecuteDCT(computeCmdList, m_LuminanceTex, m_LuminanceSRV);
+        // ImguiManager::GetInstance().ftOutputTex = &m_DCT.GetDCTOutputTex();
+        // m_DCT.ExecuteIDCT(computeCmdList, m_DCT.GetDCTOutputTex(), m_DCT.GetDCTOutputSRV());
+        // ImguiManager::GetInstance().iftOutputTex = &m_DCT.GetIDCTOutputTex();
+
         assert(width == g_Renderer.m_RayTracingOutput.GetWidth() && height == g_Renderer.m_RayTracingOutput.GetHeight());
         cmdList.CopyTextureRegion(*swapChain.GetBackBuffer(), 0, 0, 0, g_Renderer.m_RayTracingOutput, rect);
         cmdList.TransitionResource(*swapChain.GetBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -380,6 +388,7 @@ private:
     std::unique_ptr<RayTracer> m_RayTracer{};
     DFT m_DFT{};
     FFT m_FFT{};
+    DCT m_DCT{};
 };
 
 int WinMain(
@@ -390,7 +399,7 @@ int WinMain(
 {
     try {
         RayTracingApp sandbox{};
-        return GameCore::RunApplication(sandbox, 512, 512, "DSMEngine", hInstance, nShowCmd);
+        return GameCore::RunApplication(sandbox, 1024, 768, "DSMEngine", hInstance, nShowCmd);
     }
     catch(const std::exception& e) {
         std::cerr << e.what() << '\n';

@@ -44,7 +44,7 @@ namespace DSM{
             ShaderDesc horizCSDesc{
                 .m_Type = ShaderType::Compute,
                 .m_Mode = ShaderMode::SM_6_6,
-                .m_FileName = "Shaders/FourierTransform/DFT.hlsl",
+                .m_FileName = "Shaders/DigitalImageProcessing/DFT.hlsl",
                 .m_EnterPoint = "LuminanceDFTCS"
             };
             ShaderByteCode horizDFTCS{horizCSDesc};
