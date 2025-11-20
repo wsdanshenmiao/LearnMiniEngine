@@ -8,6 +8,14 @@ using float4 = DSM::Math::Vector4;
 using float3x3 = DSM::Math::Matrix3;
 using float4x4 = DSM::Math::Matrix4;
 using uint = uint32_t;
+
+struct PCGState
+{
+    uint state;
+};
+
+#else
+#include "Random.hlsli"
 #endif
 
 
@@ -35,7 +43,7 @@ namespace RayTracing {
     {
         float4 color;
         uint depth;
-        uint seed;
+        PCGState rng;
     };
 
     // 自定义图元的属性

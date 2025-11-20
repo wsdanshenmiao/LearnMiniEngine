@@ -58,7 +58,6 @@ namespace DSM {
         // 基2 FFT
         std::string fftRadix2FileName = "Shaders/DigitalImageProcessing/FFTRadix2.hlsl";
         std::vector<std::pair<std::string, std::string>> defines{};
-        createPSO(m_IFFTScalePSO, fftRadix2FileName, "IFFTScale");
         if(m_EnabledDebugOutput){
             defines.emplace_back("ENABLE_DEBUG_OUTPUT", "1");
         }
@@ -66,11 +65,13 @@ namespace DSM {
         createPSO(m_FFTHorizBitReversedPSO, fftRadix2FileName, "BitReverseCS", defines);
         createPSO(m_FFTHorizPSO, fftRadix2FileName, "FFTRadix2CS", defines);
         createPSO(m_FFTHorizGroupMemPSO, fftRadix2FileName, "FFTRadix2WithGroupMemCS", defines);
+        createPSO(m_IFFTScaleHorizPSO, fftRadix2FileName, "IFFTScale");
 
         defines.emplace_back("IS_VERTICAL", "1");
         createPSO(m_FFTVerticBitReversedPSO, fftRadix2FileName, "BitReverseCS", defines);
         createPSO(m_FFTVerticPSO, fftRadix2FileName, "FFTRadix2CS", defines);
         createPSO(m_FFTVerticGroupMemPSO, fftRadix2FileName, "FFTRadix2WithGroupMemCS", defines);
+        createPSO(m_IFFTScaleVerticPSO, fftRadix2FileName, "IFFTScale");
 
         // Bluestein FFT
         std::string fftBluesteinFileName = "Shaders/DigitalImageProcessing/FFTBluestein.hlsl";
@@ -142,7 +143,8 @@ namespace DSM {
             // 预计算卷积核的 FFT
             ComputeCommandList cmdList{L"FFT Precompute Convolution Kernel"};
             cmdList.SetDescriptorHeap(g_Renderer.m_TextureHeap.GetHeap());
-            ExecuteRadix2(cmdList, m_ConvolutionKernelTex, m_ConvolutionKernelUAV, false);
+            ExecuteRadix2Horiz(cmdList, m_ConvolutionKernelTex, m_ConvolutionKernelUAV, false);
+            ExecuteRadix2Vertic(cmdList, m_ConvolutionKernelTex, m_ConvolutionKernelUAV, false);
         }
         else{   // 无需使用，节省显存
             m_ConvolutionKernelTex.Destroy();
@@ -217,95 +219,92 @@ namespace DSM {
             m_VerticReverseIndicesBuffer.GetResource(), &srvDesc, m_VerticReverseIndicesSRV);
     }
     
-    void FFT::ExecuteRadix2(ComputeCommandList &cmdList, Texture& outputTex, DescriptorHandle outputUAV, bool inverse)
+    void FFT::ExecuteRadix2(
+        ComputeCommandList &cmdList, 
+        Texture& outputTex, 
+        DescriptorHandle outputUAV, 
+        bool isVertic,
+        bool inverse)
     {
-        uint32_t width = outputTex.GetWidth();
-        uint32_t height = outputTex.GetHeight();
-        uint32_t horizStages = std::log2(Math::NextPowerOf2(width));
-        uint32_t vertStages = std::log2(Math::NextPowerOf2(height));
+        auto& bitReversePSO = isVertic ?  m_FFTVerticBitReversedPSO : m_FFTHorizBitReversedPSO;
+        auto& groupMemPSO = isVertic ? m_FFTVerticGroupMemPSO : m_FFTHorizGroupMemPSO;
+        auto& fftPSO = isVertic ? m_FFTVerticPSO : m_FFTHorizPSO;
+        auto& indicesBufferSRV = isVertic ? m_VerticReverseIndicesSRV : m_HorizReverseIndicesSRV;
+        auto& ifftScalePSO = isVertic ? m_IFFTScaleVerticPSO : m_IFFTScaleHorizPSO;
+
+        uint32_t width = isVertic ? outputTex.GetHeight() : outputTex.GetWidth();
+        uint32_t height = isVertic ? outputTex.GetWidth() : outputTex.GetHeight();
+        uint32_t axisStages = std::log2(Math::NextPowerOf2(width));
+        uint32_t numStages = (std::min)(uint32_t(std::log2(sm_ThreadSize)), axisStages);
         FFTConstants constants{
             .numStages = 1,
             .stage = 0,
             .sign = -1.0f
         };
         if(inverse){
-            constants.sign = 1;
+            constants.sign = 1.0f;
         }
-
-        auto computeFFT = [&](auto& bitReversePSO,
-            auto& groupMemPSO,
-            auto& fftPSO,
-            DescriptorHandle indicesBufferSRV,
-            uint32_t numStages,
-            uint32_t axisStages,
-            uint32_t width, 
-            uint32_t height){
-            cmdList.SetPipelineState(bitReversePSO);
-            cmdList.SetDescriptorTable(0, outputUAV);
-            cmdList.SetDescriptorTable(1, indicesBufferSRV);
-            cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-            cmdList.InsertUAVBarrier(outputTex, true);
-
-            cmdList.SetPipelineState(groupMemPSO);
-            if(m_EnabledDebugOutput){
-                cmdList.SetDescriptorTable(3, m_FFTDebugUAV);
-            }
-            cmdList.SetDescriptorTable(0, outputUAV);
-            constants.numStages = numStages;
-            constants.stage = 0;
-            cmdList.SetConstantArray(2, sizeof(FFTConstants) / sizeof(uint32_t), &constants);
-            cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-            cmdList.InsertUAVBarrier(outputTex, true);
-
-            cmdList.SetPipelineState(fftPSO);
-            if(m_EnabledDebugOutput){
-                cmdList.SetDescriptorTable(3, m_FFTDebugUAV);
-            }
-            constants.numStages = 1;
-            for(uint32_t stage = numStages; stage < axisStages; ++stage){
-                cmdList.SetDescriptorTable(0, outputUAV);
-                constants.stage = stage;
-                cmdList.SetConstantArray(2, sizeof(FFTConstants) / sizeof(uint32_t), &constants);
-                cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
-                cmdList.InsertUAVBarrier(outputTex, true);
-            }
-        };
 
         cmdList.SetRootSignature(m_FFTRootSig);
 
         // 水平FFT
-        uint32_t numStages = (std::min)(uint32_t(std::log2(sm_ThreadSize)), horizStages);
-        computeFFT(
-            m_FFTHorizBitReversedPSO,
-            m_FFTHorizGroupMemPSO,
-            m_FFTHorizPSO,
-            m_HorizReverseIndicesSRV,
-            numStages,
-            horizStages,
-            width,
-            height);
+        cmdList.SetPipelineState(bitReversePSO);
+        cmdList.SetDescriptorTable(0, outputUAV);
+        cmdList.SetDescriptorTable(1, indicesBufferSRV);
+        cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
+        cmdList.InsertUAVBarrier(outputTex, true);
 
-        // 垂直FFT
-        numStages = (std::min)(uint32_t(std::log2(sm_ThreadSize)), vertStages);
-        computeFFT(
-            m_FFTVerticBitReversedPSO,
-            m_FFTVerticGroupMemPSO,
-            m_FFTVerticPSO,
-            m_VerticReverseIndicesSRV,
-            numStages,
-            vertStages,
-            height,
-            width);
+        cmdList.SetPipelineState(groupMemPSO);
+        if(m_EnabledDebugOutput){
+            cmdList.SetDescriptorTable(3, m_FFTDebugUAV);
+        }
+        cmdList.SetDescriptorTable(0, outputUAV);
+        constants.numStages = numStages;
+        constants.stage = 0;
+        cmdList.SetConstantArray(2, sizeof(FFTConstants) / sizeof(uint32_t), &constants);
+        cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
+        cmdList.InsertUAVBarrier(outputTex, true);
+
+        cmdList.SetPipelineState(fftPSO);
+        if(m_EnabledDebugOutput){
+            cmdList.SetDescriptorTable(3, m_FFTDebugUAV);
+        }
+        constants.numStages = 1;
+        for(uint32_t stage = numStages; stage < axisStages; ++stage){
+            cmdList.SetDescriptorTable(0, outputUAV);
+            constants.stage = stage;
+            cmdList.SetConstantArray(2, sizeof(FFTConstants) / sizeof(uint32_t), &constants);
+            cmdList.Dispatch2D(width, height, sm_ThreadSize, 1);
+            cmdList.InsertUAVBarrier(outputTex, true);
+        }
 
         if(inverse){
-            cmdList.SetPipelineState(m_IFFTScalePSO);
+            cmdList.SetPipelineState(ifftScalePSO);
             cmdList.SetDescriptorTable(0, outputUAV);
-            cmdList.Dispatch2D(width, height, 32, 32);
+            cmdList.Dispatch2D(width, height, 16, 16);
         }
 
         cmdList.ExecuteCommandList();
     }
-    
+
+    void FFT::ExecuteRadix2Horiz(
+        ComputeCommandList &cmdList, 
+        Texture &outputTex, 
+        DescriptorHandle outputUAV, 
+        bool inverse)
+    {
+        ExecuteRadix2(cmdList, outputTex, outputUAV, false, inverse);
+    }
+
+    void FFT::ExecuteRadix2Vertic(
+        ComputeCommandList &cmdList,
+        Texture &outputTex,
+        DescriptorHandle outputUAV,
+        bool inverse)
+    {
+        ExecuteRadix2(cmdList, outputTex, outputUAV, true, inverse);
+    }
+
     void FFT::Execute(
         ComputeCommandList &cmdList, 
         Texture &inputTex, DescriptorHandle inputSRV, 
@@ -327,48 +326,49 @@ namespace DSM {
         if(isPowerOf2){
             auto rect = RECT{0, 0, static_cast<LONG>(inputTex.GetWidth()), static_cast<LONG>(inputTex.GetHeight())};
             cmdList.CopyTextureRegion(outputTex, 0, 0, 0, inputTex, rect);
-            ExecuteRadix2(cmdList, outputTex, outputUAV, inverse);
+            ExecuteRadix2Horiz(cmdList, outputTex, outputUAV, inverse);
+            ExecuteRadix2Vertic(cmdList, outputTex, outputUAV, inverse);
         }
         else{
-            std::array<float, 3> constants = { 0.0f, 0.0f, 0.0f };
-            constants[0] = inverse ? 1.0f : -1.0f;
+            // std::array<float, 3> constants = { 0.0f, 0.0f, 0.0f };
+            // constants[0] = inverse ? 1.0f : -1.0f;
 
-            uint32_t indicesWidth = Math::NextPowerOf2(width * 2 - 1);
-            uint32_t indicesHeight = Math::NextPowerOf2(height * 2 - 1);
-            cmdList.SetRootSignature(m_FFTRootSig);
+            // uint32_t indicesWidth = Math::NextPowerOf2(width * 2 - 1);
+            // uint32_t indicesHeight = Math::NextPowerOf2(height * 2 - 1);
+            // cmdList.SetRootSignature(m_FFTRootSig);
 
-            // 计算序列并转换到频域
-            cmdList.SetPipelineState(m_CalcuSequencePSO);
-            cmdList.SetDescriptorTable(0, m_SequenceUAV);
-            cmdList.SetDescriptorTable(1, inputSRV);
-            cmdList.SetConstantArray(2, constants.size(), constants.data());
-            cmdList.Dispatch2D(indicesWidth, indicesHeight, 16, 16);
-            cmdList.InsertUAVBarrier(m_SequenceTex, true);
+            // // 计算序列并转换到频域
+            // cmdList.SetPipelineState(m_CalcuSequencePSO);
+            // cmdList.SetDescriptorTable(0, m_SequenceUAV);
+            // cmdList.SetDescriptorTable(1, inputSRV);
+            // cmdList.SetConstantArray(2, constants.size(), constants.data());
+            // cmdList.Dispatch2D(indicesWidth, indicesHeight, 16, 16);
+            // cmdList.InsertUAVBarrier(m_SequenceTex, true);
 
-            ExecuteRadix2(cmdList, m_SequenceTex, m_SequenceUAV, false);
+            // ExecuteRadix2(cmdList, m_SequenceTex, m_SequenceUAV, false);
 
-            // 将频域空间的序列与卷积核相乘
-            cmdList.SetPipelineState(m_FrequencyMultiplicationPSO);
-            cmdList.SetDescriptorTable(0, m_SequenceUAV);
-            cmdList.SetDescriptorTable(1, m_ConvolutionKernelSRV);
-            cmdList.SetConstantArray(2, constants.size(), constants.data());
-            cmdList.Dispatch2D(indicesWidth, indicesHeight, 16, 16);
-            cmdList.InsertUAVBarrier(m_ConvolutionKernelTex, true);
+            // // 将频域空间的序列与卷积核相乘
+            // cmdList.SetPipelineState(m_FrequencyMultiplicationPSO);
+            // cmdList.SetDescriptorTable(0, m_SequenceUAV);
+            // cmdList.SetDescriptorTable(1, m_ConvolutionKernelSRV);
+            // cmdList.SetConstantArray(2, constants.size(), constants.data());
+            // cmdList.Dispatch2D(indicesWidth, indicesHeight, 16, 16);
+            // cmdList.InsertUAVBarrier(m_ConvolutionKernelTex, true);
 
-            // 进行逆变换
-            ExecuteRadix2(cmdList, m_SequenceTex, m_SequenceUAV, true);
+            // // 进行逆变换
+            // ExecuteRadix2(cmdList, m_SequenceTex, m_SequenceUAV, true);
 
-            // 乘上相位因子
-            cmdList.SetPipelineState(m_PhaseFactorPSO);
-            cmdList.SetDescriptorTable(0, outputUAV);
-            cmdList.SetDescriptorTable(1, m_SequenceSRV);
-            cmdList.SetConstantArray(2, constants.size(), constants.data());
-            if(m_EnabledDebugOutput){
-                cmdList.SetDescriptorTable(3, m_FFTDebugUAV);
-            }
-            cmdList.Dispatch2D(width, height, 16, 16);
+            // // 乘上相位因子
+            // cmdList.SetPipelineState(m_PhaseFactorPSO);
+            // cmdList.SetDescriptorTable(0, outputUAV);
+            // cmdList.SetDescriptorTable(1, m_SequenceSRV);
+            // cmdList.SetConstantArray(2, constants.size(), constants.data());
+            // if(m_EnabledDebugOutput){
+            //     cmdList.SetDescriptorTable(3, m_FFTDebugUAV);
+            // }
+            // cmdList.Dispatch2D(width, height, 16, 16);
 
-            cmdList.ExecuteCommandList();
+            // cmdList.ExecuteCommandList();
         }
     }
 }

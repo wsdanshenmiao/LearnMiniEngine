@@ -167,7 +167,7 @@ void FFTRadix2CS(uint3 dispatchThreadID : SV_DispatchThreadID)
 #endif
 }
 
-[numthreads(32, 32, 1)]
+[numthreads(16, 16, 1)]
 void IFFTScale(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width, height;
@@ -175,6 +175,10 @@ void IFFTScale(uint3 dispatchThreadID : SV_DispatchThreadID)
     if(dispatchThreadID.x >= width || dispatchThreadID.y >= height)
         return;
 
-    gFFTOutputTex[dispatchThreadID.xy] = gFFTOutputTex[dispatchThreadID.xy].xy / float(width * height);
+    float scale = 1.0f / float(width);
+#if defined(IS_VERTICAL)
+    scale = 1.0f / float(height);
+#endif
+    gFFTOutputTex[dispatchThreadID.xy] = gFFTOutputTex[dispatchThreadID.xy].xy * scale;
 }
 

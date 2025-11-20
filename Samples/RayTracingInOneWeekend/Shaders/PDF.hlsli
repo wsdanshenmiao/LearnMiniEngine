@@ -205,26 +205,26 @@ float GetMixturePDFValue(PDFType pdfTypes[2], Ray incomingRay, Ray scatterRay, S
 
 
 // Sample PDF
-float3 SampleSpherePDF(inout uint state)
+float3 SampleSpherePDF(inout PCGState rng)
 {
-    return RandomUnitVector(state);
+    return RandomUnitVector(rng);
 }
 
-float3 SampleCosinePDF(float3 normal, inout uint state)
+float3 SampleCosinePDF(float3 normal, inout PCGState rng)
 {
-    return OrthonormalBasisTransform(normal, RandomCosineDirection(state));
+    return OrthonormalBasisTransform(normal, RandomCosineDirection(rng));
 }
 
 // 球体的重要性采样
-float3 SampleSphereImportanceSamplingPDF(float3 origin, uint primitiveDataOffset, inout uint state)
+float3 SampleSphereImportanceSamplingPDF(float3 origin, uint primitiveDataOffset, inout PCGState rng)
 {
     RayTracing::ImportanceSampling::SphereData sphere = GetSphereData(primitiveDataOffset);
 
     float3 direction = sphere.center - origin;
     float distanceSquared = dot(direction, direction);
     
-    float r1 = RandomFloat(state);
-    float r2 = RandomFloat(state);
+    float r1 = RandomFloat(rng);
+    float r2 = RandomFloat(rng);
     float cosThetaMax = sqrt(1 - sphere.radius * sphere.radius / distanceSquared);
     float z = 1 + r2 * (cosThetaMax - 1);
     float sinTheta = sqrt(1 - z * z);
@@ -237,46 +237,46 @@ float3 SampleSphereImportanceSamplingPDF(float3 origin, uint primitiveDataOffset
     return OrthonormalBasisTransform(direction, sampleDir);
 }
 
-float3 SampleQuadImportanceSamplingPDF(float3 origin, uint primitiveDataOffset, inout uint state)
+float3 SampleQuadImportanceSamplingPDF(float3 origin, uint primitiveDataOffset, inout PCGState rng)
 {
     RayTracing::ImportanceSampling::QuadData quad = GetQuadData(primitiveDataOffset);
     // 在四边形上随机取一个点
-    float3 p = quad.q + (RandomFloat(state) * quad.u) + (RandomFloat(state) * quad.v);
+    float3 p = quad.q + (RandomFloat(rng) * quad.u) + (RandomFloat(rng) * quad.v);
     return p - origin;
 }
 
-float3 SampleImportanceSamplingPDF(float3 origin, inout uint state)
+float3 SampleImportanceSamplingPDF(float3 origin, inout PCGState rng)
 {
     uint size = gSceneCB.numImportanceSamplingObjects;
     if(size <= 0)
         return 0;
 
-    uint index = RandomUint(state, 0, size - 1);
+    uint index = RandomUint(rng, 0, size - 1);
     RayTracing::ImportanceSampling::ImportanceSamplingObject obj = gImportanceSamplingObjects[index];
     
     switch(obj.type){
     case RayTracing::ImportanceSampling::ImportanceSamplingPrimitiveType::Sphere: {
-        return SampleSphereImportanceSamplingPDF(origin, obj.primitiveDataOffset, state);
+        return SampleSphereImportanceSamplingPDF(origin, obj.primitiveDataOffset, rng);
     }
     case RayTracing::ImportanceSampling::ImportanceSamplingPrimitiveType::Quad: {
-        return SampleQuadImportanceSamplingPDF(origin, obj.primitiveDataOffset, state);
+        return SampleQuadImportanceSamplingPDF(origin, obj.primitiveDataOffset, rng);
     }
     default:
         return 0;
     }
 }
 
-float3 SamplePDF(PDFType pdfType, Surface surface, inout uint state)
+float3 SamplePDF(PDFType pdfType, Surface surface, inout PCGState rng)
 {
     switch(pdfType) {
     case PDFType::SpherePDF: {
-        return SampleSpherePDF(state);
+        return SampleSpherePDF(rng);
     }
     case PDFType::CosinePDF: {
-        return SampleCosinePDF(surface.normal, state);
+        return SampleCosinePDF(surface.normal, rng);
     }
     case PDFType::ImportanceSamplingPDF: {
-        return SampleImportanceSamplingPDF(surface.position, state);
+        return SampleImportanceSamplingPDF(surface.position, rng);
     }
     default:
         return 0;
@@ -284,10 +284,10 @@ float3 SamplePDF(PDFType pdfType, Surface surface, inout uint state)
 }
 
 
-float3 SampleMixturePDF(PDFType pdfTypes[2], Surface surface, inout uint state)
+float3 SampleMixturePDF(PDFType pdfTypes[2], Surface surface, inout PCGState rng)
 {
-    PDFType selectedPDF = RandomFloat(state) < 0.5f ? pdfTypes[0] : pdfTypes[1];
-    return SamplePDF(selectedPDF, surface, state);
+    PDFType selectedPDF = RandomFloat(rng) < 0.5f ? pdfTypes[0] : pdfTypes[1];
+    return SamplePDF(selectedPDF, surface, rng);
 }
 
 

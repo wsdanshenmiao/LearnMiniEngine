@@ -31,7 +31,22 @@ namespace DSM{
 
     private:
         void CreateReverseIndicesBuffer(uint32_t width, uint32_t height);
-        void ExecuteRadix2(ComputeCommandList& cmdList, Texture& outputTex, DescriptorHandle outputUAV, bool inverse);
+        void ExecuteRadix2(
+            ComputeCommandList& cmdList, 
+            Texture& outputTex, 
+            DescriptorHandle outputUAV,
+            bool isVertic, 
+            bool inverse);
+        void ExecuteRadix2Horiz(
+            ComputeCommandList& cmdList, 
+            Texture& outputTex, 
+            DescriptorHandle outputUAV,
+            bool inverse);
+        void ExecuteRadix2Vertic(
+            ComputeCommandList& cmdList, 
+            Texture& outputTex, 
+            DescriptorHandle outputUAV,
+            bool inverse);
         void Execute(ComputeCommandList& cmdList,
             Texture& inputTex, DescriptorHandle inputSRV,
             Texture& outputTex, DescriptorHandle outputUAV, 
@@ -84,7 +99,8 @@ namespace DSM{
         ComputePSO m_FFTHorizBitReversedPSO;
         ComputePSO m_FFTVerticBitReversedPSO;
 
-        ComputePSO m_IFFTScalePSO;
+        ComputePSO m_IFFTScaleHorizPSO;
+        ComputePSO m_IFFTScaleVerticPSO;
 
         ComputePSO m_CalcuSequencePSO{};
         ComputePSO m_FrequencyMultiplicationPSO{};

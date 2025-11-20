@@ -30,17 +30,17 @@ struct GenerateCameraRayParams
     float3 defocusV;
 };
 
-RayTracing::Ray GenerateCameraRay(GenerateCameraRayParams params, inout uint seed)
+RayTracing::Ray GenerateCameraRay(GenerateCameraRayParams params, inout PCGState rng)
 {
     // 在像素内随机取样
-    float2 offset = RandomFloat2(seed) + params.subPixelIndex;
+    float2 offset = RandomFloat2(rng) + params.subPixelIndex;
     offset *= params.invSPP;
     offset -= 0.5f;
     float2 pixelOffset = float2(params.index) + offset;
     float3 pixelSample = params.viewportStart + pixelOffset.x * params.pixelDeltaU + pixelOffset.y * params.pixelDeltaV;
 
     // 进行散焦模糊的随机偏移
-    float2 defocusDisk = RandomInUnitDisk(seed);
+    float2 defocusDisk = RandomInUnitDisk(rng);
     float3 center = params.cameraPos + defocusDisk.x * params.defocusU + defocusDisk.y * params.defocusV;
 
     RayTracing::Ray ray;
@@ -57,7 +57,7 @@ float3 GetHitAttributes(float3 attributes[3], float2 barycentrics)
 }
 
 
-float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
+float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout PCGState rng)
 {
     [branch]
     if(depth >= MAX_TRACE_RECURSION_DEPTH) {
@@ -73,7 +73,7 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
     RayTracing::RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
     payload.depth = depth + 1;
-    payload.seed = seed;
+    payload.rng = rng;
     TraceRay(gScene, 
         RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 
         RayTracing::TraceRayParameters::InstanceMark, 
@@ -83,7 +83,7 @@ float4 TraceRadianceRay(RayTracing::Ray ray, uint depth, inout uint seed)
         rayDesc, 
         payload);
 
-    seed = payload.seed;
+    rng = payload.rng;
     
     return payload.color;
 }
@@ -95,14 +95,14 @@ float4 GetColor(inout RayTracing::RayPayload payload, Surface surface)
     ScatterRecord scatterRecord;
     float4 color = 0;
     [branch]
-    if(!GetMaterialScatter(lMaterialCB, surface, scatterRecord, payload.seed)){
+    if(!GetMaterialScatter(lMaterialCB, surface, scatterRecord, payload.rng)){
         return float4(scatterRecord.emission, 1);
     }
 
     // 是否需要根据 PDF 进行采样
     [branch]
     if(scatterRecord.skipPDF) {
-        color = TraceRadianceRay(scatterRecord.scatterRay, payload.depth, payload.seed);
+        color = TraceRadianceRay(scatterRecord.scatterRay, payload.depth, payload.rng);
         color *= float4(scatterRecord.attenuation, 1);
     }
     else{
@@ -113,7 +113,7 @@ float4 GetColor(inout RayTracing::RayPayload payload, Surface surface)
         }
 
         // 根据 pdf 进行采样
-        float3 pdfSampleDir = SampleMixturePDF(pdfTypes, surface, payload.seed);
+        float3 pdfSampleDir = SampleMixturePDF(pdfTypes, surface, payload.rng);
 
         Ray scatterRay;
         scatterRay.origin = surface.position;
@@ -124,7 +124,7 @@ float4 GetColor(inout RayTracing::RayPayload payload, Surface surface)
         // 材质在特定方向进行散射的概率
         float scatterPDF = GetScatteringPDF(lMaterialCB.type, incomingRay, scatterRay, surface);
         
-        color = TraceRadianceRay(scatterRay, payload.depth, payload.seed);
+        color = TraceRadianceRay(scatterRay, payload.depth, payload.rng);
         color = (color * float4(scatterRecord.attenuation, 1) * scatterPDF) / pdfVal;
     }
 
@@ -151,7 +151,7 @@ void RaygenShader()
     uint frameIndex = uint(gSceneCB.viewportUAndFrameIndex.w);
 
     // 初始化随机数状态
-    uint pcgState = PCG_Init(index, asuint(frameIndex * totalTime));
+    PCGState pcgState = PCG_Init(index, asuint(frameIndex * totalTime));
 
     // 计算摄像机光线参数
     float3 front = normalize(cross(viewportV, viewportU));

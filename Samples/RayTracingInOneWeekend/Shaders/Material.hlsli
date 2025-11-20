@@ -54,7 +54,7 @@ bool ScatterLambertian(
     Surface surface, 
     uint matDataOffset, 
     out ScatterRecord scatterRecord,
-    inout uint seed)
+    inout PCGState rng)
 {
     RayTracing::MaterialType::LambertianMatData matData = GetLambertianMaterialData(matDataOffset);
 
@@ -69,14 +69,14 @@ bool ScatterMetal(
     Surface surface, 
     uint matDataOffset,  
     out ScatterRecord scatterRecord,
-    inout uint seed)
+    inout PCGState rng)
 {
     scatterRecord.emission = float3(0,0,0);
     
     RayTracing::MaterialType::MetalMatData matData = GetMetalMaterialData(matDataOffset);
     // 反射光线
     float3 reflected = reflect(WorldRayDirection(), surface.normal);
-    float3 scatterDir = reflected + matData.fuzz * RandomUnitVector(seed);
+    float3 scatterDir = reflected + matData.fuzz * RandomUnitVector(rng);
     scatterRecord.attenuation = surface.color * matData.albedo;
     scatterRecord.scatterRay.origin = surface.position;
     scatterRecord.scatterRay.direction = scatterDir;
@@ -89,7 +89,7 @@ bool ScatterDielectric(
     Surface surface, 
     uint matDataOffset, 
     out ScatterRecord scatterRecord,
-    inout uint seed)
+    inout PCGState rng)
 {
     scatterRecord.emission = float3(0,0,0);
 
@@ -114,7 +114,7 @@ bool ScatterDielectric(
     float condition = r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 
     // 根据蒙特卡洛方法决定反射或折射
-    if(cannotRefract || condition > RandomFloat(seed)){
+    if(cannotRefract || condition > RandomFloat(rng)){
         scatterRecord.scatterRay.direction = reflect(unitDirection, surface.normal);
     } else {
         scatterRecord.scatterRay.direction = refract(unitDirection, surface.normal, refractionRatio);
@@ -128,7 +128,7 @@ bool ScatterDiffuseLight(
     Surface surface, 
     uint matDataOffset,
     out ScatterRecord scatterRecord,
-    inout uint seed)
+    inout PCGState rng)
 {
     // 发光材质不散射光线
     scatterRecord.attenuation = float3(0,0,0);
@@ -144,20 +144,20 @@ bool GetMaterialScatter(
     MaterialConstants materialCB, 
     Surface surface,
     out ScatterRecord scatterRecord,
-    inout uint seed)
+    inout PCGState rng)
 {
     switch(materialCB.type) {
     case RayTracing::MaterialType::Lambertian: {
-        return ScatterLambertian(surface, materialCB.matDataOffset, scatterRecord, seed);
+        return ScatterLambertian(surface, materialCB.matDataOffset, scatterRecord, rng);
     }
     case RayTracing::MaterialType::Metal: {
-        return ScatterMetal(surface, materialCB.matDataOffset, scatterRecord, seed);
+        return ScatterMetal(surface, materialCB.matDataOffset, scatterRecord, rng);
     }
     case RayTracing::MaterialType::Dielectric: {
-        return ScatterDielectric(surface, materialCB.matDataOffset, scatterRecord, seed);
+        return ScatterDielectric(surface, materialCB.matDataOffset, scatterRecord, rng);
     }
     case RayTracing::MaterialType::DiffuseLight: {
-        return ScatterDiffuseLight(surface, materialCB.matDataOffset, scatterRecord, seed);
+        return ScatterDiffuseLight(surface, materialCB.matDataOffset, scatterRecord, rng);
     }
     default:
         return false;
